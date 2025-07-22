@@ -44,12 +44,13 @@ struct Frame
 // 1 row of a frame.
 struct FrameRow
 {
-	int note[8] = { -1, 8, -1, -1, -1, -1, -1, -1 };
-	int instrument[8] = { -1, 12, 2, -1, -1, -1, 3, -1 };
-	int volume[8] = { -1, 1, -1, -1, -1, -1, 8, -1 };
-	int effect[8] = { -1, 7, -1, -1, -1, -1, -1, -1 };
-	int effectValue[8] = { -1, 38, -1, -1, -1, -1, -1, -1 };
+	int note[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+	int instrument[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+	int volume[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+	int effect[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+	int effectValue[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
 };
+
 
 
 // An unrolled frame object

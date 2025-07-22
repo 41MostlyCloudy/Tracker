@@ -40,7 +40,14 @@ int selectedOctave = 4;
 // 0 = Song name
 int selectedButton = -1;
 Vector2 selectedTile;
-float frameListScroll = 0.0f;
+int selectedSample = 0;
+
+
+int frameListScroll = 0.0f;
+float frameScroll = 0.0f;
+
+Vector2 noteSelectionStart;
+Vector2 noteSelectionEnd;
 
 
 uint8_t uiColors[12][3] =
