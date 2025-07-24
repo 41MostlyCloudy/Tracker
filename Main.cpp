@@ -19,6 +19,8 @@
 #include "stb_image.h"
 #include "Draw.cpp"
 #include "FileHandling.cpp"
+#include "FrameHandling.cpp"
+#include "SongHandling.cpp"
 
 
 
@@ -153,6 +155,9 @@ void RunEngine()
 
     // Set buttons to unpressed state.
     releaseButton();
+
+    // Show the samples currently in the "Samples" file.
+    LoadSamples();
     
 
     // Loop until the user closes the window
@@ -161,6 +166,10 @@ void RunEngine()
         // Start the delta timer
         std::chrono::high_resolution_clock time;
         auto start = time.now();
+
+
+        if (playingSong) // Play the song.
+            stepSong();
 
         if (mouseDown)
         {
@@ -380,6 +389,27 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
                         selectedTile.x--;
                 }
             }
+            else // Delete note
+            {
+                int selectedChannel = int((noteSelectionStart.x) / 11.0f);
+                int selectedPart = int(noteSelectionStart.x) % 11;
+
+
+                if (selectedPart < 5) // Playing keys
+                {
+                    loadedFrame.rows[loadedSong.currentNote].note[selectedChannel] = -1;
+                    loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = -1;
+                }
+                else if (selectedPart == 5 || selectedPart == 6) // Volume
+                {
+                    loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] = -1;
+                }
+                else if (selectedPart > 6) // Effect
+                {
+                    loadedFrame.rows[loadedSong.currentNote].effect[selectedChannel] = -1;
+                    loadedFrame.rows[loadedSong.currentNote].effectValue[selectedChannel] = -1;
+                }
+            }
         }
         
         if (key == GLFW_KEY_UP || key == GLFW_KEY_KP_8) // Move up
@@ -436,6 +466,31 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
                     noteSelectionStart.x += 1;
                 }
                 noteSelectionEnd.x = noteSelectionStart.x;
+            }
+        }
+
+        if (key == GLFW_KEY_SPACE) // Start/stop song
+        {
+            playingSong = !playingSong;
+        }
+
+        if (key == GLFW_KEY_ENTER) // Return to start of song
+        {
+            loadedSong.currentNote = 0;
+            frameScroll = 0.0f;
+        }
+
+        if (key == GLFW_KEY_TAB) // Create stop note
+        {
+            int selectedChannel = int((noteSelectionStart.x) / 11.0f);
+            int selectedPart = int(noteSelectionStart.x) % 11;
+
+            if (selectedPart < 3) // Playing keys
+            {
+                loadedFrame.rows[loadedSong.currentNote].note[selectedChannel] = 255;
+
+                if (loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] < 0)
+                    loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = selectedSample;
             }
         }
     }
@@ -754,9 +809,31 @@ void pressButton()
     {
         if (hoveredTile.x > 0 && hoveredTile.x < 6)
         {
+            saveCurrentFrame();
             loadedSong.currentFrame = hoveredTile.y - 2 + frameListScroll;
             if (loadedSong.currentFrame >= loadedSong.frameSequence.size()) // Snap to end of song.
                 loadedSong.currentFrame = loadedSong.frameSequence.size() - 1;
+            loadCurrentFrame();
+        }
+    }
+
+    if (hoveredTile.y > 1 && hoveredTile.y < 12) // Select file / Select sample.
+    {
+        if (hoveredTile.x == 66) // Load sample
+        {
+            loadedSamples.emplace_back(fileSamples[selectedFile]);
+        }
+        else if (hoveredTile.x > 66 && hoveredTile.x < 77) // Select file
+        {
+            selectedFile = hoveredTile.y - 2 + fileListScroll;
+            if (selectedFile >= fileSamples.size()) // Snap to end of song.
+                selectedFile = fileSamples.size() - 1;
+        }
+        else if (hoveredTile.x > 80 && hoveredTile.x < 91) // Select sample
+        {
+            selectedSample = hoveredTile.y - 2 + sampleListScroll;
+            if (selectedSample >= loadedSamples.size()) // Snap to end of song.
+                selectedSample = loadedSamples.size() - 1;
         }
     }
 
@@ -765,10 +842,15 @@ void pressButton()
     {
         if (hoveredTile.x == 6) // Frame menu scroll up.
         {
-            activeUI[6][10].sprite = { 7, 4 };
             if (frameListScroll > 0)
                 frameListScroll--;
             activeUI[6][2].sprite = { 7, 3 };
+        }
+        else if (hoveredTile.x == 77) // File menu scroll up.
+        {
+            if (fileListScroll > 0)
+                fileListScroll--;
+            activeUI[77][2].sprite = { 7, 3 };
         }
     }
     else if (hoveredTile.y == 3) // Change song BPM.
@@ -794,20 +876,24 @@ void pressButton()
     {
         if (hoveredTile.x == 7) // Change song frame.
         {
+            saveCurrentFrame();
             loadedSong.frameSequence[loadedSong.currentFrame]++;
             while (loadedSong.frameSequence[loadedSong.currentFrame] >= loadedSong.frames.size()) // Create a new frame when changed to one not yet used.
             {
                 Frame newFrame;
                 loadedSong.frames.emplace_back(newFrame);
             }
+            loadCurrentFrame();
             activeUI[7][5].sprite = { 8, 4 };
             activeUI[8][5].sprite = { 9, 4 };
         }
         else if (hoveredTile.x == 9) // Change song frame.
         {
+            saveCurrentFrame();
             loadedSong.frameSequence[loadedSong.currentFrame]--;
             if (loadedSong.frameSequence[loadedSong.currentFrame] < 0)
                 loadedSong.frameSequence[loadedSong.currentFrame] = 0;
+            loadCurrentFrame();
             activeUI[9][5].sprite = { 10, 4 };
             activeUI[8][5].sprite = { 9, 4 };
         }
@@ -852,14 +938,17 @@ void pressButton()
         if (hoveredTile.x == 7)
         {
             // Add a duplicate of the selected frame after it.
+            saveCurrentFrame();
             loadedSong.frameSequence.emplace(loadedSong.frameSequence.begin() + loadedSong.currentFrame, loadedSong.frameSequence[loadedSong.currentFrame]);
             activeUI[7][8].sprite = { 8, 4 };
             activeUI[8][8].sprite = { 9, 4 };
             loadedSong.currentFrame++;
+            loadCurrentFrame();
         }
         else if (hoveredTile.x == 9)
         {
             // Delete the current frame if there is more than one in the song.
+            saveCurrentFrame();
             if (loadedSong.frameSequence.size() > 1)
             {
                 loadedSong.frameSequence.erase(loadedSong.frameSequence.begin() + loadedSong.currentFrame);
@@ -868,6 +957,7 @@ void pressButton()
                 loadedSong.frameSequence.shrink_to_fit();
                 if (loadedSong.currentFrame >= loadedSong.frameSequence.size())
                     loadedSong.currentFrame--;
+                loadCurrentFrame();
             }
         }
     }
@@ -879,6 +969,7 @@ void pressButton()
             {
                 FrameRow newRow;
                 loadedFrame.rows.emplace_back(newRow);
+                saveCurrentFrame();
                 activeUI[13][9].sprite = { 8, 4 };
                 activeUI[14][9].sprite = { 9, 4 };
             }
@@ -890,6 +981,7 @@ void pressButton()
                 loadedFrame.rows.erase(loadedFrame.rows.begin() + loadedFrame.rows.size() - 1);
                 loadedFrame.rows.shrink_to_fit();
             }
+            saveCurrentFrame();
             activeUI[15][9].sprite = { 10, 4 };
             activeUI[14][9].sprite = { 9, 4 };
         }
@@ -901,6 +993,15 @@ void pressButton()
             activeUI[6][10].sprite = { 7, 4 };
             if (loadedSong.frameSequence.size() - frameListScroll > 1)
                 frameListScroll++;
+        }
+    }
+    else if (hoveredTile.y == 11)
+    {
+        if (hoveredTile.x == 77) // File menu scroll down.
+        {
+            activeUI[77][11].sprite = { 7, 4 };
+            if (fileSamples.size() - fileListScroll > 1)
+                fileListScroll++;
         }
     }
     else if (hoveredTile.y == 16)
@@ -958,6 +1059,9 @@ void releaseButton()
         // Frame scroll arrows
         activeUI[91][16].sprite = { 6, 3 };
         activeUI[91][55].sprite = { 6, 4 };
+        // File scroll arrows
+        activeUI[77][2].sprite = { 6, 3 };
+        activeUI[77][11].sprite = { 6, 4 };
     }
 }
 

@@ -32,16 +32,31 @@ struct RGBColor
 };
 
 
-// Song frame object
-struct Frame
+// An audio sample
+struct Sample
 {
-	//uint8_t rows = 64; // Length of the frame in beats.
-
-	// Frame format
+	std::string sampleName = "NewSample";
 };
 
 
-// 1 row of a frame.
+// 1 channel of a frame.
+struct FrameChannel
+{
+	std::vector <int> notes;
+	std::vector <int> volumes;
+	std::vector <int> effects;
+};
+
+
+// Song frame object
+struct Frame
+{
+	uint8_t rows = 64; // Length of the frame in beats.
+	FrameChannel channels[8];
+};
+
+
+// 1 row of an unrolled frame.
 struct FrameRow
 {
 	int note[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
@@ -73,7 +88,7 @@ struct Song
 
 	std::vector <Frame> frames;
 
-	int currentFrame = 0;
+	int currentFrame = 0; // Current frame in frameSequence.
 	int currentNote = 0;
 	float timeInNote = 0;
 };

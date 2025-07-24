@@ -14,6 +14,8 @@
 
 float delta = 0.0f; // Time between frames.
 
+bool playingSong = false;
+
 bool drawScreen = false;
 
 
@@ -30,8 +32,9 @@ UIElement activeUI[92][57]; // Active user interface elements on the screen.
 Channel channels[8];
 
 Song loadedSong;
-
 UnrolledFrame loadedFrame; // The frame currently in the editor.
+std::vector <Sample> fileSamples; // The names of the samples in the "Samples" file.
+std::vector <Sample> loadedSamples; // The names of the samples used in the song.
 
 
 // Editing settings
@@ -41,9 +44,12 @@ int selectedOctave = 4;
 int selectedButton = -1;
 Vector2 selectedTile;
 int selectedSample = 0;
+int selectedFile = 0;
 
 
-int frameListScroll = 0.0f;
+int frameListScroll = 0;
+int fileListScroll = 0;
+int sampleListScroll = 0;
 float frameScroll = 0.0f;
 
 Vector2 noteSelectionStart;

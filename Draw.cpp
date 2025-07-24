@@ -163,7 +163,7 @@ void  DrawBorder()
 	DrawText(loadedSong.songName, 45, 21 + 44, 2, 5, 0, -1, 0);
 
 	// File select box
-	for (int y = 2; y < 12; y++)
+	for (int y = 3; y < 11; y++)
 	{
 		activeUI[66][y].sprite = { 2, 4 };
 		activeUI[77][y].sprite = { 2, 4 };
@@ -175,6 +175,49 @@ void  DrawBorder()
 	{
 		activeUI[x][1].sprite = { 2, 3 };
 	}
+	activeUI[66][2].sprite = { 2, 4 };
+	activeUI[66][11].sprite = { 2, 4 };
+	activeUI[78][2].sprite = { 2, 4 };
+	activeUI[78][11].sprite = { 2, 4 };
+	activeUI[80][2].sprite = { 2, 4 };
+	activeUI[80][11].sprite = { 2, 4 };
+	for (int y = 2; y < 12; y++)
+	{
+		if (y - 2 + fileListScroll < fileSamples.size()) // Draw files
+		{
+			if (y - 2 + fileListScroll == selectedFile)
+			{
+				DrawText(fileSamples[y - 2 + fileListScroll].sampleName, 67, 77, y, 5, 3, -1, -1);
+				activeUI[66][y].sprite = { 5, 4 };
+			}
+			else
+			{
+				DrawText(fileSamples[y - 2 + fileListScroll].sampleName, 67, 77, y, 4, 0, -1, -1);
+			}
+		}
+		else
+		{
+			DrawText("", 67, 77, y, 4, 0, -1, -1);
+		}
+
+		if (y - 2 + sampleListScroll < loadedSamples.size()) // Draw samples
+		{
+			if (y - 2 + sampleListScroll == selectedSample)
+			{
+				DrawText(loadedSamples[y - 2 + sampleListScroll].sampleName, 81, 91, y, 5, 3, -1, -1);
+				activeUI[80][y].sprite = { 5, 4 };
+			}
+			else
+			{
+				DrawText(loadedSamples[y - 2 + sampleListScroll].sampleName, 81, 91, y, 4, 0, -1, -1);
+			}
+		}
+		else
+		{
+			DrawText("", 81, 91, y, 4, 0, -1, -1);
+		}
+	}
+	
 	
 	activeUI[66][12].sprite = { 4, 4 };
 	activeUI[77][12].sprite = { 4, 4 };
@@ -189,8 +232,6 @@ void  DrawBorder()
 	activeUI[91][1].sprite = { 1, 3 };
 
 	// Scroll arrows
-	activeUI[77][2].sprite = { 6, 3 };
-	activeUI[77][11].sprite = { 6, 4 };
 	activeUI[91][2].sprite = { 6, 3 };
 	activeUI[91][11].sprite = { 6, 4 };
 
@@ -248,10 +289,12 @@ void  DrawBorder()
 	activeUI[logoX + 9][logoY].sprite = { 22, 4 };																activeUI[logoX + 11][logoY].sprite = { 25, 4 };
 	activeUI[logoX + 12][logoY].sprite = { 25, 3 };		activeUI[logoX + 13][logoY].sprite = { 23, 4 };			activeUI[logoX + 14][logoY].sprite = { 24, 4 };
 
+	/* // Eye
 	logoY -= 2;
 	activeUI[logoX + 15][logoY].sprite = { 26, 1 }; activeUI[logoX + 16][logoY].sprite = { 27, 1 };
 	activeUI[logoX + 15][logoY + 1].sprite = { 26, 2 }; activeUI[logoX + 16][logoY + 1].sprite = { 27, 2 };
 	activeUI[logoX + 15][logoY + 2].sprite = { 28, 2 }; activeUI[logoX + 16][logoY + 2].sprite = { 29, 2 };
+	*/
 
 	return;
 }
@@ -346,6 +389,8 @@ void DrawFrameBorder()
 		{
 			activeUI[1][y].bgCol = 2;
 			activeUI[2][y].bgCol = 2;
+			activeUI[1][y].textCol++;
+			activeUI[2][y].textCol++;
 			activeUI[0][y].sprite = { 5, 4 };
 			activeUI[3][y].sprite = { 5, 4 };
 		}
@@ -449,6 +494,18 @@ void DrawChannel(int channelNum)
 			if (loadedFrame.rows[y + frameScroll].instrument[channelNum] > -1) // Instrument
 				DrawHex(uint8_t(loadedFrame.rows[y + frameScroll].instrument[channelNum]), 7 + 11 * channelNum, y + 16, textColor + 3, bgColor, -1, -1);
 
+			// Draw stop note
+			if (loadedFrame.rows[y + frameScroll].note[channelNum] == 255) // Stop Note
+			{
+				activeUI[4 + 11 * channelNum][y + 16].sprite = { 18, 0 };
+				activeUI[5 + 11 * channelNum][y + 16].sprite = { 19, 0 };
+				activeUI[6 + 11 * channelNum][y + 16].sprite = { 19, 0 };
+				activeUI[7 + 11 * channelNum][y + 16].sprite = { 19, 0 };
+				activeUI[7 + 11 * channelNum][y + 16].textCol = 5;
+				activeUI[8 + 11 * channelNum][y + 16].sprite = { 20, 0 };
+				activeUI[8 + 11 * channelNum][y + 16].textCol = 5;
+			}
+
 			if (loadedFrame.rows[y + frameScroll].volume[channelNum] > -1) // Volume
 				DrawHex(uint8_t(loadedFrame.rows[y + frameScroll].volume[channelNum]), 9 + 11 * channelNum, y + 16, textColor + 6, bgColor, -1, -1);
 
@@ -493,7 +550,7 @@ void DrawText(std::string text, int textStart, int textEnd, int textY, int textC
 		if (i > textEnd)
 			return;
 
-		Vector2 textSprite = { 15, 0 };
+		Vector2 textSprite = { 17, 0 };
 
 		if (i < text.length())
 		{
