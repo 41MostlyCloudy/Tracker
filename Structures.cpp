@@ -20,6 +20,7 @@ struct UIElement
 struct Channel
 {
 	bool muted = false;
+	float volume = 1;
 };
 
 
@@ -51,7 +52,7 @@ struct FrameChannel
 // Song frame object
 struct Frame
 {
-	uint8_t rows = 64; // Length of the frame in beats.
+	uint8_t rows = 32; // Length of the frame in beats.
 	FrameChannel channels[8];
 };
 
@@ -88,7 +89,18 @@ struct Song
 
 	std::vector <Frame> frames;
 
+
+
 	int currentFrame = 0; // Current frame in frameSequence.
 	int currentNote = 0;
 	float timeInNote = 0;
+
+
+	int toNextChannelNote[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+	int toNextChannelVolume[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+	int toNextChannelEffect[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+
+	int noteChannelIndex[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+	int volumeChannelIndex[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+	int effectChannelIndex[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 };

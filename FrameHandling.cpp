@@ -37,6 +37,9 @@ Frame rollFrame(UnrolledFrame frame)
 
 	for (int ch = 0; ch < 8; ch++)
 	{
+		newFrame.channels[ch].notes.clear();
+		newFrame.channels[ch].volumes.clear();
+		newFrame.channels[ch].effects.clear();
 		int toNextNote = 0;
 		int toNextVolume = 0;
 		int toNextEffect = 0;

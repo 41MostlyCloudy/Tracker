@@ -151,13 +151,16 @@ void RunEngine()
     Frame firstFrame;
     loadedSong.frames.emplace_back(firstFrame);
     loadedSong.frameSequence.emplace_back(0);
-    loadedFrame.rows.resize(64);
+    loadedFrame.rows.resize(32);
 
     // Set buttons to unpressed state.
     releaseButton();
 
     // Show the samples currently in the "Samples" file.
     LoadSamples();
+
+    // Set up the audio engine.
+    SetUpAudioEngine();
     
 
     // Loop until the user closes the window
@@ -391,23 +394,24 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             }
             else // Delete note
             {
-                int selectedChannel = int((noteSelectionStart.x) / 11.0f);
-                int selectedPart = int(noteSelectionStart.x) % 11;
+                for (int y = noteSelectionStart.y; y <= noteSelectionEnd.y; y++)
+                {
+                    for (int x = noteSelectionStart.x; x <= noteSelectionEnd.x; x++)
+                    {
+                        int selectedChannel = int((x) / 11.0f);
+                        int selectedPart = int(x) % 11;
 
-
-                if (selectedPart < 5) // Playing keys
-                {
-                    loadedFrame.rows[loadedSong.currentNote].note[selectedChannel] = -1;
-                    loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = -1;
-                }
-                else if (selectedPart == 5 || selectedPart == 6) // Volume
-                {
-                    loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] = -1;
-                }
-                else if (selectedPart > 6) // Effect
-                {
-                    loadedFrame.rows[loadedSong.currentNote].effect[selectedChannel] = -1;
-                    loadedFrame.rows[loadedSong.currentNote].effectValue[selectedChannel] = -1;
+                        if (selectedPart < 3)
+                            loadedFrame.rows[y].note[selectedChannel] = -1;
+                        else if (selectedPart < 5)
+                            loadedFrame.rows[y].instrument[selectedChannel] = -1;
+                        else if (selectedPart < 7)
+                            loadedFrame.rows[y].volume[selectedChannel] = -1;
+                        if (selectedPart < 8)
+                            loadedFrame.rows[y].effect[selectedChannel] = -1;
+                        else if (selectedPart < 10)
+                            loadedFrame.rows[y].effectValue[selectedChannel] = -1;
+                    }
                 }
             }
         }
@@ -472,6 +476,23 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         if (key == GLFW_KEY_SPACE) // Start/stop song
         {
             playingSong = !playingSong;
+            saveCurrentFrame();
+
+            if (playingSong) // Restart the frame when playing the song.
+            {
+                loadedSong.currentNote = 0;
+                loadedSong.timeInNote = 0.0f;
+                frameScroll = 0.0f;
+                for (int ch = 0; ch < 8; ch++)
+                {
+                    loadedSong.noteChannelIndex[ch] = 0;
+                    loadedSong.volumeChannelIndex[ch] = 0;
+                    loadedSong.effectChannelIndex[ch] = 0;
+                    loadedSong.toNextChannelNote[ch] = 0;
+                    loadedSong.toNextChannelVolume[ch] = 0;
+                    loadedSong.toNextChannelEffect[ch] = 0;
+                }
+            }
         }
 
         if (key == GLFW_KEY_ENTER) // Return to start of song
@@ -491,6 +512,70 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
                 if (loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] < 0)
                     loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = selectedSample;
+            }
+        }
+
+        if (key == GLFW_KEY_LEFT_SHIFT) // Copy selected notes.
+        {
+            // Create mouse selection frame.
+            frameSelection.rows.clear();
+            frameSelection.rows.resize(int(noteSelectionEnd.y + 1 - noteSelectionStart.y));
+            int leftMostChannel = int((noteSelectionStart.x) / 11.0f);
+
+            for (int y = 0; y < frameSelection.rows.size(); y++)
+            {
+                for (int x = 0; x < 8; x++)
+                {
+                    frameSelection.rows[y].note[x] = -2;
+                    frameSelection.rows[y].instrument[x] = -2;
+                    frameSelection.rows[y].volume[x] = -2;
+                    frameSelection.rows[y].effect[x] = -2;
+                    frameSelection.rows[y].effectValue[x] = -2;
+                }
+                for (int x = noteSelectionStart.x; x < noteSelectionEnd.x; x++)
+                {
+                    int selectedChannel = int((x) / 11.0f);
+                    int selectedPart = int(x) % 11;
+
+                    if (selectedPart < 3)
+                        frameSelection.rows[y].note[selectedChannel - leftMostChannel] = loadedFrame.rows[y + noteSelectionStart.y].note[selectedChannel];
+                    else if (selectedPart < 5)
+                        frameSelection.rows[y].instrument[selectedChannel - leftMostChannel] = loadedFrame.rows[y + noteSelectionStart.y].instrument[selectedChannel];
+                    else if (selectedPart < 7)
+                        frameSelection.rows[y].volume[selectedChannel - leftMostChannel] = loadedFrame.rows[y + noteSelectionStart.y].volume[selectedChannel];
+                    if (selectedPart < 8)
+                        frameSelection.rows[y].effect[selectedChannel - leftMostChannel] = loadedFrame.rows[y + noteSelectionStart.y].effect[selectedChannel];
+                    else if (selectedPart < 10)
+                        frameSelection.rows[y].effectValue[selectedChannel - leftMostChannel] = loadedFrame.rows[y + noteSelectionStart.y].effectValue[selectedChannel];
+                }
+            }
+        }
+
+        if (key == GLFW_KEY_RIGHT_SHIFT) // Paste selected notes.
+        {
+            int leftMostChannel = int((noteSelectionStart.x) / 11.0f);
+
+            for (int y = 0; y < frameSelection.rows.size(); y++)
+            {
+                if (y + int(noteSelectionStart.y) < loadedFrame.rows.size())
+                {
+                    for (int ch = 0; ch < 8; ch++)
+                    {
+                        if (ch + +leftMostChannel < 8)
+                        {
+                            if (frameSelection.rows[y].note[ch] > -2)
+                                loadedFrame.rows[y + int(noteSelectionStart.y)].note[ch + leftMostChannel] = frameSelection.rows[y].note[ch];
+                            if (frameSelection.rows[y].instrument[ch] > -2)
+                                loadedFrame.rows[y + int(noteSelectionStart.y)].instrument[ch + leftMostChannel] = frameSelection.rows[y].instrument[ch];
+                            if (frameSelection.rows[y].volume[ch] > -2)
+                                loadedFrame.rows[y + int(noteSelectionStart.y)].volume[ch + leftMostChannel] = frameSelection.rows[y].volume[ch];
+                            if (frameSelection.rows[y].effect[ch] > -2)
+                                loadedFrame.rows[y + int(noteSelectionStart.y)].effect[ch + leftMostChannel] = frameSelection.rows[y].effect[ch];
+                            if (frameSelection.rows[y].effectValue[ch] > -2)
+                                loadedFrame.rows[y + int(noteSelectionStart.y)].effectValue[ch + leftMostChannel] = frameSelection.rows[y].effectValue[ch];
+                        }
+                    }
+                }
             }
         }
     }
@@ -530,11 +615,11 @@ void mouse_button_callback(GLFWwindow* window, int key, int action, int mods)
 
     if (action == GLFW_RELEASE)
     {
-            // Mouse click actions
-            if (key == GLFW_MOUSE_BUTTON_LEFT)
-            {
-                releaseButton();
-            }
+        // Mouse click actions
+        if (key == GLFW_MOUSE_BUTTON_LEFT)
+        {
+            releaseButton();
+        }
     }
 
     return;
@@ -669,6 +754,8 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
 
             if (loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] < 0)
                 loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = selectedSample;
+
+            StartSample(selectedChannel, selectedSample, noteNum);
         }
         else if (selectedPart == 3 || selectedPart == 4) // Instrument
         {
@@ -678,6 +765,8 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                 val = input - 48;
             else if (input > 96 && input < 103)
                 val = input - 97 + 10;
+            else
+                return;
 
             if (loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] < 0)
                 loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = 0;
@@ -687,7 +776,7 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                 int d1 = loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] % 16;
                 loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = val * 16 + d1;
             }
-            else
+            else if (selectedPart == 4)
             {
                 int d2 = loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] - loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] % 16;
                 loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = d2 + val;
@@ -701,6 +790,8 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                 val = input - 48;
             else if (input > 96 && input < 103)
                 val = input - 97 + 10;
+            else
+                return;
 
             if (loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] < 0)
                 loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] = 0;
@@ -710,7 +801,7 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                 int d1 = loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] % 16;
                 loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] = val * 16 + d1;
             }
-            else
+            else if(selectedPart == 6)
             {
                 int d2 = loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] - loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] % 16;
                 loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] = d2 + val;
@@ -724,6 +815,8 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                 if (loadedFrame.rows[loadedSong.currentNote].effectValue[selectedChannel] < 0)
                     loadedFrame.rows[loadedSong.currentNote].effectValue[selectedChannel] = 0;
             }
+            else
+                return;
         }
         else if (selectedPart == 8 || selectedPart == 9) // Effect value
         {
@@ -733,6 +826,8 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                 val = input - 48;
             else if (input > 96 && input < 103)
                 val = input - 97 + 10;
+            else
+                return;
 
             if (loadedFrame.rows[loadedSong.currentNote].effectValue[selectedChannel] < 0)
                 loadedFrame.rows[loadedSong.currentNote].effectValue[selectedChannel] = 0;

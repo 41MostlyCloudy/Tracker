@@ -35,6 +35,7 @@ Song loadedSong;
 UnrolledFrame loadedFrame; // The frame currently in the editor.
 std::vector <Sample> fileSamples; // The names of the samples in the "Samples" file.
 std::vector <Sample> loadedSamples; // The names of the samples used in the song.
+UnrolledFrame frameSelection; // A frame containing the portion of the fram that is selected, with that number of rows. All values not used are set to -2.
 
 
 // Editing settings
