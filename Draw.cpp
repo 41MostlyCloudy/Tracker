@@ -2,6 +2,8 @@
 
 
 
+
+
 void DrawEverything();
 
 void  DrawBorder();
@@ -144,11 +146,13 @@ void  DrawBorder()
 
 	// Song name box
 	DrawText("Song Name", 45, 21 + 44, 0, 3, 0, -1, -1);
-	DrawText("SAVE", 61, 21 + 44, 0, 4, 2, -1, -1);
-	DrawText("FILES", 67, 72, 0, 4, 2, -1, -1);
-	DrawText("LOAD", 73, 77, 0, 4, 2, -1, -1);
-	DrawText("SAMPLES", 79, 86, 0, 4, 2, -1, -1);
-	DrawText("CLOSE", 87, 92, 0, 4, 2, -1, -1);
+	DrawText("SAVE", 61, 65, 0, 4, 2, -1, -1);
+	if (filesSampleNotSong)
+		DrawText("FILES(Samples)", 67, 80, 0, 4, 2, -1, -1);
+	else
+		DrawText("FILES(Songs)", 67, 80, 0, 4, 2, -1, -1);
+	DrawText("SAMPLES", 79 + 4, 86 + 4, 0, 4, 2, -1, -1);
+	//DrawText("CLOSE", 87, 92, 0, 4, 2, -1, -1);
 	activeUI[44][1].sprite = { 0, 3 };
 	activeUI[44][2].sprite = { 2, 4 };
 	activeUI[44][3].sprite = { 0, 4 };
@@ -183,16 +187,16 @@ void  DrawBorder()
 	activeUI[80][11].sprite = { 2, 4 };
 	for (int y = 2; y < 12; y++)
 	{
-		if (y - 2 + fileListScroll < fileSamples.size()) // Draw files
+		if (y - 2 + fileListScroll < fileNameList.size()) // Draw files
 		{
 			if (y - 2 + fileListScroll == selectedFile)
 			{
-				DrawText(fileSamples[y - 2 + fileListScroll].sampleName, 67, 77, y, 5, 3, -1, -1);
+				DrawText(fileNameList[y - 2 + fileListScroll], 67, 77, y, 5, 3, -1, -1);
 				activeUI[66][y].sprite = { 5, 4 };
 			}
 			else
 			{
-				DrawText(fileSamples[y - 2 + fileListScroll].sampleName, 67, 77, y, 4, 0, -1, -1);
+				DrawText(fileNameList[y - 2 + fileListScroll], 67, 77, y, 4, 0, -1, -1);
 			}
 		}
 		else
@@ -335,6 +339,35 @@ void DrawMute()
 		activeUI[9 + 11 * i][14].sprite = { 2.0f * i + 1 + muteOffset * 16 / 3, 6 };
 
 		activeUI[14 + 11 * i][13].sprite = { 2, 4 }; activeUI[14 + 11 * i][14].sprite = { 2, 4 };
+
+
+		// Box color
+		int color = 1;
+		//color = channels[i].soundVolume * 1.0f;
+		
+
+		activeUI[4 + 11 * i][13].bgCol = color; activeUI[4 + 11 * i][14].bgCol = color;
+		activeUI[5 + 11 * i][13].bgCol = color; activeUI[5 + 11 * i][14].bgCol = color;
+		activeUI[6 + 11 * i][13].bgCol = color; activeUI[6 + 11 * i][14].bgCol = color;
+		activeUI[7 + 11 * i][13].bgCol = color; activeUI[7 + 11 * i][14].bgCol = color;
+		activeUI[8 + 11 * i][13].bgCol = color; activeUI[8 + 11 * i][14].bgCol = color;
+		activeUI[9 + 11 * i][13].bgCol = color; activeUI[9 + 11 * i][14].bgCol = color;
+		activeUI[10 + 11 * i][13].bgCol = color; activeUI[10 + 11 * i][14].bgCol = color;
+		activeUI[11 + 11 * i][13].bgCol = color; activeUI[11 + 11 * i][14].bgCol = color;
+		activeUI[12 + 11 * i][13].bgCol = color; activeUI[12 + 11 * i][14].bgCol = color;
+		activeUI[13 + 11 * i][13].bgCol = color; activeUI[13 + 11 * i][14].bgCol = color;
+
+		activeUI[4 + 11 * i][13].textCol = color + 2; activeUI[4 + 11 * i][14].textCol = color + 2;
+		activeUI[5 + 11 * i][13].textCol = color + 2; activeUI[5 + 11 * i][14].textCol = color + 2;
+		activeUI[6 + 11 * i][13].textCol = color + 2; activeUI[6 + 11 * i][14].textCol = color + 2;
+		activeUI[7 + 11 * i][13].textCol = color + 2; activeUI[7 + 11 * i][14].textCol = color + 2;
+		activeUI[8 + 11 * i][13].textCol = color + 2; activeUI[8 + 11 * i][14].textCol = color + 2;
+		activeUI[9 + 11 * i][13].textCol = color + 2; activeUI[9 + 11 * i][14].textCol = color + 2;
+		activeUI[10 + 11 * i][13].textCol = color + 2; activeUI[10 + 11 * i][14].textCol = color + 2;
+		activeUI[11 + 11 * i][13].textCol = color + 2; activeUI[11 + 11 * i][14].textCol = color + 2;
+		activeUI[12 + 11 * i][13].textCol = color + 2; activeUI[12 + 11 * i][14].textCol = color + 2;
+		activeUI[13 + 11 * i][13].textCol = color + 2; activeUI[13 + 11 * i][14].textCol = color + 2;
+
 	}
 	activeUI[3][12].sprite = { 0, 3 };
 	activeUI[3][13].sprite = { 2, 4 };

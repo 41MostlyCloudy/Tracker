@@ -21,6 +21,12 @@ struct Channel
 {
 	bool muted = false;
 	float volume = 1;
+	float soundVolume = 0.0f;
+
+	float effect = 0;
+	float effectX = 0;
+	float effectY = 0; // The second effect parameter for effects that use two.
+	float pitch = 0;
 };
 
 
@@ -94,6 +100,8 @@ struct Song
 	int currentFrame = 0; // Current frame in frameSequence.
 	int currentNote = 0;
 	float timeInNote = 0;
+	float timeInTick = 0;
+	float timeInSong = 0;
 
 
 	int toNextChannelNote[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -104,3 +112,63 @@ struct Song
 	int volumeChannelIndex[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 	int effectChannelIndex[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 };
+
+
+
+// Effects:
+
+// 0 - No effect:
+
+// 1 - Arpeggio:
+//		Play alternating notes every tick, between the base note and the two offsets.
+//		-x = semitone offset 1
+//		-y = semitone offset 2
+
+// 2 - Vibrato:
+//		Change the note pitch over time.
+//		-x = speed
+//		-y = depth
+
+// 3 - Tremolo:
+//		Change the note volume over time.
+//		-x = speed
+//		-y = depth
+
+// 4 - Set Panning:
+//		Set the stereo panning position from 00(Left) to FF(Right).
+//		-xy = position
+
+// 5 - Volume Slide:
+//		Slide the volume up by x speed or down by y speed.
+//		-x = speed up
+//		-y = speed down
+
+// 6 - Pitch Slide:
+//		Slide the pitch up by x speed or down by y speed.
+//		-x = speed up
+//		-y = speed down
+
+// 7 - Pitch Slide (fine):
+//		Slide the pitch up by x speed or down by y speed.
+//		-x = speed up
+//		-y = speed down
+
+// 8 - Jump to frame:
+//		Jump the thr specified frame.
+//		-xx = frame
+
+// 9 - Note Delay:
+//		Start the note late, after x ticks.
+//		-xx ticks
+
+// A - Sample offset:
+//		Offset the sample starting on the beat by x ticks.
+//		-xx = ticks
+
+// B - Set BPM:
+//		Set the song BPM to x.
+//		-xx = BPM
+
+// C - Set TPB:
+//		Set the song TPB to x.
+//		-xx = TPB

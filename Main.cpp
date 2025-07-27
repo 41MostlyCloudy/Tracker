@@ -752,8 +752,7 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
 
             loadedFrame.rows[loadedSong.currentNote].note[selectedChannel] = noteNum;
 
-            if (loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] < 0)
-                loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = selectedSample;
+            loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = selectedSample;
 
             StartSample(selectedChannel, selectedSample, noteNum);
         }
@@ -800,11 +799,17 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
             {
                 int d1 = loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] % 16;
                 loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] = val * 16 + d1;
+
+                if (loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] > 64)
+                    loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] = 64;
             }
             else if(selectedPart == 6)
             {
                 int d2 = loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] - loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] % 16;
                 loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] = d2 + val;
+
+                if (loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] > 64)
+                    loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] = 64;
             }
         }
         else if (selectedPart == 7) // Effect
@@ -912,17 +917,40 @@ void pressButton()
         }
     }
 
+    if (hoveredTile.y == 0)  
+    {
+        if (hoveredTile.x > 60 && hoveredTile.x < 65) // Save song.
+        {
+            SaveSong();
+        }
+        else if (hoveredTile.x > 66 && hoveredTile.x < 80) // Swap between loading samples and songs.
+        {
+            filesSampleNotSong = !filesSampleNotSong;
+            if (filesSampleNotSong)
+                LoadSamples();
+            else
+                LoadSongFiles();
+        }
+    }
+
     if (hoveredTile.y > 1 && hoveredTile.y < 12) // Select file / Select sample.
     {
-        if (hoveredTile.x == 66) // Load sample
+        if (hoveredTile.x == 66) // Load sample/Song
         {
-            loadedSamples.emplace_back(fileSamples[selectedFile]);
+            if (filesSampleNotSong)
+            {
+                Sample newSample;
+                newSample.sampleName = fileNameList[selectedFile];
+                loadedSamples.emplace_back(newSample);
+            }
+            else
+                LoadSong(fileNameList[selectedFile]);
         }
         else if (hoveredTile.x > 66 && hoveredTile.x < 77) // Select file
         {
             selectedFile = hoveredTile.y - 2 + fileListScroll;
-            if (selectedFile >= fileSamples.size()) // Snap to end of song.
-                selectedFile = fileSamples.size() - 1;
+            if (selectedFile >= fileNameList.size()) // Snap to end of song.
+                selectedFile = fileNameList.size() - 1;
         }
         else if (hoveredTile.x > 80 && hoveredTile.x < 91) // Select sample
         {
@@ -1095,7 +1123,7 @@ void pressButton()
         if (hoveredTile.x == 77) // File menu scroll down.
         {
             activeUI[77][11].sprite = { 7, 4 };
-            if (fileSamples.size() - fileListScroll > 1)
+            if (fileNameList.size() - fileListScroll > 1)
                 fileListScroll++;
         }
     }

@@ -33,19 +33,20 @@ Channel channels[8];
 
 Song loadedSong;
 UnrolledFrame loadedFrame; // The frame currently in the editor.
-std::vector <Sample> fileSamples; // The names of the samples in the "Samples" file.
+std::vector <std::string> fileNameList; // The names of the samples in the "Samples" file.
 std::vector <Sample> loadedSamples; // The names of the samples used in the song.
-UnrolledFrame frameSelection; // A frame containing the portion of the fram that is selected, with that number of rows. All values not used are set to -2.
+UnrolledFrame frameSelection; // A frame containing the portion of the frame that is selected, with that number of rows. All values not used are set to -2.
 
 
 // Editing settings
-int selectedOctave = 4;
+int selectedOctave = 3;
 // Selectable Buttons:
 // 0 = Song name
 int selectedButton = -1;
 Vector2 selectedTile;
 int selectedSample = 0;
 int selectedFile = 0;
+bool filesSampleNotSong = true; // Whether you are loading samples or songs.
 
 
 int frameListScroll = 0;

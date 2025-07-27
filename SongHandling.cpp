@@ -39,8 +39,34 @@ ma_sound channelAudio[8];
 
 // Pitch lookup table
 // To get different notes, the pitch of the sample is shifted. Samples should be a 'C4' note by default, and the pitch is scaled around that.
-float pitchTable[60] =
+float pitchTable[84] =
 {
+    0.066,
+    0.07,
+    0.074,
+    0.0787,
+    0.0834,
+    0.0884,
+    0.0936,
+    0.0992,
+    0.105,
+    0.111,
+    0.118,
+    0.125, // C1
+
+    0.132,
+    0.14,
+    0.149,
+    0.157,
+    0.167,
+    0.177,
+    0.187,
+    0.198,
+    0.21,
+    0.223,
+    0.236,
+    0.25, // C2
+
     0.265,
     0.28,
     0.297,
@@ -151,6 +177,9 @@ void StartSample(int channel, int sampleNumber, float pitch)
     //ma_sound_set_volume(&channelAudio[channel], songPlaying.channels[channel].channelVolume);
 
     ma_sound_set_volume(&channelAudio[channel], channels[channel].volume);
+
+    
+
     return;
 }
 
@@ -183,6 +212,8 @@ void stepSong()
 
 
 	loadedSong.timeInNote += delta;
+    loadedSong.timeInTick += delta;
+    loadedSong.timeInSong += delta;
 
 	
 
@@ -200,8 +231,11 @@ void stepSong()
 			loadedSong.currentFrame++;
 			loadedSong.currentNote = 0;
 
-			if (loadedSong.currentFrame >= loadedSong.frameSequence.size())
-				loadedSong.currentFrame = 0;
+            if (loadedSong.currentFrame >= loadedSong.frameSequence.size())
+            {
+                loadedSong.currentFrame = 0;
+                loadedSong.timeInSong = 0;
+            }
 
 			loadCurrentFrame();
 
@@ -256,6 +290,8 @@ void stepSong()
                     int note = loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].notes[noteIndex];
                     loadedSong.noteChannelIndex[ch]++;
                     noteIndex++;
+                    channels[ch].pitch = note;
+
                     int instrument = loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].notes[noteIndex];
                     loadedSong.noteChannelIndex[ch]++;
                     noteIndex++;
@@ -284,8 +320,8 @@ void stepSong()
                     loadedSong.volumeChannelIndex[ch]++;
                     volumeIndex++;
 
-                    channels[ch].volume = float(volume) / 255.0f;
-                    ma_sound_set_volume(&channelAudio[ch], float(volume) / 255.0f);
+                    channels[ch].volume = float(volume) / 64.0f;
+                    ma_sound_set_volume(&channelAudio[ch], float(volume) / 64.0f);
 
                     // Set distance to next note.
                     if (volumeIndex < loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].volumes.size())
@@ -297,7 +333,57 @@ void stepSong()
                         loadedSong.toNextChannelVolume[ch] = 255; // No more notes in this channel in the frame.
                 }
             }
-            
+
+            if (loadedSong.toNextChannelEffect[ch] < 0) // Read next effect.
+            {
+                if (effectIndex < loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].effects.size())
+                {
+                    int effect= loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].effects[effectIndex];
+                    loadedSong.effectChannelIndex[ch]++;
+                    effectIndex++;
+                    int effectValue = loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].effects[effectIndex];
+                    loadedSong.effectChannelIndex[ch]++;
+                    effectIndex++;
+
+
+                    channels[ch].effect = effect;
+                    if (effect == 1)
+                    {
+                        channels[ch].effectX = channels[ch].pitch + effectValue / 16;
+                        channels[ch].effectY = channels[ch].pitch + effectValue % 16;
+                    }
+                    else if (effect == 2 || effect == 3 || effect == 5 || effect == 6 || effect == 7) // 2-parameter effects.
+                    {
+                        channels[ch].effectX = effectValue / 16;
+                        channels[ch].effectY = effectValue % 16;
+                    }
+                    else // 1-parameter effects.
+                        channels[ch].effectX = effectValue;
+                    
+
+                    if (effectIndex < loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].effects.size())
+                    {
+                        loadedSong.toNextChannelEffect[ch] = loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].effects[effectIndex];
+                        loadedSong.effectChannelIndex[ch]++;
+                    }
+                    else
+                        loadedSong.toNextChannelEffect[ch] = 255; // No more notes in this channel in the frame.
+                }
+            }
+
+
+
+
+            /*
+            channels[ch].soundVolume = 4.0f - ma_sound_get_time_in_milliseconds(&channelAudio[ch]) * 0.01;
+
+            if (channels[ch].soundVolume < 0)
+                channels[ch].soundVolume = 0.0f;
+
+            if (channels[ch].soundVolume > 5.0)
+                channels[ch].soundVolume = 5.0f;
+            */
+            //channels[ch].soundVolume = ma_sound_get_data_source(&channelAudio[ch]);
         }
 
         /*
@@ -307,6 +393,51 @@ void stepSong()
                 StartSample(ch, 0, 32);
         }*/
 	}
+
+
+    if (loadedSong.timeInTick > (60000.0f / (loadedSong.ticksPerBeat * 4.0f * loadedSong.bpm))) // New tick
+    {
+        loadedSong.timeInTick = 0;
+        for (int ch = 0; ch < 8; ch++)
+        {
+            if (channels[ch].effect == 1) // Arpeggio
+            {
+                int oldNote = channels[ch].pitch;
+                channels[ch].pitch = channels[ch].effectX;
+                channels[ch].effectX = channels[ch].effectY;
+                channels[ch].effectY = oldNote;
+                ma_sound_set_pitch(&channelAudio[ch], pitchTable[int(channels[ch].pitch)]);
+            }
+        }
+    }
+
+
+    for (int ch = 0; ch < 8; ch++) // Constant checks
+    {
+        if (channels[ch].effect == 2) // Vibrato
+        {
+            float volOffset = sin(loadedSong.timeInSong * float(channels[ch].effectX) * 0.005) * channels[ch].effectY * 0.01;
+
+            ma_sound_set_pitch(&channelAudio[ch], pitchTable[int(channels[ch].pitch)] + volOffset);
+        }
+        else if (channels[ch].effect == 3) // Tremolo
+        {
+            float volOffset = sin(loadedSong.timeInSong * float(channels[ch].effectX) * 0.005) * (channels[ch].effectY / 32.0f);
+
+            ma_sound_set_volume(&channelAudio[ch], channels[ch].volume + volOffset);
+        }
+        else if (channels[ch].effect == 4) // Set panning
+        {
+            float pan = (float(channels[ch].effectX) - 127.0f) / 128.0f;
+
+            ma_sound_set_pan(&channelAudio[ch], pan);
+        }
+
+        if (channels[ch].muted)
+            ma_sound_set_volume(&channelAudio[ch], 0.0);
+    }
+
+
 
 	
 
