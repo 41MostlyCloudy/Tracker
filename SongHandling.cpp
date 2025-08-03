@@ -16,7 +16,7 @@ void SetUpAudioEngine();
 
 void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount);
 
-void StartSample(int channel, int sampleNumber, float pitch);
+void StartSample(int channel, int sampleNumber, float pitch, float time);
 
 void StopSample(int channel);
 
@@ -152,7 +152,7 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
 }
 
 
-void StartSample(int channel, int sampleNumber, float pitch)
+void StartSample(int channel, int sampleNumber, float pitch, float time)
 {
     if (sampleNumber >= loadedSamples.size()) // Don't play samples that are not loaded.
         return;
@@ -164,13 +164,26 @@ void StartSample(int channel, int sampleNumber, float pitch)
 
     ma_sound_uninit(&channelAudio[channel]);
     ma_sound_init_from_file(&engine, name, MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &channelAudio[channel]);
+
+    ma_sound_set_start_time_in_milliseconds(&channelAudio[channel], time);
+
     ma_sound_start(&channelAudio[channel]);
 
 
     //ma_sound_set_fade_in_milliseconds(&channelAudio[channel], 0, 1, 20);
     pitch = pitchTable[int(pitch)];
+    channels[channel].realPitch = pitch;
 
     ma_sound_set_pitch(&channelAudio[channel], pitch);
+
+
+    
+    /*
+    if (channels[channel].effect == 10) // Sample offset
+    {
+        ma_sound_set_start_time_in_milliseconds(&channelAudio[channel], channels[channel].effectX);
+    }*/
+
     // Pith shift by interpolating pitch every frame.
     //ma_sound_set_pan(&channelAudio[channel], 1);
     //ma_sound_set_looping(&channels[channel], true);
@@ -264,7 +277,7 @@ void stepSong()
             int volumeIndex = loadedSong.volumeChannelIndex[ch];
             int effectIndex = loadedSong.effectChannelIndex[ch];
 
-            if (noteIndex == 0)
+            if (noteIndex == 0) // Initial "to next note" at the start of each frame.
             {
                 loadedSong.toNextChannelNote[ch] = loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].notes[0];
                 loadedSong.noteChannelIndex[ch]++;
@@ -275,6 +288,7 @@ void stepSong()
                 loadedSong.toNextChannelEffect[ch] = loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].effects[0];
                 loadedSong.effectChannelIndex[ch]++;
                 effectIndex++;
+                loadedSong.currentNote = 0;
             }
 
 
@@ -283,34 +297,7 @@ void stepSong()
             loadedSong.toNextChannelEffect[ch]--;
 
             
-            if (loadedSong.toNextChannelNote[ch] < 0) // Read next note.
-            {
-                if (noteIndex < loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].notes.size())
-                {
-                    int note = loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].notes[noteIndex];
-                    loadedSong.noteChannelIndex[ch]++;
-                    noteIndex++;
-                    channels[ch].pitch = note;
-
-                    int instrument = loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].notes[noteIndex];
-                    loadedSong.noteChannelIndex[ch]++;
-                    noteIndex++;
-
-                    if (note == 255)
-                        StopSample(ch);
-                    else
-                        StartSample(ch, instrument, note);
-
-                    // Set distance to next note.
-                    if (noteIndex < loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].notes.size())
-                    {
-                        loadedSong.toNextChannelNote[ch] = loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].notes[noteIndex];
-                        loadedSong.noteChannelIndex[ch]++;
-                    }
-                    else
-                        loadedSong.toNextChannelNote[ch] = 255; // No more notes in this channel in the frame.
-                }
-            }
+            
             
             if (loadedSong.toNextChannelVolume[ch] < 0) // Read next volume.
             {
@@ -321,7 +308,7 @@ void stepSong()
                     volumeIndex++;
 
                     channels[ch].volume = float(volume) / 64.0f;
-                    ma_sound_set_volume(&channelAudio[ch], float(volume) / 64.0f);
+                    ma_sound_set_volume(&channelAudio[ch], channels[ch].volume);
 
                     // Set distance to next note.
                     if (volumeIndex < loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].volumes.size())
@@ -338,7 +325,7 @@ void stepSong()
             {
                 if (effectIndex < loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].effects.size())
                 {
-                    int effect= loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].effects[effectIndex];
+                    int effect = loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].effects[effectIndex];
                     loadedSong.effectChannelIndex[ch]++;
                     effectIndex++;
                     int effectValue = loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].effects[effectIndex];
@@ -347,12 +334,7 @@ void stepSong()
 
 
                     channels[ch].effect = effect;
-                    if (effect == 1)
-                    {
-                        channels[ch].effectX = channels[ch].pitch + effectValue / 16;
-                        channels[ch].effectY = channels[ch].pitch + effectValue % 16;
-                    }
-                    else if (effect == 2 || effect == 3 || effect == 5 || effect == 6 || effect == 7) // 2-parameter effects.
+                    if (effect == 0 || effect == 1 || effect == 2 || effect == 3 || effect == 5 || effect == 6 || effect == 7) // 2-parameter effects.
                     {
                         channels[ch].effectX = effectValue / 16;
                         channels[ch].effectY = effectValue % 16;
@@ -368,6 +350,35 @@ void stepSong()
                     }
                     else
                         loadedSong.toNextChannelEffect[ch] = 255; // No more notes in this channel in the frame.
+                }
+            }
+
+            if (loadedSong.toNextChannelNote[ch] < 0) // Read next note.
+            {
+                if (noteIndex < loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].notes.size())
+                {
+                    int note = loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].notes[noteIndex];
+                    loadedSong.noteChannelIndex[ch]++;
+                    noteIndex++;
+                    channels[ch].pitch = note;
+
+                    int instrument = loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].notes[noteIndex];
+                    loadedSong.noteChannelIndex[ch]++;
+                    noteIndex++;
+
+                    if (note == 255)
+                        StopSample(ch);
+                    else
+                        StartSample(ch, instrument, note, 0);
+
+                    // Set distance to next note.
+                    if (noteIndex < loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].notes.size())
+                    {
+                        loadedSong.toNextChannelNote[ch] = loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].notes[noteIndex];
+                        loadedSong.noteChannelIndex[ch]++;
+                    }
+                    else
+                        loadedSong.toNextChannelNote[ch] = 255; // No more notes in this channel in the frame.
                 }
             }
 
@@ -400,12 +411,20 @@ void stepSong()
         loadedSong.timeInTick = 0;
         for (int ch = 0; ch < 8; ch++)
         {
-            if (channels[ch].effect == 1) // Arpeggio
+            if (channels[ch].effect == 0) // Cosmic Arp (Up)
             {
                 int oldNote = channels[ch].pitch;
-                channels[ch].pitch = channels[ch].effectX;
-                channels[ch].effectX = channels[ch].effectY;
-                channels[ch].effectY = oldNote;
+                channels[ch].pitch += channels[ch].effectX;
+                channels[ch].effectX = channels[ch].effectY - channels[ch].effectX;
+                channels[ch].effectY = -channels[ch].effectY;
+                ma_sound_set_pitch(&channelAudio[ch], pitchTable[int(channels[ch].pitch)]);
+            }
+            else if (channels[ch].effect == 1) // Cosmic Arp (Down)
+            {
+                int oldNote = channels[ch].pitch;
+                channels[ch].pitch -= channels[ch].effectX;
+                channels[ch].effectX = channels[ch].effectX - channels[ch].effectY;
+                channels[ch].effectY = -channels[ch].effectY;
                 ma_sound_set_pitch(&channelAudio[ch], pitchTable[int(channels[ch].pitch)]);
             }
         }
@@ -416,13 +435,13 @@ void stepSong()
     {
         if (channels[ch].effect == 2) // Vibrato
         {
-            float volOffset = sin(loadedSong.timeInSong * float(channels[ch].effectX) * 0.005) * channels[ch].effectY * 0.01;
+            float volOffset = sin((loadedSong.timeInSong / (60000.0f / (loadedSong.bpm * 4.0f))) * 3.14f * 0.125f * channels[ch].effectX) * channels[ch].effectY * 0.01;
 
             ma_sound_set_pitch(&channelAudio[ch], pitchTable[int(channels[ch].pitch)] + volOffset);
         }
-        else if (channels[ch].effect == 3) // Tremolo
+        else if (channels[ch].effect == 3) // Vibrato
         {
-            float volOffset = sin(loadedSong.timeInSong * float(channels[ch].effectX) * 0.005) * (channels[ch].effectY / 32.0f);
+            float volOffset = sin((loadedSong.timeInSong / (60000.0f / (loadedSong.bpm * 4.0f))) * 3.14f * 0.125f * channels[ch].effectX) * channels[ch].effectY * 0.1;
 
             ma_sound_set_volume(&channelAudio[ch], channels[ch].volume + volOffset);
         }
@@ -431,6 +450,32 @@ void stepSong()
             float pan = (float(channels[ch].effectX) - 127.0f) / 128.0f;
 
             ma_sound_set_pan(&channelAudio[ch], pan);
+        }
+        else if (channels[ch].effect == 5) // Volume Slide
+        {
+            float vol = float(channels[ch].effectX - channels[ch].effectY) * 0.0002f * delta;
+            channels[ch].volume += vol;
+
+            if (channels[ch].volume < 0)
+                channels[ch].volume = 0;
+            else if (channels[ch].volume > 1)
+                channels[ch].volume = 1;
+
+            ma_sound_set_volume(&channelAudio[ch], float(channels[ch].volume));
+        }
+        else if (channels[ch].effect == 6) // Pitch Slide
+        {
+            float vol = float(channels[ch].effectX - channels[ch].effectY) * 0.001f * delta;
+            channels[ch].realPitch += vol;
+
+            ma_sound_set_pitch(&channelAudio[ch], channels[ch].realPitch);
+        }
+        else if (channels[ch].effect == 7) // Pitch Slide (fine)
+        {
+            float vol = float(channels[ch].effectX - channels[ch].effectY) * 0.0001f * delta;
+            channels[ch].realPitch += vol;
+
+            ma_sound_set_pitch(&channelAudio[ch], channels[ch].realPitch);
         }
 
         if (channels[ch].muted)

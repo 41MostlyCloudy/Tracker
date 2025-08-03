@@ -18,9 +18,12 @@ bool playingSong = false;
 
 bool drawScreen = false;
 
+//int uiColorTheme = 0;
+
 
 Vector2 mouseCoords;
 bool mouseDown = false;
+bool keyDown = false;
 float mouseHoldTime = 0.0f; // The amount of time that the mouse has been held down.
 Vector2 hoveredTile;
 Vector2 screenSize;
@@ -45,6 +48,8 @@ int selectedOctave = 3;
 int selectedButton = -1;
 Vector2 selectedTile;
 int selectedSample = 0;
+int selectedKey = -1;
+int selectedEffect = -1;
 int selectedFile = 0;
 bool filesSampleNotSong = true; // Whether you are loading samples or songs.
 

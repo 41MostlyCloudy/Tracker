@@ -41,6 +41,8 @@ void pressButton();
 
 void releaseButton();
 
+//unsigned char* ChangeTheme();
+
 
 
 
@@ -348,7 +350,7 @@ void processInput(GLFWwindow* window)
 
 
     
-
+    
     glfwSetKeyCallback(window, key_callback);
 
     glfwSetMouseButtonCallback(window, mouse_button_callback);
@@ -481,10 +483,15 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             if (playingSong) // Restart the frame when playing the song.
             {
                 loadedSong.currentNote = 0;
-                loadedSong.timeInNote = 0.0f;
+                loadedSong.timeInNote = 1000000.0f;
+                loadedSong.timeInSong = 0.0f;
                 frameScroll = 0.0f;
                 for (int ch = 0; ch < 8; ch++)
                 {
+                    channels[ch].effect = -1;
+                    channels[ch].effectX = 0;
+                    channels[ch].effectY = 0;
+                    channels[ch].pitch = 0;
                     loadedSong.noteChannelIndex[ch] = 0;
                     loadedSong.volumeChannelIndex[ch] = 0;
                     loadedSong.effectChannelIndex[ch] = 0;
@@ -583,6 +590,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if (key == GLFW_KEY_ESCAPE)
         glfwSetWindowShouldClose(window, true);
 
+
+    if (action == GLFW_PRESS || action == GLFW_RELEASE)
+        keyDown = false;
+
     return;
 }
 
@@ -608,6 +619,20 @@ void mouse_button_callback(GLFWwindow* window, int key, int action, int mods)
                 noteSelectionStart = { hoveredTile.x - 4, hoveredTile.y - 16 + frameScroll };
                 noteSelectionEnd = { hoveredTile.x - 4, hoveredTile.y - 16 + frameScroll };
                 loadedSong.currentNote = hoveredTile.y - 16 + frameScroll;
+
+
+
+                int selectedChannel = int((noteSelectionStart.x) / 11.0f);
+                int selectedPart = int(noteSelectionStart.x) % 11;
+
+                if (selectedPart == 7)
+                {
+                    loadedFrame.rows[loadedSong.currentNote].effect[selectedChannel] = selectedEffect;
+                    if (loadedFrame.rows[loadedSong.currentNote].effectValue[selectedChannel] < 0)
+                        loadedFrame.rows[loadedSong.currentNote].effectValue[selectedChannel] = 0;
+                    if (selectedEffect == -1) // Delete effect value when deleting effect.
+                        loadedFrame.rows[loadedSong.currentNote].effectValue[selectedChannel] = -1;
+                }
             }
         }
     }
@@ -667,94 +692,107 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
 
         if (selectedPart < 3) // Playing keys
         {
-            int noteNum = selectedOctave * 12;
+            int noteNum = -1;
 
             if (input == 122) // z (C 1)
-            {
-
-            }
-            else if (input == 115) // s (C# 1)
                 noteNum += 1;
-            else if (input == 120) // x (D 1)
+            else if (input == 115) // s (C# 1)
                 noteNum += 2;
-            else if (input == 100) // d (D# 1)
+            else if (input == 120) // x (D 1)
                 noteNum += 3;
-            else if (input == 99) // c (E 1)
+            else if (input == 100) // d (D# 1)
                 noteNum += 4;
-            else if (input == 118) // v (F 1)
+            else if (input == 99) // c (E 1)
                 noteNum += 5;
-            else if (input == 103) // g (F# 1)
+            else if (input == 118) // v (F 1)
                 noteNum += 6;
-            else if (input == 98) // b (G 1)
+            else if (input == 103) // g (F# 1)
                 noteNum += 7;
-            else if (input == 104) // h (G# 1)
+            else if (input == 98) // b (G 1)
                 noteNum += 8;
-            else if (input == 110) // n (A 2)
+            else if (input == 104) // h (G# 1)
                 noteNum += 9;
-            else if (input == 106) // j (A# 2)
+            else if (input == 110) // n (A 2)
                 noteNum += 10;
-            else if (input == 109) // m (B 2)
+            else if (input == 106) // j (A# 2)
                 noteNum += 11;
+            else if (input == 109) // m (B 2)
+                noteNum += 12;
             else if (input == 44) // , (C 2)
-                noteNum += 12;
+                noteNum += 13;
             else if (input == 108) // l (C# 2)
-                noteNum += 13;
+                noteNum += 14;
             else if (input == 46) // . (D 2)
-                noteNum += 14;
+                noteNum += 15;
             else if (input == 59) // ; (D# 2)
-                noteNum += 15;
+                noteNum += 16;
             else if (input == 47) // / (E 2)
-                noteNum += 16;
-
-
-            else if (input == 113) // q (C 2)
-                noteNum += 12;
-            else if (input == 50) // 2 (C# 2)
-                noteNum += 13;
-            else if (input == 119) // w (D 2)
-                noteNum += 14;
-            else if (input == 51) // 3 (D# 2)
-                noteNum += 15;
-            else if (input == 101) // e (E 2)
-                noteNum += 16;
-            else if (input == 114) // r (F 2)
                 noteNum += 17;
-            else if (input == 53) // 5 (F# 2)
+
+            selectedKey = noteNum;
+
+
+            if (input == 113) // q (C 2)
+                noteNum += 13;
+            else if (input == 50) // 2 (C# 2)
+                noteNum += 14;
+            else if (input == 119) // w (D 2)
+                noteNum += 15;
+            else if (input == 51) // 3 (D# 2)
+                noteNum += 16;
+            else if (input == 101) // e (E 2)
+                noteNum += 17;
+            else if (input == 114) // r (F 2)
                 noteNum += 18;
-            else if (input == 116) // t (G 2)
+            else if (input == 53) // 5 (F# 2)
                 noteNum += 19;
-            else if (input == 54) // 6 (G# 2)
+            else if (input == 116) // t (G 2)
                 noteNum += 20;
-            else if (input == 121) // y (A 3)
+            else if (input == 54) // 6 (G# 2)
                 noteNum += 21;
-            else if (input == 55) // 7 (A# 3)
+            else if (input == 121) // y (A 3)
                 noteNum += 22;
-            else if (input == 117) // u (B 3)
+            else if (input == 55) // 7 (A# 3)
                 noteNum += 23;
-            else if (input == 105) // i (C 3)
+            else if (input == 117) // u (B 3)
                 noteNum += 24;
-            else if (input == 57) // 9 (C# 3)
+            else if (input == 105) // i (C 3)
                 noteNum += 25;
-            else if (input == 111) // o (D 3)
+            else if (input == 57) // 9 (C# 3)
                 noteNum += 26;
-            else if (input == 48) // 0 (D# 3)
+            else if (input == 111) // o (D 3)
                 noteNum += 27;
-            else if (input == 112) // p (E 3)
+            else if (input == 48) // 0 (D# 3)
                 noteNum += 28;
-            else if (input == 91) // [ (F 3)
+            else if (input == 112) // p (E 3)
                 noteNum += 29;
-            else if (input == 61) // = (F# 3)
+            else if (input == 91) // [ (F 3)
                 noteNum += 30;
-            else if (input == 93) // ] (A 3)
+            else if (input == 61) // = (F# 3)
                 noteNum += 31;
-            else
-                return;
+            else if (input == 93) // ] (A 3)
+                noteNum += 32;
 
-            loadedFrame.rows[loadedSong.currentNote].note[selectedChannel] = noteNum;
+            if (selectedKey == -1)
+            {
+                if (noteNum == -1)
+                    selectedKey = -1;
+                else
+                    selectedKey = noteNum + 5;
+            }
+            if (noteNum != -1)
+            {
+                noteNum += selectedOctave * 12;
 
-            loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = selectedSample;
+                if (!keyDown)
+                {
+                    channels[selectedChannel].volume = 64.0f;
+                    StartSample(selectedChannel, selectedSample, noteNum, 0);
+                }
+                loadedFrame.rows[loadedSong.currentNote].note[selectedChannel] = noteNum;
 
-            StartSample(selectedChannel, selectedSample, noteNum);
+                loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = selectedSample;
+            }
         }
         else if (selectedPart == 3 || selectedPart == 4) // Instrument
         {
@@ -812,17 +850,6 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                     loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] = 64;
             }
         }
-        else if (selectedPart == 7) // Effect
-        {
-            if (input > 47 && input < 58)
-            {
-                loadedFrame.rows[loadedSong.currentNote].effect[selectedChannel] = input - 48;
-                if (loadedFrame.rows[loadedSong.currentNote].effectValue[selectedChannel] < 0)
-                    loadedFrame.rows[loadedSong.currentNote].effectValue[selectedChannel] = 0;
-            }
-            else
-                return;
-        }
         else if (selectedPart == 8 || selectedPart == 9) // Effect value
         {
             int val = 0;
@@ -855,6 +882,8 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
         
 
     }
+
+    keyDown = true;
 
     return;
 }
@@ -889,7 +918,6 @@ void pressButton()
 
 
 
-
     if (hoveredTile.y > 12 && hoveredTile.y < 15 && hoveredTile.x > 3) // Mute/unmute
     {
         int selectedChannel = int((hoveredTile.x - 4.0f) / 11.0f);
@@ -902,6 +930,18 @@ void pressButton()
         selectedButton = 0;
         if (selectedTile.x - 45 >= loadedSong.songName.length()) // Snap to end of text.
             selectedTile.x = 44 + loadedSong.songName.length();
+    }
+
+    if (hoveredTile.y > 0 && hoveredTile.y < 5) // Select effect.
+    {
+        if (hoveredTile.x > 38 && hoveredTile.x < 43)
+        {
+            int newEffect = int(hoveredTile.x - 39) + int(hoveredTile.y - 1) * 4;
+            if (newEffect == selectedEffect)
+                selectedEffect = -1;
+            else
+                selectedEffect = int(hoveredTile.x - 39) + int(hoveredTile.y - 1) * 4;
+        }
     }
 
     
@@ -935,6 +975,12 @@ void pressButton()
 
     if (hoveredTile.y > 1 && hoveredTile.y < 12) // Select file / Select sample.
     {
+        if (hoveredTile.x > 65 && hoveredTile.x < 77) // Select file
+        {
+            selectedFile = hoveredTile.y - 2 + fileListScroll;
+            if (selectedFile >= fileNameList.size()) // Snap to end of song.
+                selectedFile = fileNameList.size() - 1;
+        }
         if (hoveredTile.x == 66) // Load sample/Song
         {
             if (filesSampleNotSong)
@@ -946,15 +992,21 @@ void pressButton()
             else
                 LoadSong(fileNameList[selectedFile]);
         }
-        else if (hoveredTile.x > 66 && hoveredTile.x < 77) // Select file
+        else if (hoveredTile.x > 77 && hoveredTile.x < 91) // Select sample
         {
-            selectedFile = hoveredTile.y - 2 + fileListScroll;
-            if (selectedFile >= fileNameList.size()) // Snap to end of song.
-                selectedFile = fileNameList.size() - 1;
-        }
-        else if (hoveredTile.x > 80 && hoveredTile.x < 91) // Select sample
-        {
-            selectedSample = hoveredTile.y - 2 + sampleListScroll;
+            
+
+            if (selectedSample == hoveredTile.y - 2 + sampleListScroll && hoveredTile.x == 90 && loadedSamples.size() > 0) // Delete sample.
+            {
+                loadedSamples.erase(loadedSamples.begin() + selectedSample);
+                loadedSamples.shrink_to_fit();
+                selectedSample--;
+                if (selectedSample < 0)
+                    selectedSample = 0;
+            }
+            else
+                selectedSample = hoveredTile.y - 2 + sampleListScroll;
+
             if (selectedSample >= loadedSamples.size()) // Snap to end of song.
                 selectedSample = loadedSamples.size() - 1;
         }
@@ -974,6 +1026,12 @@ void pressButton()
             if (fileListScroll > 0)
                 fileListScroll--;
             activeUI[77][2].sprite = { 7, 3 };
+        }
+        else if (hoveredTile.x == 91) // Sample menu scroll up.
+        {
+            if (sampleListScroll > 0)
+                sampleListScroll--;
+            activeUI[91][2].sprite = { 7, 3 };
         }
     }
     else if (hoveredTile.y == 3) // Change song BPM.
@@ -1126,6 +1184,12 @@ void pressButton()
             if (fileNameList.size() - fileListScroll > 1)
                 fileListScroll++;
         }
+        else if (hoveredTile.x == 91) // File menu scroll down.
+        {
+            activeUI[91][11].sprite = { 7, 4 };
+            if (loadedSamples.size() - sampleListScroll > 1)
+                sampleListScroll++;
+        }
     }
     else if (hoveredTile.y == 16)
     {
@@ -1185,6 +1249,9 @@ void releaseButton()
         // File scroll arrows
         activeUI[77][2].sprite = { 6, 3 };
         activeUI[77][11].sprite = { 6, 4 };
+        // Sample scroll arrows
+        activeUI[91][2].sprite = { 6, 3 };
+        activeUI[91][11].sprite = { 6, 4 };
     }
 }
 
@@ -1196,3 +1263,34 @@ int main(void)
 
     return 0;
 }
+
+
+/*
+unsigned char* ChangeTheme()
+{
+    uiColorTheme++;
+    if (uiColorTheme > 2)
+        uiColorTheme = 0;
+
+    // Load the ui texture map.
+    int sizeX, sizeY, comps;
+    unsigned int uiTexture;
+    glGenTextures(1, &uiTexture);
+    glBindTexture(GL_TEXTURE_2D, uiTexture);
+    unsigned char* data = stbi_load("Tiles.png", &sizeX, &sizeY, &comps, 3);
+
+    for (int i = 0; i < sizeX * sizeY; i++)
+    {
+        if (uiColorTheme == 1)
+        {
+            int oldBlue = data[(3 * i) + 2];
+            data[(3 * i) + 2] = data[3 * i];
+            data[3 * i] = oldBlue;
+        }
+    }
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 512, 512, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    stbi_image_free(data);
+
+    return data;
+}*/

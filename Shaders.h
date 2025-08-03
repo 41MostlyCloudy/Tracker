@@ -19,7 +19,7 @@ const char* uiVertexShaderSource = "#version 330 core\n"
 "void main()\n"
 "{\n"
 
-"	vec3 uiColors[12] =\n"
+"	vec3 uiColors[15] =\n"
 "	{\n"
 "		{0.0, 0.0, 0.0}, // Blue/Gray\n"
 "		{30.0/255.0, 30.0/255.0, 60.0/255.0},\n"
@@ -35,6 +35,10 @@ const char* uiVertexShaderSource = "#version 330 core\n"
 "		{100.0/255.0, 0.0, 60.0/255.0}, // Red\n"
 "		{160.0/255.0, 0.0, 40.0/255.0},\n"
 "		{1.0, 0.0, 0.0},\n"
+
+"		{0.0, 0.0, 120.0/255.0}, // Blue\n"
+"		{0.0, 90.0/255.0, 180.0/255.0},\n"
+"		{0.0, 180.0/255.0, 1.0},\n"
 "	};\n"
 
 
