@@ -28,6 +28,9 @@ struct Channel
 	float effectY = 0; // The second effect parameter for effects that use two.
 	float pitch = 0;
 	float realPitch = 0;
+	float instrument = 0;
+
+
 
 
 	std::vector <int> loopNoteIndex = {};
@@ -110,9 +113,9 @@ struct Song
 	float timeInSong = 0;
 
 
-	int toNextChannelNote[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-	int toNextChannelVolume[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-	int toNextChannelEffect[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+	float toNextChannelNote[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+	float toNextChannelVolume[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+	float toNextChannelEffect[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
 	int noteChannelIndex[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 	int volumeChannelIndex[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -125,72 +128,77 @@ struct Song
 
 // -1 - No effect:
 
-// 0 - Cosmic Arp: (Done)
+// 0 - Cosmic Arp:
 //		Play alternating notes every tick, between the base note and the two offsets.
 //		-x = semitone offset 1
 //		-y = semitone offset 2
 
-// 1 - Vibrato: (Done)
+// 2 - Vibrato:
 //		Change the note pitch over time.
 //		-x = speed (1 cycle in x loops)
 //		-y = depth (y/4 semitones)
 
-// 2 - Tremolo: (Done)
+// 3 - Tremolo:
 //		Change the note volume over time.
 //		-x = speed (1 cycle in x loops)
 //		-y = depth (y/4 semitones)
 
-// 3 - Set Panning: (Done)
+// 4 - Set Panning:
 //		Set the stereo panning position from 00(Left) to FF(Right).
 //		-xy = position
 
-// 4 - Volume Slide: (Done)
+// 5 - Volume Slide:
 //		Slide the volume up by x speed or down by y speed.
 //		-x = volume up (x/4 semitones per beat)
 //		-y = volume down (x/4 semitones per beat)
 
-// 5 - Pitch Slide: (done)
+// 6 - Pitch Slide:
 //		Slide the pitch up by x speed or down by y speed.
 //		-x = pitch up (x semitones per beat)
 //		-y = pitch down (x semitones per beat)
 
-// 6 - Pitch Slide (fine): (done)
+// 7 - Pitch Slide (fine):
 //		Slide the pitch up by x speed or down by y speed.
 //		-x = speed up (x/4 semitones per beat)
 //		-y = speed down (x/4 semitones per beat)
 
-// 7 - Jump to frame:
+// 8 - Jump to frame:
 //		Jump the the specified frame.
 //		-xx = frame
 
-// 8 - Note delay:
+// 9 - Note delay:
 //		Start the note late, after x ticks.
 //		-xx = ticks
 
-// 9 - Sample offset:
+// 10 - Sample offset:
 //		Offset the sample starting on the beat by x ticks.
 //		-xx = ticks
 
-// A - Set BPM:
+// 11 - Set BPM:
 //		Set the song BPM to x.
 //		-xx = BPM
 
-// B - Set TPB:
+// 12 - Set TPB:
 //		Set the song TPB to x.
 //		-xx = TPB
 
-// C - Low Pass:
+
+/////////////////////////////////////////// FUTURE
+
+
+
+// 13 - Low Pass:
 //		A Low pass filter.
 //		-xx size.
 // 
-// D - High Pass:
+// 14 - High Pass:
 //		A High pass filter.
 //		-xx size.
 // 
-// E - Loop section:
+// 15 - Loop section:
 //		Loop the next x beats y times.
 //		Other notes, instruments, volumes and effects play over the repeated beats and take priority.
 //		The loop ends when another loop effect is encountered. (A loop of length 0 stops loops entirely).
 //		-xx = Number of beats.
 
-// F - (To be decided)
+// 16 - (To be decided)

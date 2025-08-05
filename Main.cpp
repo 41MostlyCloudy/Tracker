@@ -488,6 +488,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
                 frameScroll = 0.0f;
                 for (int ch = 0; ch < 8; ch++)
                 {
+                    channels[ch].volume = 1;
                     channels[ch].effect = -1;
                     channels[ch].effectX = 0;
                     channels[ch].effectY = 0;
@@ -498,6 +499,14 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
                     loadedSong.toNextChannelNote[ch] = 0;
                     loadedSong.toNextChannelVolume[ch] = 0;
                     loadedSong.toNextChannelEffect[ch] = 0;
+                }
+            }
+            else
+            {
+                for (int ch = 0; ch < 8; ch++)
+                {
+                    channels[ch].volume = 0;
+                    ma_sound_set_volume(&channelAudio[ch], channels[ch].volume);
                 }
             }
         }
@@ -916,6 +925,11 @@ void pressButton()
 
     selectedTile = hoveredTile; // Select the tile that the mouse is currently on
 
+
+    if (hoveredTile.y > 9 && hoveredTile.y < 12 && hoveredTile.x > 23 && hoveredTile.x < 26) // Record
+    {
+        recordingSong = !recordingSong;
+    }
 
 
     if (hoveredTile.y > 12 && hoveredTile.y < 15 && hoveredTile.x > 3) // Mute/unmute

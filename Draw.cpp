@@ -238,6 +238,10 @@ void  DrawBorder()
 	DrawKey(16, 4, { 62, 10 });
 
 
+	
+
+
+
 	// File select box
 	for (int y = 3; y < 11; y++)
 	{
@@ -360,6 +364,15 @@ void  DrawBorder()
 	activeUI[logoX + 6][logoY].sprite = { 22, 4 };		activeUI[logoX + 7][logoY].sprite = { 23, 4 };			activeUI[logoX + 8][logoY].sprite = { 24, 4 };
 	activeUI[logoX + 9][logoY].sprite = { 22, 4 };																activeUI[logoX + 11][logoY].sprite = { 25, 4 };
 	activeUI[logoX + 12][logoY].sprite = { 25, 3 };		activeUI[logoX + 13][logoY].sprite = { 23, 4 };			activeUI[logoX + 14][logoY].sprite = { 24, 4 };
+
+
+	// Draw recording button
+	DrawText("Record", 22, 28, 9, 3, 0, -1, -1);
+	activeUI[24][10].sprite = { 22 + float(recordingSong) * 2, 7 };
+	activeUI[25][10].sprite = { 23 + float(recordingSong) * 2, 7 };
+	activeUI[24][11].sprite = { 22 + float(recordingSong) * 2, 8 };
+	activeUI[25][11].sprite = { 23 + float(recordingSong) * 2, 8 };
+
 
 	// Eye
 	/*

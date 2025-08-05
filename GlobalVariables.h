@@ -15,6 +15,7 @@
 float delta = 0.0f; // Time between frames.
 
 bool playingSong = false;
+bool recordingSong = false;
 
 bool drawScreen = false;
 
