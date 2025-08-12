@@ -394,7 +394,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
                         selectedTile.x--;
                 }
             }
-            else // Delete note
+            else if (editing) // Delete note
             {
                 for (int y = noteSelectionStart.y; y <= noteSelectionEnd.y; y++)
                 {
@@ -420,64 +420,81 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         
         if (key == GLFW_KEY_UP || key == GLFW_KEY_KP_8) // Move up
         {
-            if (frameScroll > 0)
-                frameScroll--;
-            if (loadedSong.currentNote > 0)
-                loadedSong.currentNote--;
-            noteSelectionStart.y = loadedSong.currentNote;
-            noteSelectionEnd.y = loadedSong.currentNote;
-            activeUI[91][16].sprite = { 7, 3 };
+            if (editing)
+            {
+                if (frameScroll > 0)
+                    frameScroll--;
+                if (loadedSong.currentNote > 0)
+                    loadedSong.currentNote--;
+                noteSelectionStart.y = loadedSong.currentNote;
+                noteSelectionEnd.y = loadedSong.currentNote;
+                activeUI[91][16].sprite = { 7, 3 };
+            }
 
             
         }
         if (key == GLFW_KEY_DOWN || key == GLFW_KEY_KP_5) // Move down
         {
-            if (frameScroll < loadedFrame.rows.size() - 40)
-                frameScroll++;
-            if (loadedSong.currentNote < loadedFrame.rows.size() - 1)
-                loadedSong.currentNote++;
-            noteSelectionStart.y = loadedSong.currentNote;
-            noteSelectionEnd.y = loadedSong.currentNote;
-            activeUI[91][55].sprite = { 7, 4 };
+            if (editing)
+            {
+                if (frameScroll < loadedFrame.rows.size() - 40)
+                    frameScroll++;
+                if (loadedSong.currentNote < loadedFrame.rows.size() - 1)
+                    loadedSong.currentNote++;
+                noteSelectionStart.y = loadedSong.currentNote;
+                noteSelectionEnd.y = loadedSong.currentNote;
+                activeUI[91][55].sprite = { 7, 4 };
+            }
         }
         if (key == GLFW_KEY_LEFT || key == GLFW_KEY_KP_4) // Move left
         {
-            if (noteSelectionStart.x > 0)
+            if (editing)
             {
-                int selectedPart = int(noteSelectionStart.x) % 11;
+                if (noteSelectionStart.x > 0)
+                {
+                    int selectedPart = int(noteSelectionStart.x) % 11;
 
-                if (selectedPart == 0)
-                {
-                    noteSelectionStart.x -= 2;
+                    if (selectedPart == 0)
+                    {
+                        noteSelectionStart.x -= 2;
+                    }
+                    else
+                    {
+                        noteSelectionStart.x -= 1;
+                    }
+                    noteSelectionEnd.x = noteSelectionStart.x;
                 }
-                else
-                {
-                    noteSelectionStart.x -= 1;
-                }
-                noteSelectionEnd.x = noteSelectionStart.x;
             }
         }
         if (key == GLFW_KEY_RIGHT || key == GLFW_KEY_KP_6) // Move left
         {
-            if (noteSelectionStart.x < 86)
+            if (editing)
             {
-                int selectedPart = int(noteSelectionStart.x) % 11;
+                if (noteSelectionStart.x < 86)
+                {
+                    int selectedPart = int(noteSelectionStart.x) % 11;
 
-                if (selectedPart == 9)
-                {
-                    noteSelectionStart.x += 2;
+                    if (selectedPart == 9)
+                    {
+                        noteSelectionStart.x += 2;
+                    }
+                    else
+                    {
+                        noteSelectionStart.x += 1;
+                    }
+                    noteSelectionEnd.x = noteSelectionStart.x;
                 }
-                else
-                {
-                    noteSelectionStart.x += 1;
-                }
-                noteSelectionEnd.x = noteSelectionStart.x;
             }
         }
 
         if (key == GLFW_KEY_SPACE) // Start/stop song
         {
             playingSong = !playingSong;
+
+            if (inHelpPage) // Don't play the song if editing.
+                playingSong = false;
+
+            editing = !playingSong;
             saveCurrentFrame();
 
             if (playingSong) // Restart the frame when playing the song.
@@ -500,18 +517,31 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
                     loadedSong.toNextChannelVolume[ch] = 0;
                     loadedSong.toNextChannelEffect[ch] = 0;
                 }
+
+                if (recordingSong) // Set up recording.
+                {
+                    std::string fileName = "Export/" + loadedSong.songName + ".wav";
+                    const char* name = &fileName[0];
+                    ma_encoder_init_file(name, &encoderConfig, &encoder);
+                }
             }
             else
             {
                 for (int ch = 0; ch < 8; ch++)
                 {
                     channels[ch].volume = 0;
-                    ma_sound_set_volume(&channelAudio[ch], channels[ch].volume);
+                    //ma_sound_set_volume(&channelAudio[ch], channels[ch].volume);
+                }
+
+                if (recordingSong) // Stop recording.
+                {
+                    ma_encoder_uninit(&encoder);
+                    recordingSong = false;
                 }
             }
         }
 
-        if (key == GLFW_KEY_ENTER) // Return to start of song
+        if (key == GLFW_KEY_ENTER && editing) // Return to start of song
         {
             loadedSong.currentNote = 0;
             frameScroll = 0.0f;
@@ -531,7 +561,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             }
         }
 
-        if (key == GLFW_KEY_LEFT_SHIFT) // Copy selected notes.
+        if (key == GLFW_KEY_LEFT_SHIFT && editing) // Copy selected notes.
         {
             // Create mouse selection frame.
             frameSelection.rows.clear();
@@ -567,7 +597,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             }
         }
 
-        if (key == GLFW_KEY_RIGHT_SHIFT) // Paste selected notes.
+        if (key == GLFW_KEY_RIGHT_SHIFT && editing) // Paste selected notes.
         {
             int leftMostChannel = int((noteSelectionStart.x) / 11.0f);
 
@@ -621,7 +651,7 @@ void mouse_button_callback(GLFWwindow* window, int key, int action, int mods)
 
     if (action == GLFW_PRESS)
     {
-        if (key == GLFW_MOUSE_BUTTON_LEFT)
+        if (key == GLFW_MOUSE_BUTTON_LEFT && editing)
         {
             if (hoveredTile.y > 15 && hoveredTile.y < 56 && hoveredTile.x > 3 && hoveredTile.x < 91) // Select note
             {
@@ -693,7 +723,7 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
         }
     }
 
-    if (!writing)
+    if (!writing && editing)
     {
         int selectedChannel = int((noteSelectionStart.x) / 11.0f);
         int selectedPart = int(noteSelectionStart.x) % 11;
@@ -926,9 +956,24 @@ void pressButton()
     selectedTile = hoveredTile; // Select the tile that the mouse is currently on
 
 
-    if (hoveredTile.y > 9 && hoveredTile.y < 12 && hoveredTile.x > 23 && hoveredTile.x < 26) // Record
+    if (hoveredTile.y > 9 && hoveredTile.y < 12 && hoveredTile.x > 23 && hoveredTile.x < 26 && editing) // Record
     {
         recordingSong = !recordingSong;
+    }
+
+    if (hoveredTile.y == 9 && hoveredTile.x > 29 && hoveredTile.x < 34 && editing) // Read Help Page
+    {
+        inHelpPage = !inHelpPage;
+        frameScroll = 0.0f; // Reset frame scroll.
+        editing = !inHelpPage;
+
+        if (inHelpPage)
+        {
+            saveCurrentFrame();
+            loadedFrame.rows.resize(helpPageText.size());
+        }
+        else
+            loadCurrentFrame();
     }
 
 
@@ -959,7 +1004,7 @@ void pressButton()
     }
 
     
-    if (hoveredTile.y > 1 && hoveredTile.y < 11) // Select song frame.
+    if (hoveredTile.y > 1 && hoveredTile.y < 11 && editing) // Select song frame.
     {
         if (hoveredTile.x > 0 && hoveredTile.x < 6)
         {

@@ -22,6 +22,8 @@ void DrawNote(uint8_t num, int textStart, int textY, int textCol, int bgCol, int
 
 void DrawKey(int button, int key, Vector2 pos);
 
+void DrawHelpPage();
+
 
 
 
@@ -36,6 +38,9 @@ void DrawEverything()
 	{
 		DrawChannel(i);
 	}
+
+	if (inHelpPage)
+		DrawHelpPage();
 
 	return;
 }
@@ -153,7 +158,7 @@ void  DrawBorder()
 		DrawText("FILES(Samples)", 67, 80, 0, 4, 2, -1, -1);
 	else
 		DrawText("FILES(Songs)", 67, 80, 0, 4, 2, -1, -1);
-	DrawText("SAMPLES", 79 + 4, 86 + 4, 0, 4, 2, -1, -1);
+	DrawText("Samples", 79 + 4, 86 + 4, 0, 3, 0, -1, -1);
 	//DrawText("CLOSE", 87, 92, 0, 4, 2, -1, -1);
 	activeUI[44][1].sprite = { 0, 3 };
 	activeUI[44][2].sprite = { 2, 4 };
@@ -372,6 +377,8 @@ void  DrawBorder()
 	activeUI[25][10].sprite = { 23 + float(recordingSong) * 2, 7 };
 	activeUI[24][11].sprite = { 22 + float(recordingSong) * 2, 8 };
 	activeUI[25][11].sprite = { 23 + float(recordingSong) * 2, 8 };
+
+	DrawText("HELP", 30, 34, 9, 4, 2, -1, -1);
 
 
 	// Eye
@@ -867,6 +874,39 @@ void DrawKey(int button, int key, Vector2 pos)
 
 	activeUI[int(pos.x)][int(pos.y)].sprite = { float(key * 2), 9 };
 		activeUI[int(pos.x + 1)][int(pos.y)].sprite = { float(key * 2) + 1, 9 };
+
+	return;
+}
+
+
+void DrawHelpPage()
+{
+	for (int y = 16; y < 56; y++)
+	{
+		/*
+		for (int x = 1; x < 91; x++)
+		{
+			activeUI[x][y].sprite = { 15, 0 };
+			activeUI[x][y].bgCol = 0;
+			activeUI[x][y].textCol = 5;
+		}*/
+
+		int textY = y - 16 + int(frameScroll);
+		if (textY < helpPageText.size())
+		{
+			if (helpPageText[textY].length() > 0 && helpPageText[textY].at(0) == '#')
+			{
+				for (int x = 1; x < 91; x++)
+				{
+					activeUI[x][y].sprite = { 21, 0 };
+				}
+			}
+			else
+				DrawText(helpPageText[textY], 1, 91, y, 5, 0, -1, -1);
+		}
+		else
+			DrawText("", 1, 91, y, 5, 0, -1, -1);
+	}
 
 	return;
 }

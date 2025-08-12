@@ -15,7 +15,9 @@
 float delta = 0.0f; // Time between frames.
 
 bool playingSong = false;
+bool editing = true;
 bool recordingSong = false;
+bool inHelpPage = false;
 
 bool drawScreen = false;
 
@@ -80,4 +82,61 @@ uint8_t uiColors[12][3] =
 	{100, 0, 60}, // Red
 	{160, 0, 40},
 	{255, 0, 0},
+};
+
+
+
+std::vector <std::string> helpPageText =
+{
+	"SUPER SOUND",
+	"",
+	"",
+	"",
+	"",
+	"#",
+	"ABOUT",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"#",
+	"HEXADECIMALS",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"#",
+	"EFFECTS",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
 };
