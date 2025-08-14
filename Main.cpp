@@ -310,9 +310,18 @@ void processInput(GLFWwindow* window)
     mouseCoords.x = (mouseX / screenSize.x) * 736;
     mouseCoords.y = (mouseY / screenSize.y) * 456;
 
-    mouseCoords.x -= 368;
-    mouseCoords.x /= windowRatio;
-    mouseCoords.x += 368;
+    if (windowRatio < 1.0f)
+    {
+        mouseCoords.x -= 368;
+        mouseCoords.x /= windowRatio;
+        mouseCoords.x += 368;
+    }
+    else
+    {
+        mouseCoords.y -= 228;
+        mouseCoords.y *= windowRatio;
+        mouseCoords.y += 228;
+    }
 
     hoveredTile = { float(int(mouseCoords.x / 8)), float(int(mouseCoords.y / 8)) };
 
@@ -487,7 +496,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             }
         }
 
-        if (key == GLFW_KEY_SPACE) // Start/stop song
+        if (key == GLFW_KEY_SPACE && !inHelpPage) // Start/stop song
         {
             playingSong = !playingSong;
 
@@ -496,6 +505,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
             editing = !playingSong;
             saveCurrentFrame();
+
+            for (int ch = 0; ch < 8; ch++)
+                channelPlayingNote[ch] = false; // Set notes to not playing.
 
             if (playingSong) // Restart the frame when playing the song.
             {
@@ -961,7 +973,7 @@ void pressButton()
         recordingSong = !recordingSong;
     }
 
-    if (hoveredTile.y == 9 && hoveredTile.x > 29 && hoveredTile.x < 34 && editing) // Read Help Page
+    if (hoveredTile.y == 9 && hoveredTile.x > 29 && hoveredTile.x < 34 && !playingSong) // Read Help Page
     {
         inHelpPage = !inHelpPage;
         frameScroll = 0.0f; // Reset frame scroll.
@@ -991,8 +1003,31 @@ void pressButton()
             selectedTile.x = 44 + loadedSong.songName.length();
     }
 
-    if (hoveredTile.y > 0 && hoveredTile.y < 5) // Select effect.
+    if (hoveredTile.y > 1 && hoveredTile.y < 8) // Select effect.
     {
+        if (hoveredTile.x == 38)
+        {
+            int newEffect = -1;
+            if (hoveredTile.y == 2)
+                newEffect = 4;
+            else if (hoveredTile.y == 3)
+                newEffect = 5;
+            else if (hoveredTile.y == 4)
+                newEffect = 8;
+            else if (hoveredTile.y == 5)
+                newEffect = 9;
+            else if (hoveredTile.y == 6)
+                newEffect = 11;
+            else if (hoveredTile.y == 7)
+                newEffect = 12;
+
+            if (newEffect == selectedEffect)
+                selectedEffect = -1;
+            else
+                selectedEffect = newEffect;
+        }
+
+        /*
         if (hoveredTile.x > 38 && hoveredTile.x < 43)
         {
             int newEffect = int(hoveredTile.x - 39) + int(hoveredTile.y - 1) * 4;
@@ -1001,6 +1036,7 @@ void pressButton()
             else
                 selectedEffect = int(hoveredTile.x - 39) + int(hoveredTile.y - 1) * 4;
         }
+        */
     }
 
     

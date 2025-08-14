@@ -139,14 +139,14 @@ void read_and_mix_pcm_frames_f32(ma_decoder* pDecoder, float* pOutputF32, ma_uin
 void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount);
 
 
-ma_decoder* g_pDecoders;
+ma_decoder g_pDecoders[8];
+bool channelPlayingNote[8] = { false, false, false, false, false, false, false, false };
 
 //ma_event g_stopEvent; /* <-- Signaled by the audio thread, waited on by the main thread. */
 
 ma_decoder_config decoderConfig;
 ma_device_config deviceConfig;
 ma_device device;
-ma_uint32 iDecoder;
 
 
 // Encoder
@@ -155,12 +155,11 @@ ma_encoder encoder;
 
 
 void read_and_mix_pcm_frames_f32(ma_decoder* pDecoder, float* pOutputF32, ma_uint32 frameCount, int channel)
-{
-    /*
-    The way mixing works is that we just read into a temporary buffer, then take the contents of that buffer and mix it with the
-    contents of the output buffer by simply adding the samples together. You could also clip the samples to -1..+1, but I'm not
-    doing that in this example.
-    */
+{   
+    //The way mixing works is that we just read into a temporary buffer, then take the contents of that buffer and mix it with the
+    //contents of the output buffer by simply adding the samples together. You could also clip the samples to -1..+1, but I'm not
+    //doing that in this example.
+    
     float temp[4096];
     ma_uint32 tempCapInFrames = ma_countof(temp) / 2;
     ma_uint32 totalFramesRead = 0;
@@ -193,7 +192,7 @@ void read_and_mix_pcm_frames_f32(ma_decoder* pDecoder, float* pOutputF32, ma_uin
         }
 
         
-        /* Mix the frames together. */
+        // Mix the frames together.
         for (iSample = 0; iSample < framesReadThisIteration * 2; iSample += 2) // Add the frames from temp to pOutputF32.
         {
             pOutputF32[totalFramesRead * 2 + iSample] += temp[iSample] * volumeLeft;
@@ -206,7 +205,10 @@ void read_and_mix_pcm_frames_f32(ma_decoder* pDecoder, float* pOutputF32, ma_uin
 
         if (framesReadThisIteration < (ma_uint32)framesToReadThisIteration) // Break if at the end of the sample.
         {
-            break;  /* Reached EOF. */
+            channelPlayingNote[channel] = false;
+            ma_decoder_uninit(&g_pDecoders[channel]);
+            ma_decoder_init_memory(0, 0, &decoderConfig, &g_pDecoders[channel]);
+            break;  // Reached EOF.
         }
     }
 
@@ -220,10 +222,11 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
     float* pOutputF32 = (float*)pOutput;
     ma_uint32 iDecoder;
 
-    /* This example assumes the device was configured to use ma_format_f32. */
-    for (int channel = 0; channel < 8; ++channel)
+    // This example assumes the device was configured to use ma_format_f32.
+    for (int channel = 0; channel < 8; channel++)
     {
-        read_and_mix_pcm_frames_f32(&g_pDecoders[channel], pOutputF32, frameCount, channel);        
+        if (channelPlayingNote[channel])
+            read_and_mix_pcm_frames_f32(&g_pDecoders[channel], pOutputF32, frameCount, channel);        
     }
     if (playingSong && recordingSong)
     {
@@ -231,10 +234,10 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
         ma_encoder_write_pcm_frames(&encoder, pOutputF32, frameCount, &framesWritten); // Write frames to file if recording.
     }
 
-    /*
-    If at the end all of our decoders are at the end we need to stop. We cannot stop the device in the callback. Instead we need to
-    signal an event to indicate that it's stopped. The main thread will be waiting on the event, after which it will stop the device.
-    */
+    
+    //If at the end all of our decoders are at the end we need to stop. We cannot stop the device in the callback. Instead we need to
+    //signal an event to indicate that it's stopped. The main thread will be waiting on the event, after which it will stop the device.
+    
 
 
     (void)pInput;
@@ -253,19 +256,9 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
 
 void SetUpAudioEngine()
 {
-    //ma_engine_init(NULL, &engine);
-    //engineConfig = ma_engine_config_init();
-
-
-
-    ///////////////////////////////////////////// NEW!
-
-
-    g_pDecoders = (ma_decoder*)malloc(sizeof(*g_pDecoders) * 8);
-
-    /* In this example, all decoders need to have the same output format. */
+    // In this example, all decoders need to have the same output format.
     decoderConfig = ma_decoder_config_init(ma_format_f32, 2, 48000);
-    for (int ch = 0; ch < 8; ++ch)
+    for (int ch = 0; ch < 8; ch++)
     {
         ma_decoder_init_memory(0, 0, &decoderConfig, &g_pDecoders[ch]);
     }
@@ -280,7 +273,7 @@ void SetUpAudioEngine()
 
     ma_device_init(NULL, &deviceConfig, &device);
 
-    /* Now we start playback and wait for the audio thread to tell us to stop. */
+    // Now we start playback and wait for the audio thread to tell us to stop.
     ma_device_start(&device);
     
 
@@ -295,60 +288,6 @@ void SetUpAudioEngine()
 }
 
 
-void RecordSong()
-{
-    // Initialize the encoder for recording.
-    /*
-    ma_encoder encoder;
-    ma_format format = ma_format_f32;
-    ma_uint32 channels = 2;
-    ma_uint32 sampleRate = 48000;
-    ma_encoder_config config = ma_encoder_config_init(ma_encoding_format_wav, format, channels, sampleRate);
-    ma_encoder_init_file("SongFile.wav", &config, &encoder);
-    */
-
-
-    return;
-}
-
-
-/*
-void playback_data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount)
-{
-    ma_engine_read_pcm_frames(&engine, pOutput, frameCount, NULL);
-
-    //std::cout << "a";
-}*/
-
-/*
-void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount)
-{
-    
-    ma_decoder* pDecoder = (ma_decoder*)pDevice->pUserData;
-    if (pDecoder == NULL)
-    {
-        return;
-    }
-
-    // Reading PCM frames will loop based on what we specified when called ma_data_source_set_looping().
-    ma_data_source_read_pcm_frames(pDecoder, pOutput, frameCount, NULL);
-
-    
-    
-    ma_encoder* pEncoder = (ma_encoder*)pDevice->pUserData;
-    if (pEncoder == NULL)
-    {
-        return;
-    }
-
-    ma_uint64 framesWritten;
-    result = ma_encoder_write_pcm_frames(&encoder, pOutput, frameCount, &framesWritten);
-    
-
-
-    (void)pInput;
-}*/
-
 
 void StartSample(int channel, int sampleNumber, float pitch, float time)
 {
@@ -360,9 +299,6 @@ void StartSample(int channel, int sampleNumber, float pitch, float time)
     const char* name = &fileName[0];
 
 
-    //ma_sound_uninit(&channelAudio[channel]);
-    //ma_sound_init_from_file(&engine, name, MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &channelAudio[channel]);
-    //ma_sound_start(&channelAudio[channel]);
 
     pitch = pitchTable[int(pitch)];
     channels[channel].realPitch = pitch;
@@ -372,28 +308,9 @@ void StartSample(int channel, int sampleNumber, float pitch, float time)
     ma_decoder_uninit(&g_pDecoders[channel]);
     ma_decoder_init_file(name, &decoderConfig, &g_pDecoders[channel]);
 
-
-    //ma_sound_set_fade_in_milliseconds(&channelAudio[channel], 0, 1, 20);
-    
+    channelPlayingNote[channel] = true;
 
 
-    
-
-    //ma_decoder_
-
-    //ma_sound_set_pitch(&channelAudio[channel], pitch);
-
-    
-
-
-    
-    
-    
-
-    // Pith shift by interpolating pitch every frame.
-    //ma_sound_set_pan(&channelAudio[channel], 1);
-    //ma_sound_set_looping(&channels[channel], true);
-    //ma_sound_set_volume(&channelAudio[channel], songPlaying.channels[channel].channelVolume);
 
     if (channels[channel].volume > 1)
         channels[channel].volume = 1;
@@ -401,12 +318,6 @@ void StartSample(int channel, int sampleNumber, float pitch, float time)
         channels[channel].volume = 0;
 
 
-    //ma_sound_set_volume(&channelAudio[channel], channels[channel].volume);
-
-
-    
-
-    
 
     return;
 }
@@ -414,23 +325,19 @@ void StartSample(int channel, int sampleNumber, float pitch, float time)
 
 void StopSample(int channel)
 {
-    //ma_sound_set_fade_in_milliseconds(&channelAudio[channel], 1, 0, 800);
     ma_decoder_uninit(&g_pDecoders[channel]);
     ma_decoder_init_memory(0, 0, &decoderConfig, &g_pDecoders[channel]);
-    //ma_sound_stop(&channelAudio[channel]);
     return;
 }
 
 
-/*
-void SetBackgroundVolume(float volume)
-{
-    ma_sound_set_volume(&bgMusic, volume);
-}*/
+
 
 
 void stepSong()
 {
+    
+    
 	// 1B = 1/BPM;
 
 	// 1B = 60/BPS;
@@ -445,10 +352,11 @@ void stepSong()
     loadedSong.timeInTick += delta;
     loadedSong.timeInSong += delta;
 
-	
+    
 
 	if (loadedSong.timeInNote > (60000.0f / (loadedSong.bpm * 4.0f)))
 	{
+        
 		loadedSong.currentNote++;
 
 		if (loadedSong.currentNote > 8)
@@ -456,8 +364,14 @@ void stepSong()
 
 		loadedSong.timeInNote = 0;
 
-		if (loadedSong.currentNote >= loadedSong.frames[loadedSong.currentFrame].rows) // Start new row
+        
+        //if (loadedSong.currentFrame >= loadedSong.frames.size())
+        //    loadedSong.currentFrame = loadedSong.frames.size() - 1;
+
+		if (loadedSong.currentNote >= loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].rows) // Start new row
 		{
+            //std::cout << " start -> ";
+
 			loadedSong.currentFrame++;
 			loadedSong.currentNote = 0;
 
@@ -472,11 +386,18 @@ void stepSong()
                 }
             }
 
+
 			loadCurrentFrame();
+
+            
+
 
             // Reset frame values.
             loadedSong.currentNote = 0;
             frameScroll = 0.0f;
+
+            
+
             for (int ch = 0; ch < 8; ch++)
             {
                 loadedSong.noteChannelIndex[ch] = 0;
@@ -486,8 +407,14 @@ void stepSong()
                 loadedSong.toNextChannelVolume[ch] = 0;
                 loadedSong.toNextChannelEffect[ch] = 0;
             }
+            
+            //std::cout << " <- end ";
+
 		}
 
+        
+
+        
 
         // Read note data an display notes.
         for (int ch = 0; ch < 8; ch++)
@@ -530,7 +457,7 @@ void stepSong()
                     volumeIndex++;
 
                     channels[ch].volume = float(volume) / 64.0f;
-                    //ma_sound_set_volume(&channelAudio[ch], channels[ch].volume);
+                    
 
                     // Set distance to next note.
                     if (volumeIndex < loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].volumes.size())
@@ -687,6 +614,8 @@ void stepSong()
         }*/
 	}
 
+    
+
 
     if (loadedSong.timeInTick > (60000.0f / (loadedSong.ticksPerBeat * 4.0f * loadedSong.bpm))) // New tick
     {
@@ -731,10 +660,10 @@ void stepSong()
 
             //ma_sound_set_pitch(&channelAudio[ch], pitchTable[int(channels[ch].pitch)] + volOffset);
         }
-        else if (channels[ch].effect == 3) // Vibrato
+        else if (channels[ch].effect == 3) // Tremolo
         {
             float volOffset = sin((loadedSong.timeInSong / (60000.0f / (loadedSong.bpm * 4.0f))) * 3.14f * 0.125f * channels[ch].effectX) * channels[ch].effectY * 0.1;
-
+            //channels[ch].volume += volOffset;
             //ma_sound_set_volume(&channelAudio[ch], channels[ch].volume + volOffset);
         }
         else if (channels[ch].effect == 4) // Set panning
@@ -786,6 +715,8 @@ void stepSong()
     if (frameScroll < 0)
         frameScroll = 0;
 
+    
+    
 
 	return;
 }

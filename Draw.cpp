@@ -152,7 +152,7 @@ void  DrawBorder()
 
 
 	// Song name box
-	DrawText("Song Name", 45, 21 + 44, 0, 3, 0, -1, -1);
+	DrawText("Song Name", 46, 21 + 45, 0, 3, 0, -1, -1);
 	DrawText("SAVE", 61, 65, 0, 4, 2, -1, -1);
 	if (filesSampleNotSong)
 		DrawText("FILES(Samples)", 67, 80, 0, 4, 2, -1, -1);
@@ -175,6 +175,32 @@ void  DrawBorder()
 
 	// Effect menu
 	DrawText("Effects", 37, 44, 0, 3, 0, -1, 0);
+	if (selectedEffect == 4)
+		activeUI[38][2].sprite = { 5, 7 };
+	else
+		activeUI[38][2].sprite = { 5, 8 };
+	if (selectedEffect == 5)
+		activeUI[38][3].sprite = { 6, 7 };
+	else
+		activeUI[38][3].sprite = { 6, 8 };
+	if (selectedEffect == 8)
+		activeUI[38][4].sprite = { 9, 7 };
+	else
+		activeUI[38][4].sprite = { 9, 8 };
+	if (selectedEffect == 9)
+		activeUI[38][5].sprite = { 10, 7 };
+	else
+		activeUI[38][5].sprite = { 10, 8 };
+	if (selectedEffect == 11)
+		activeUI[38][6].sprite = { 12, 7 };
+	else
+		activeUI[38][6].sprite = { 12, 8 };
+	if (selectedEffect == 12)
+		activeUI[38][7].sprite = { 13, 7 };
+	else
+		activeUI[38][7].sprite = { 13, 8 };
+
+	/*
 	for (int y = 0; y < 4; y++)
 	{
 		for (int x = 0; x < 4; x++)
@@ -185,7 +211,7 @@ void  DrawBorder()
 			else
 				activeUI[39 + x][1 + y].sprite = { float(effect) + 1, 8 };
 		}
-	}
+	}*/
 
 	
 
@@ -690,6 +716,12 @@ void DrawText(std::string text, int textStart, int textEnd, int textY, int textC
 				textSprite = { float(text.at(i) - 65), 1.0f };
 			else if (text.at(i) > 96 && text.at(i) < 123) // a-z
 				textSprite = { float(text.at(i) - 97), 2.0f };
+			else if (text.at(i) == 44) // ,
+				textSprite = { 23.0f, 0.0f };
+			else if (text.at(i) == 45) // -
+				textSprite = { 11.0f, 0.0f };
+			else if (text.at(i) == 46) // .
+				textSprite = { 22.0f, 0.0f };
 		}
 
 		activeUI[textStart + i][textY].sprite = textSprite;
@@ -902,10 +934,10 @@ void DrawHelpPage()
 				}
 			}
 			else
-				DrawText(helpPageText[textY], 1, 91, y, 5, 0, -1, -1);
+				DrawText(helpPageText[textY], 1, 91, y, 4, 0, -1, -1);
 		}
 		else
-			DrawText("", 1, 91, y, 5, 0, -1, -1);
+			DrawText("", 1, 91, y, 4, 0, -1, -1);
 	}
 
 	return;

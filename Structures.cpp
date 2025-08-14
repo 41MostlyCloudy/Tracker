@@ -128,17 +128,17 @@ struct Song
 
 // -1 - No effect:
 
-// 0 - Cosmic Arp:
+// 0 - Cosmic Arp: (Not Implemented)
 //		Play alternating notes every tick, between the base note and the two offsets.
 //		-x = semitone offset 1
 //		-y = semitone offset 2
 
-// 2 - Vibrato:
+// 2 - Vibrato: (Not Implemented)
 //		Change the note pitch over time.
 //		-x = speed (1 cycle in x loops)
 //		-y = depth (y/4 semitones)
 
-// 3 - Tremolo:
+// 3 - Tremolo: (Not Implemented)
 //		Change the note volume over time.
 //		-x = speed (1 cycle in x loops)
 //		-y = depth (y/4 semitones)
@@ -152,12 +152,12 @@ struct Song
 //		-x = volume up (x/4 semitones per beat)
 //		-y = volume down (x/4 semitones per beat)
 
-// 6 - Pitch Slide:
+// 6 - Pitch Slide: (Not Implemented)
 //		Slide the pitch up by x speed or down by y speed.
 //		-x = pitch up (x semitones per beat)
 //		-y = pitch down (x semitones per beat)
 
-// 7 - Pitch Slide (fine):
+// 7 - Pitch Slide (fine): (Not Implemented)
 //		Slide the pitch up by x speed or down by y speed.
 //		-x = speed up (x/4 semitones per beat)
 //		-y = speed down (x/4 semitones per beat)
@@ -170,7 +170,7 @@ struct Song
 //		Start the note late, after x ticks.
 //		-xx = ticks
 
-// 10 - Sample offset:
+// 10 - Sample offset: (Not Implemented)
 //		Offset the sample starting on the beat by x ticks.
 //		-xx = ticks
 

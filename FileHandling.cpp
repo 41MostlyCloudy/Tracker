@@ -84,7 +84,7 @@ void SaveSong() // Save the currently loaded song.
         // Song Body
         uint8_t bpm = int(loadedSong.bpm);
         songFile.write((char*)&bpm, 1);
-        uint8_t tpb = int(loadedSong.bpm);
+        uint8_t tpb = int(loadedSong.ticksPerBeat);
         songFile.write((char*)&tpb, 1);
         uint8_t seqSize = loadedSong.frameSequence.size();
         songFile.write((char*)&seqSize, 1);
@@ -181,8 +181,12 @@ void LoadSong(std::string name) // Load the song file with the given name.
 
         // Song Body
 
-        songFile.read((char*)&loadedSong.bpm, 1);
-        songFile.read((char*)&loadedSong.ticksPerBeat, 1);
+        uint8_t bpm;
+        songFile.read((char*)&bpm, 1);
+        loadedSong.bpm = bpm;
+        uint8_t tpb;
+        songFile.read((char*)&tpb, 1);
+        loadedSong.ticksPerBeat = tpb;
 
         // Frame sequence
         uint8_t frameSeqNum;
@@ -201,7 +205,9 @@ void LoadSong(std::string name) // Load the song file with the given name.
         loadedSong.frames.resize(frameNum);
         for (int i = 0; i < frameNum; i++)
         {
-            songFile.read((char*)&loadedSong.frames[i].rows, 1);
+            uint8_t rows;
+            songFile.read((char*)&rows, 1);
+            loadedSong.frames[i].rows = rows;
 
             for (int ch = 0; ch < 8; ch++)
             {
@@ -210,21 +216,33 @@ void LoadSong(std::string name) // Load the song file with the given name.
                 loadedSong.frames[i].channels[ch].notes.clear();
                 loadedSong.frames[i].channels[ch].notes.resize(noteNum);
                 for (int j = 0; j < noteNum; j++)
-                    songFile.read((char*)&loadedSong.frames[i].channels[ch].notes[j], 1);
+                {
+                    uint8_t note;
+                    songFile.read((char*)&note, 1);
+                    loadedSong.frames[i].channels[ch].notes[j] = note;
+                }
 
                 uint8_t volumeNum;
                 songFile.read((char*)&volumeNum, 1);
                 loadedSong.frames[i].channels[ch].volumes.clear();
                 loadedSong.frames[i].channels[ch].volumes.resize(volumeNum);
                 for (int j = 0; j < volumeNum; j++)
-                    songFile.read((char*)&loadedSong.frames[i].channels[ch].volumes[j], 1);
+                {
+                    uint8_t volume;
+                    songFile.read((char*)&volume, 1);
+                    loadedSong.frames[i].channels[ch].volumes[j] = volume;
+                }
 
                 uint8_t effectNum;
                 songFile.read((char*)&effectNum, 1);
                 loadedSong.frames[i].channels[ch].effects.clear();
                 loadedSong.frames[i].channels[ch].effects.resize(effectNum);
                 for (int j = 0; j < effectNum; j++)
-                    songFile.read((char*)&loadedSong.frames[i].channels[ch].effects[j], 1);
+                {
+                    uint8_t effect;
+                    songFile.read((char*)&effect, 1);
+                    loadedSong.frames[i].channels[ch].effects[j] = effect;
+                }
             }
         }
 
