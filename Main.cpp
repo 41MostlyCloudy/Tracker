@@ -975,6 +975,8 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 
     frameScroll = int(frameScroll);
 
+    drawFrameThisFrame = true;
+
     return;
 }
 
@@ -1015,6 +1017,9 @@ void pressButton(GLFWwindow* window)
         }
         else
             loadCurrentFrame();
+
+        // The interface has changed, and must be redrawn.
+        drawFrameThisFrame = true;
     }
 
 
