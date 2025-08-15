@@ -209,4 +209,7 @@ void loadCurrentFrame()
 {
 	loadedFrame = unrollFrame(loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]]);
 	frameScroll = 0.0f;
+
+	// The interface has changed, and must be redrawn.
+	drawFrameThisFrame = true;
 }

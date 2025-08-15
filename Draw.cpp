@@ -31,16 +31,23 @@ void DrawEverything()
 {
 	drawScreen = true;
 
-	DrawFrameBorder();
-	DrawMute();
-	DrawBorder();
-	for (int i = 0; i < 8; i++)
+	if (drawUIThisFrame)
 	{
-		DrawChannel(i);
+		DrawFrameBorder();
+		DrawMute();
+		DrawBorder();
 	}
 
-	if (inHelpPage)
-		DrawHelpPage();
+	if (drawFrameThisFrame)
+	{
+		for (int i = 0; i < 8; i++)
+		{
+			DrawChannel(i);
+		}
+
+		if (inHelpPage)
+			DrawHelpPage();
+	}
 
 	return;
 }
@@ -329,6 +336,10 @@ void  DrawBorder()
 			DrawHex(y - 2 + int(sampleListScroll), 78, y, 2, 0, -1, -1);
 		}
 	}
+
+
+	// Close program button.
+	activeUI[91][0].sprite = { 29, 9 };
 	
 	
 	activeUI[66][12].sprite = { 4, 4 };

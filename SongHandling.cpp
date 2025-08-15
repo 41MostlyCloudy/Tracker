@@ -12,8 +12,10 @@
 
 // Pitch lookup table
 // To get different notes, the pitch of the sample is shifted. Samples should be a 'C4' note by default, and the pitch is scaled around that.
-float pitchTable[84] =
+float pitchTable[85] =
 {
+    0.05, // C1
+
     0.066,
     0.07,
     0.074,
@@ -159,13 +161,16 @@ void read_and_mix_pcm_frames_f32(ma_decoder* pDecoder, float* pOutputF32, ma_uin
     //The way mixing works is that we just read into a temporary buffer, then take the contents of that buffer and mix it with the
     //contents of the output buffer by simply adding the samples together. You could also clip the samples to -1..+1, but I'm not
     //doing that in this example.
-    
+    ma_result result;
     float temp[4096];
     ma_uint32 tempCapInFrames = ma_countof(temp) / 2;
     ma_uint32 totalFramesRead = 0;
 
+    std::cout << " start -> ";
+
     while (totalFramesRead < frameCount) // While there are frames to read.
     {
+        
         ma_uint64 iSample;
         ma_uint64 framesReadThisIteration;
         ma_uint32 totalFramesRemaining = frameCount - totalFramesRead;
@@ -178,7 +183,13 @@ void read_and_mix_pcm_frames_f32(ma_decoder* pDecoder, float* pOutputF32, ma_uin
         }
 
         
-        ma_decoder_read_pcm_frames(pDecoder, temp, framesToReadThisIteration, &framesReadThisIteration); // Read new frames to temp.
+        result = ma_decoder_read_pcm_frames(pDecoder, temp, framesToReadThisIteration, &framesReadThisIteration); // Read new frames to temp.
+        if (result != MA_SUCCESS || framesReadThisIteration == 0)
+        {
+            std::cout << " <- end ";
+            return;
+        }
+
 
         
         float volumeLeft = channels[channel].volume;
@@ -192,25 +203,30 @@ void read_and_mix_pcm_frames_f32(ma_decoder* pDecoder, float* pOutputF32, ma_uin
         }
 
         
+        
         // Mix the frames together.
         for (iSample = 0; iSample < framesReadThisIteration * 2; iSample += 2) // Add the frames from temp to pOutputF32.
         {
             pOutputF32[totalFramesRead * 2 + iSample] += temp[iSample] * volumeLeft;
-            pOutputF32[totalFramesRead * 2 + iSample + 1] += temp[iSample] * volumeRight;
+            pOutputF32[totalFramesRead * 2 + iSample + 1] += temp[iSample + 1] * volumeRight;
         }
 
-        
 
         totalFramesRead += (ma_uint32)framesReadThisIteration; // Increment the number of frames read up.
 
         if (framesReadThisIteration < (ma_uint32)framesToReadThisIteration) // Break if at the end of the sample.
         {
             channelPlayingNote[channel] = false;
+            //std::cout << " start -> ";
             ma_decoder_uninit(&g_pDecoders[channel]);
             ma_decoder_init_memory(0, 0, &decoderConfig, &g_pDecoders[channel]);
-            break;  // Reached EOF.
+            //std::cout << " <- end ";
+            std::cout << " <- end ";
+            return;  // Reached EOF.
         }
+        
     }
+    std::cout << " <- end ";
 
     return;
 }
@@ -225,6 +241,7 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
     // This example assumes the device was configured to use ma_format_f32.
     for (int channel = 0; channel < 8; channel++)
     {
+        // /////////////////////////////////////////////////////////////////////////////////////////////////////////////// THE CRASH IS HERE
         if (channelPlayingNote[channel])
             read_and_mix_pcm_frames_f32(&g_pDecoders[channel], pOutputF32, frameCount, channel);        
     }
@@ -318,7 +335,6 @@ void StartSample(int channel, int sampleNumber, float pitch, float time)
         channels[channel].volume = 0;
 
 
-
     return;
 }
 
@@ -356,7 +372,9 @@ void stepSong()
 
 	if (loadedSong.timeInNote > (60000.0f / (loadedSong.bpm * 4.0f)))
 	{
-        
+        // The interface has changed, and must be redrawn.
+        drawFrameThisFrame = true;
+
 		loadedSong.currentNote++;
 
 		if (loadedSong.currentNote > 8)
@@ -367,6 +385,8 @@ void stepSong()
         
         //if (loadedSong.currentFrame >= loadedSong.frames.size())
         //    loadedSong.currentFrame = loadedSong.frames.size() - 1;
+
+        //std::cout << "Start -> ";
 
 		if (loadedSong.currentNote >= loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].rows) // Start new row
 		{
@@ -413,7 +433,7 @@ void stepSong()
 		}
 
         
-
+        //std::cout << " <- End ";
         
 
         // Read note data an display notes.
@@ -591,7 +611,7 @@ void stepSong()
                 }
             }
 
-
+            
 
 
             /*

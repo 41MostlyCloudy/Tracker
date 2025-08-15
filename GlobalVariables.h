@@ -21,6 +21,10 @@ bool inHelpPage = false;
 
 bool drawScreen = false;
 
+// Tells the program to draw certain parts of the screen.
+bool drawUIThisFrame = true;
+bool drawFrameThisFrame = true;
+
 //int uiColorTheme = 0;
 
 
@@ -273,4 +277,42 @@ std::vector <std::string> helpPageText =
 	"",
 	"",
 	"",
+	"#",
+	"KEY FUNCTIONS",
+	"",
+	"",
+	"",
+	"Certain keys are pressed to preform the actions below.",
+	"",
+	"    SPACE",
+	"",
+	"        Start or stop the song.",
+	"",
+	"    ENTER",
+	"",
+	"        Return the cursor to the beginning of the song.",
+	"",
+	"    ESC",
+	"",
+	"        Close the program.",
+	"",
+	"    TAB",
+	"",
+	"        Set the currently selected note to instead stop the sample playing.",
+	"",
+	"    DELETE",
+	"",
+	"        Delete the currently selected notes.",
+	"",
+	"    LEFT SHIFT",
+	"",
+	"        Copy the currently selected notes.",
+	"",
+	"    RIGHT SHIFT",
+	"",
+	"        Paste the currently selected notes.",
+	"",
+	"",
+	"",
+	"#",
 };

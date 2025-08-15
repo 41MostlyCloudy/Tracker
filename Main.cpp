@@ -37,7 +37,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 void RunEngine();
 
-void pressButton();
+void pressButton(GLFWwindow* window);
 
 void releaseButton();
 
@@ -173,6 +173,9 @@ void RunEngine()
         auto start = time.now();
 
 
+        
+
+
         if (playingSong) // Play the song.
             stepSong();
 
@@ -182,14 +185,13 @@ void RunEngine()
             if (mouseHoldTime > 500.0f) // Repeatedly press button after holding for a while.
             {
                 if (int((mouseHoldTime - delta) * 0.01) % 2 != int((mouseHoldTime) * 0.01) % 2)
-                    pressButton();
+                    pressButton(window);
             }
         }
 
         drawScreen = false;
 
-        // Draw stuff
-        DrawEverything();
+        
 
         // Process player input
         processInput(window);
@@ -198,7 +200,13 @@ void RunEngine()
         glfwPollEvents();
 
 
-        // Do stuff
+
+        // Draw stuff
+        DrawEverything();
+
+        // Set the program not to draw the interface by default.
+        drawUIThisFrame = false;
+        drawFrameThisFrame = false;
         
         
 
@@ -336,6 +344,7 @@ void processInput(GLFWwindow* window)
         hoveredTile.y = 56;
 
 
+
     if (mouseDown) // Select note (End selection)
     {
         if (hoveredTile.y > 15 && hoveredTile.y < 56 && hoveredTile.x > 3 && hoveredTile.x < 91)
@@ -381,6 +390,10 @@ void processInput(GLFWwindow* window)
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
+    // Draw the ui.
+    drawUIThisFrame = true;
+    drawFrameThisFrame = true;
+
     if (action == GLFW_PRESS || action == GLFW_REPEAT)
     {
         if (key == GLFW_KEY_BACKSPACE)
@@ -657,7 +670,7 @@ void mouse_button_callback(GLFWwindow* window, int key, int action, int mods)
         if (key == GLFW_MOUSE_BUTTON_LEFT)
         {
             mouseDown = true;
-            pressButton();
+            pressButton(window);
         }
     }
 
@@ -704,6 +717,11 @@ void mouse_button_callback(GLFWwindow* window, int key, int action, int mods)
 
 void character_callback(GLFWwindow* window, unsigned int codepoint)
 {
+    // Set to draw the interface.
+    drawUIThisFrame = true;
+    drawFrameThisFrame = true;
+
+
     int input = codepoint;
 
     bool writing = false;
@@ -916,7 +934,7 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                 loadedFrame.rows[loadedSong.currentNote].effectValue[selectedChannel] = 0;
 
             if (loadedFrame.rows[loadedSong.currentNote].effect[selectedChannel] < 0)
-                loadedFrame.rows[loadedSong.currentNote].effect[selectedChannel] = 0;
+                loadedFrame.rows[loadedSong.currentNote].effect[selectedChannel] = 4;
 
             if (selectedPart == 8)
             {
@@ -961,12 +979,23 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 }
 
 
-void pressButton()
+void pressButton(GLFWwindow* window)
 {
+    // Set to draw the interface.
+    if (hoveredTile.y < 16)
+        drawUIThisFrame = true;
+    else
+        drawFrameThisFrame = true;
+
+
     selectedButton = -1;
 
     selectedTile = hoveredTile; // Select the tile that the mouse is currently on
 
+    if (hoveredTile.y == 0 && hoveredTile.x == 91) // Close program
+    {
+        glfwSetWindowShouldClose(window, true);
+    }
 
     if (hoveredTile.y > 9 && hoveredTile.y < 12 && hoveredTile.x > 23 && hoveredTile.x < 26 && editing) // Record
     {
@@ -1321,6 +1350,13 @@ void pressButton()
 
 void releaseButton()
 {
+    // Set to draw the interface.
+    if (hoveredTile.y < 16)
+        drawUIThisFrame = true;
+    else
+        drawFrameThisFrame = true;
+
+
     mouseHoldTime = 0.0f;
     mouseDown = false;
 
