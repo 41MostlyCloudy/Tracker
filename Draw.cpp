@@ -31,15 +31,9 @@ void DrawEverything()
 {
 	drawScreen = true;
 
-	if (drawUIThisFrame)
-	{
-		DrawFrameBorder();
-		DrawMute();
-		DrawBorder();
-	}
-
 	if (drawFrameThisFrame)
 	{
+		DrawFrameBorder();
 		for (int i = 0; i < 8; i++)
 		{
 			DrawChannel(i);
@@ -48,6 +42,15 @@ void DrawEverything()
 		if (inHelpPage)
 			DrawHelpPage();
 	}
+
+	if (drawUIThisFrame)
+	{
+		
+		DrawMute();
+		DrawBorder();
+	}
+
+	
 
 	return;
 }
@@ -161,12 +164,18 @@ void  DrawBorder()
 	// Song name box
 	DrawText("Song Name", 46, 21 + 45, 0, 3, 0, -1, -1);
 	DrawText("SAVE", 61, 65, 0, 4, 2, -1, -1);
+	activeUI[60][0].sprite = { 24, 0 };
+	activeUI[65][0].sprite = { 25, 0 };
+
+	activeUI[66][0].sprite = { 24, 0 };
+	activeUI[81][0].sprite = { 25, 0 };
 	if (filesSampleNotSong)
-		DrawText("FILES(Samples)", 67, 80, 0, 4, 2, -1, -1);
+		DrawText("FILES(Samples)", 67, 81, 0, 4, 2, -1, -1);
 	else
-		DrawText("FILES(Songs)", 67, 80, 0, 4, 2, -1, -1);
+		DrawText("FILES(Songs)", 67, 81, 0, 4, 2, -1, -1);
 	DrawText("Samples", 79 + 4, 86 + 4, 0, 3, 0, -1, -1);
-	//DrawText("CLOSE", 87, 92, 0, 4, 2, -1, -1);
+
+	
 	activeUI[44][1].sprite = { 0, 3 };
 	activeUI[44][2].sprite = { 2, 4 };
 	activeUI[44][3].sprite = { 0, 4 };
@@ -416,7 +425,8 @@ void  DrawBorder()
 	activeUI[25][11].sprite = { 23 + float(recordingSong) * 2, 8 };
 
 	DrawText("HELP", 30, 34, 9, 4, 2, -1, -1);
-
+	activeUI[29][9].sprite = { 24, 0 };
+	activeUI[34][9].sprite = { 25, 0 };
 
 	// Eye
 	/*
@@ -559,10 +569,6 @@ void DrawFrameBorder()
 	// File/sample select box corners.
 	activeUI[66][12].sprite = { 4, 4 };
 
-
-	// Scroll arrows
-	//activeUI[91][16].sprite = { 6, 3 };
-	//activeUI[91][55].sprite = { 6, 4 };
 
 	activeUI[0][56].sprite = { 0, 4 };
 	activeUI[91][56].sprite = { 1, 4 };

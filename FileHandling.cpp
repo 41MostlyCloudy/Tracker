@@ -3,6 +3,7 @@
 
 #include "GlobalVariables.h"
 #include "FrameHandling.cpp"
+#include "SongHandling.cpp"
 
 // For searching file directories. New as of c++ 17.
 #include <filesystem>
@@ -248,6 +249,9 @@ void LoadSong(std::string name) // Load the song file with the given name.
 
         songFile.close();
     }
+
+    // Load the sample data
+    //LoadSampleData();
 
     loadCurrentFrame();
 

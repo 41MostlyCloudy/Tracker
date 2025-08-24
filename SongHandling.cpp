@@ -10,6 +10,12 @@
 //----------------------------------------------------------------------------------
 
 
+
+
+
+
+
+
 // Pitch lookup table
 // To get different notes, the pitch of the sample is shifted. Samples should be a 'C4' note by default, and the pitch is scaled around that.
 float pitchTable[85] =
@@ -114,11 +120,15 @@ void SetUpAudioEngine();
 
 
 
-void StartSample(int channel, int sampleNumber, float pitch, float time);
+void StartSample(int channel, int sampleNumber, float pitch);
 
 void StopSample(int channel);
 
 void stepSong();
+
+//void LoadSampleData();
+
+void InitializeSample(int channel, int sampleNumber, float pitch);
 
 
 
@@ -137,16 +147,20 @@ void stepSong();
 
 
 
-void read_and_mix_pcm_frames_f32(ma_decoder* pDecoder, float* pOutputF32, ma_uint32 frameCount, int channel);
+ma_uint32 read_and_mix_pcm_frames_f32(ma_decoder* pDecoder, float* pOutputF32, ma_uint32 frameCount, int channel);
 void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount);
 
 
+// Decoders
 ma_decoder g_pDecoders[8];
-bool channelPlayingNote[8] = { false, false, false, false, false, false, false, false };
-
-//ma_event g_stopEvent; /* <-- Signaled by the audio thread, waited on by the main thread. */
-
+bool channelToUinit[8] = { false, false, false, false, false, false, false, false };
+bool channelInitialized[8] = { false, false, false, false, false, false, false, false };
+//ma_uint64 channelNoteFrames[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+//bool startNoteFlag[8] = { false, false, false, false, false, false, false, false };
 ma_decoder_config decoderConfig;
+
+
+// Device
 ma_device_config deviceConfig;
 ma_device device;
 
@@ -156,7 +170,24 @@ ma_encoder_config encoderConfig;
 ma_encoder encoder;
 
 
-void read_and_mix_pcm_frames_f32(ma_decoder* pDecoder, float* pOutputF32, ma_uint32 frameCount, int channel)
+// Resource Manager
+ma_resource_manager_config ManagerConfig;
+ma_resource_manager resourceManager;
+
+
+// Samples
+std::vector <ma_resource_manager_data_source> sampleData;
+
+
+// When a new note is played, the main thread signals the data callback with a variable.
+// Then, the data callback stops reading from that decoder (channelInitialized = false) and signals to the main thread.
+// Then, the main thread starts the sound and signals the data callback to resume.
+bool channelCallbackToStopForNote[8] = { false, false, false, false, false, false, false, false };
+bool channelMainToPlayNote[8] = { false, false, false, false, false, false, false, false };
+
+
+
+ma_uint32 read_and_mix_pcm_frames_f32(ma_decoder* pDecoder, float* pOutputF32, ma_uint32 frameCount, int channel)
 {   
     //The way mixing works is that we just read into a temporary buffer, then take the contents of that buffer and mix it with the
     //contents of the output buffer by simply adding the samples together. You could also clip the samples to -1..+1, but I'm not
@@ -166,13 +197,16 @@ void read_and_mix_pcm_frames_f32(ma_decoder* pDecoder, float* pOutputF32, ma_uin
     ma_uint32 tempCapInFrames = ma_countof(temp) / 2;
     ma_uint32 totalFramesRead = 0;
 
-    std::cout << " start -> ";
+    //std::cout << " start -> ";
+
+    
+    
 
     while (totalFramesRead < frameCount) // While there are frames to read.
     {
         
         ma_uint64 iSample;
-        ma_uint64 framesReadThisIteration;
+        ma_uint64 framesReadThisIteration = 0;
         ma_uint32 totalFramesRemaining = frameCount - totalFramesRead;
         ma_uint32 framesToReadThisIteration = tempCapInFrames;
 
@@ -182,14 +216,15 @@ void read_and_mix_pcm_frames_f32(ma_decoder* pDecoder, float* pOutputF32, ma_uin
             framesToReadThisIteration = totalFramesRemaining;
         }
 
+
         
         result = ma_decoder_read_pcm_frames(pDecoder, temp, framesToReadThisIteration, &framesReadThisIteration); // Read new frames to temp.
         if (result != MA_SUCCESS || framesReadThisIteration == 0)
         {
-            std::cout << " <- end ";
-            return;
+            channelToUinit[channel] = true;
+            break;
         }
-
+        
 
         
         float volumeLeft = channels[channel].volume;
@@ -207,28 +242,30 @@ void read_and_mix_pcm_frames_f32(ma_decoder* pDecoder, float* pOutputF32, ma_uin
         // Mix the frames together.
         for (iSample = 0; iSample < framesReadThisIteration * 2; iSample += 2) // Add the frames from temp to pOutputF32.
         {
-            pOutputF32[totalFramesRead * 2 + iSample] += temp[iSample] * volumeLeft;
-            pOutputF32[totalFramesRead * 2 + iSample + 1] += temp[iSample + 1] * volumeRight;
+            float newLeft = temp[iSample] * volumeLeft;
+            float newRight = temp[iSample + 1] * volumeRight;
+            
+
+            
+
+            pOutputF32[totalFramesRead * 2 + iSample] += newLeft;
+            pOutputF32[totalFramesRead * 2 + iSample + 1] += newRight;
         }
+        
 
 
         totalFramesRead += (ma_uint32)framesReadThisIteration; // Increment the number of frames read up.
 
         if (framesReadThisIteration < (ma_uint32)framesToReadThisIteration) // Break if at the end of the sample.
         {
-            channelPlayingNote[channel] = false;
-            //std::cout << " start -> ";
-            ma_decoder_uninit(&g_pDecoders[channel]);
-            ma_decoder_init_memory(0, 0, &decoderConfig, &g_pDecoders[channel]);
-            //std::cout << " <- end ";
-            std::cout << " <- end ";
-            return;  // Reached EOF.
+            channelToUinit[channel] = true;
+            break;  // Reached EOF.
         }
         
     }
-    std::cout << " <- end ";
+    //std::cout << " <- end ";
 
-    return;
+    return totalFramesRead;
 }
 
 
@@ -236,27 +273,36 @@ void read_and_mix_pcm_frames_f32(ma_decoder* pDecoder, float* pOutputF32, ma_uin
 void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount)
 {
     float* pOutputF32 = (float*)pOutput;
-    ma_uint32 iDecoder;
 
     // This example assumes the device was configured to use ma_format_f32.
     for (int channel = 0; channel < 8; channel++)
     {
-        // /////////////////////////////////////////////////////////////////////////////////////////////////////////////// THE CRASH IS HERE
-        if (channelPlayingNote[channel])
-            read_and_mix_pcm_frames_f32(&g_pDecoders[channel], pOutputF32, frameCount, channel);        
+        if (channelCallbackToStopForNote[channel]) // Stop the sample to play a new sample.
+        {
+            channelMainToPlayNote[channel] = true;
+        }
+        else
+        {
+            // /////////////////////////////////////////////////////////////////////////////////////////////////////////////// THE CRASH IS HERE
+            if (channelInitialized[channel] && !channelToUinit[channel])
+            {
+                ma_uint32 framesRead = read_and_mix_pcm_frames_f32(&g_pDecoders[channel], pOutputF32, frameCount, channel);
+                if (framesRead < frameCount)
+                {
+                    channelToUinit[channel] = true;
+                    break;
+                }
+            }
+        }
     }
     if (playingSong && recordingSong)
     {
         ma_uint64 framesWritten;
         ma_encoder_write_pcm_frames(&encoder, pOutputF32, frameCount, &framesWritten); // Write frames to file if recording.
     }
-
-    
-    //If at the end all of our decoders are at the end we need to stop. We cannot stop the device in the callback. Instead we need to
-    //signal an event to indicate that it's stopped. The main thread will be waiting on the event, after which it will stop the device.
     
 
-
+    
     (void)pInput;
     (void)pDevice;
 }
@@ -275,10 +321,6 @@ void SetUpAudioEngine()
 {
     // In this example, all decoders need to have the same output format.
     decoderConfig = ma_decoder_config_init(ma_format_f32, 2, 48000);
-    for (int ch = 0; ch < 8; ch++)
-    {
-        ma_decoder_init_memory(0, 0, &decoderConfig, &g_pDecoders[ch]);
-    }
 
     /* Create only a single device. The decoders will be mixed together in the callback. In this example the data format needs to be the same as the decoders. */
     deviceConfig = ma_device_config_init(ma_device_type_playback);
@@ -301,18 +343,69 @@ void SetUpAudioEngine()
     
 
 
+    // Set up the resource manager.
+    ManagerConfig = ma_resource_manager_config_init();
+    ManagerConfig.decodedFormat = device.playback.format;
+    ManagerConfig.decodedChannels = device.playback.channels;
+    ManagerConfig.decodedSampleRate = device.sampleRate;
+    ma_resource_manager_init(&ManagerConfig, &resourceManager);
+
+
+    return;
+}
+
+
+/*
+void LoadSampleData()
+{
+    
+    for (int i = 0; i < sampleData.size(); i++)
+    {
+        ma_resource_manager_data_source_uninit(&sampleData[i]);
+    }
+
+    sampleData.clear();
+    sampleData.shrink_to_fit();
+
+    
+    
+    for (int i = 0; i < loadedSamples.size(); i++)
+    {
+        ma_resource_manager_data_source newSound;
+
+        std::string fileName = "Samples/" + loadedSamples[i].sampleName;
+        const char* name = &fileName[0];
+
+        ma_resource_manager_data_source_init(&resourceManager, name, MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_ASYNC | MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_DECODE | MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_STREAM, NULL, &newSound);
+
+        sampleData.emplace_back(newSound);
+    }
+
+    
+
+
+    return;
+}*/
+
+
+
+void StartSample(int channel, int sampleNumber, float pitch)
+{
+    channelCallbackToStopForNote[channel] = true;
+    channels[channel].noteToPlaySample = sampleNumber;
+    channels[channel].noteToPlayPitch = pitch;
+
     return;
 }
 
 
 
-void StartSample(int channel, int sampleNumber, float pitch, float time)
+void InitializeSample(int channel, int sampleNumber, float pitch)
 {
     if (sampleNumber >= loadedSamples.size()) // Don't play samples that are not loaded.
         return;
 
     std::string fileName = "Samples/" + loadedSamples[sampleNumber].sampleName;
-
     const char* name = &fileName[0];
 
 
@@ -320,29 +413,42 @@ void StartSample(int channel, int sampleNumber, float pitch, float time)
     pitch = pitchTable[int(pitch)];
     channels[channel].realPitch = pitch;
 
+
     decoderConfig = ma_decoder_config_init(ma_format_f32, 2, 48000 / pitch);
 
-    ma_decoder_uninit(&g_pDecoders[channel]);
-    ma_decoder_init_file(name, &decoderConfig, &g_pDecoders[channel]);
 
-    channelPlayingNote[channel] = true;
+    StopSample(channel);
 
 
+    if (sampleNumber > -1) // Don't play notes with samples below zero. (-1 is used to stop notes.)
+    {
+        ma_decoder_init_file(name, &decoderConfig, &g_pDecoders[channel]);
+        channelInitialized[channel] = true;
 
-    if (channels[channel].volume > 1)
-        channels[channel].volume = 1;
-    else if (channels[channel].volume < 0)
-        channels[channel].volume = 0;
+        if (channels[channel].volume > 1)
+            channels[channel].volume = 1;
+        else if (channels[channel].volume < 0)
+            channels[channel].volume = 0;
+    }
 
+
+    channelMainToPlayNote[channel] = false;
+    channelCallbackToStopForNote[channel] = false;
 
     return;
 }
 
 
+
 void StopSample(int channel)
 {
-    ma_decoder_uninit(&g_pDecoders[channel]);
-    ma_decoder_init_memory(0, 0, &decoderConfig, &g_pDecoders[channel]);
+    if (channelInitialized[channel]) // Don't uninitialized uninitialized devices.
+    {
+        channelInitialized[channel] = false;
+        ma_decoder_uninit(&g_pDecoders[channel]);
+    }
+    channelToUinit[channel] = false;
+    
     return;
 }
 
@@ -585,19 +691,6 @@ void stepSong()
                     loadedSong.noteChannelIndex[ch]++;
                     noteIndex++;
 
-                    if (note == 255)
-                        StopSample(ch);
-                    else if (channels[ch].effect != 9) // Don't play delayed notes.
-                    {
-                        StartSample(ch, instrument, note, 0);
-
-
-                        if (channels[ch].effect == 10) // Set sample position.
-                        {
-                            //ma_sound_seek_to_pcm_frame(&channelAudio[ch], channels[ch].effectX * 100000.0f * (1000.0f / ma_engine_get_sample_rate(&engine)));
-                        }
-                    }
-
                     // Set distance to next note.
                     if (noteIndex < loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch].notes.size())
                     {
@@ -608,6 +701,21 @@ void stepSong()
                     }
                     else
                         loadedSong.toNextChannelNote[ch] = 255; // No more notes in this channel in the frame.
+
+                    if (note == 255)
+                        StartSample(ch, -1, 0); // Start a blank note to stop the current one.
+                    else if (channels[ch].effect != 9) // Don't play delayed notes.
+                    {
+                        StartSample(ch, instrument, note);
+
+
+                        if (channels[ch].effect == 10) // Set sample position.
+                        {
+                            //ma_sound_seek_to_pcm_frame(&channelAudio[ch], channels[ch].effectX * 100000.0f * (1000.0f / ma_engine_get_sample_rate(&engine)));
+                        }
+                    }
+
+                    
                 }
             }
 
@@ -664,7 +772,7 @@ void stepSong()
                 
                 if (channels[ch].effectX <= 0)
                 {
-                    StartSample(ch, channels[ch].instrument, channels[ch].pitch, 0);
+                    StartSample(ch, channels[ch].instrument, channels[ch].pitch);
                     channels[ch].effect = -1;
                 }
             }
@@ -721,7 +829,15 @@ void stepSong()
 
         if (channels[ch].muted)
             channels[ch].volume = 0;
-            //ma_sound_set_volume(&channelAudio[ch], 0.0);
+
+        if (channelToUinit[ch])
+        {
+            StopSample(ch);
+        }
+        if (channelMainToPlayNote[ch]) // Stop the sample to play a new sample.
+        {
+            InitializeSample(ch, channels[ch].noteToPlaySample, channels[ch].noteToPlayPitch);
+        }
     }
 
 
@@ -736,6 +852,7 @@ void stepSong()
         frameScroll = 0;
 
     
+
     
 
 	return;

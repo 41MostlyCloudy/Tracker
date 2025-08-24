@@ -363,6 +363,8 @@ void processInput(GLFWwindow* window)
                 noteSelectionEnd.y = mouseTileY;
 
             loadedSong.currentNote = mouseTileY;
+
+            drawFrameThisFrame = true;
         }
     }
 
@@ -511,6 +513,13 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
         if (key == GLFW_KEY_SPACE && !inHelpPage) // Start/stop song
         {
+            if (recordingSong && !playingSong) // Set up recording.
+            {
+                std::string fileName = "Export/" + loadedSong.songName + ".wav";
+                const char* name = &fileName[0];
+                ma_encoder_init_file(name, &encoderConfig, &encoder);
+            }
+
             playingSong = !playingSong;
 
             if (inHelpPage) // Don't play the song if editing.
@@ -519,8 +528,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             editing = !playingSong;
             saveCurrentFrame();
 
-            for (int ch = 0; ch < 8; ch++)
-                channelPlayingNote[ch] = false; // Set notes to not playing.
+            
 
             if (playingSong) // Restart the frame when playing the song.
             {
@@ -543,12 +551,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
                     loadedSong.toNextChannelEffect[ch] = 0;
                 }
 
-                if (recordingSong) // Set up recording.
-                {
-                    std::string fileName = "Export/" + loadedSong.songName + ".wav";
-                    const char* name = &fileName[0];
-                    ma_encoder_init_file(name, &encoderConfig, &encoder);
-                }
+                
             }
             else
             {
@@ -669,7 +672,11 @@ void mouse_button_callback(GLFWwindow* window, int key, int action, int mods)
         // Mouse click actions
         if (key == GLFW_MOUSE_BUTTON_LEFT)
         {
-            mouseDown = true;
+            // Note selection
+            if (editing)
+            {
+                mouseDown = true;
+            }
             pressButton(window);
         }
     }
@@ -853,10 +860,18 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
             {
                 noteNum += selectedOctave * 12;
 
-                if (!keyDown)
+                if (!keyDown && editing) // Play the note sound.
                 {
                     channels[selectedChannel].volume = 64.0f;
-                    StartSample(selectedChannel, selectedSample, noteNum, 0);
+                    //channelCallbackToStopForNote[selectedChannel] = true;
+                    //channels[selectedChannel].noteToPlaySample = selectedSample;
+                    //channels[selectedChannel].noteToPlayPitch = noteNum;
+
+
+
+                    InitializeSample(selectedChannel, selectedSample, noteNum);
+
+                    //channelMainToPlayNote[selectedChannel] = true;
                 }
                 loadedFrame.rows[loadedSong.currentNote].note[selectedChannel] = noteNum;
 
@@ -992,6 +1007,7 @@ void pressButton(GLFWwindow* window)
 
     selectedButton = -1;
 
+
     selectedTile = hoveredTile; // Select the tile that the mouse is currently on
 
     if (hoveredTile.y == 0 && hoveredTile.x == 91) // Close program
@@ -1027,6 +1043,8 @@ void pressButton(GLFWwindow* window)
     {
         int selectedChannel = int((hoveredTile.x - 4.0f) / 11.0f);
         channels[selectedChannel].muted = !channels[selectedChannel].muted;
+        // The interface has changed, and must be redrawn.
+        drawFrameThisFrame = true;
     }
 
 
@@ -1037,6 +1055,7 @@ void pressButton(GLFWwindow* window)
             selectedTile.x = 44 + loadedSong.songName.length();
     }
 
+    
     if (hoveredTile.y > 1 && hoveredTile.y < 8) // Select effect.
     {
         if (hoveredTile.x == 38)
@@ -1136,7 +1155,7 @@ void pressButton(GLFWwindow* window)
             else
                 selectedSample = hoveredTile.y - 2 + sampleListScroll;
 
-            if (selectedSample >= loadedSamples.size()) // Snap to end of song.
+            if (selectedSample >= loadedSamples.size()) // Snap to end of samples.
                 selectedSample = loadedSamples.size() - 1;
         }
     }

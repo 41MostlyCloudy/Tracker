@@ -201,6 +201,8 @@ UnrolledFrame unrollFrame(Frame frame)
 void saveCurrentFrame()
 {
 	loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]] = rollFrame(loadedFrame);
+	drawUIThisFrame = true;
+	drawFrameThisFrame = true;
 }
 
 
@@ -211,5 +213,6 @@ void loadCurrentFrame()
 	frameScroll = 0.0f;
 
 	// The interface has changed, and must be redrawn.
+	drawUIThisFrame = true;
 	drawFrameThisFrame = true;
 }

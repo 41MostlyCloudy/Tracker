@@ -36,6 +36,10 @@ struct Channel
 	std::vector <int> loopNoteIndex = {};
 	std::vector <int> loopVolumeIndex = {};
 	std::vector <int> loopEffectIndex = {};
+
+
+	int noteToPlaySample = 0;
+	float noteToPlayPitch = 0;
 };
 
 
