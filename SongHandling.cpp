@@ -126,7 +126,7 @@ void StopSample(int channel);
 
 void stepSong();
 
-//void LoadSampleData();
+void LoadSampleData();
 
 void InitializeSample(int channel, int sampleNumber, float pitch);
 
@@ -184,6 +184,10 @@ std::vector <ma_resource_manager_data_source> sampleData;
 // Then, the main thread starts the sound and signals the data callback to resume.
 bool channelCallbackToStopForNote[8] = { false, false, false, false, false, false, false, false };
 bool channelMainToPlayNote[8] = { false, false, false, false, false, false, false, false };
+
+
+// The speed at which a note stops by fading out.
+//float decoderNoteStopSpeed = 1.0f;
 
 
 
@@ -355,10 +359,12 @@ void SetUpAudioEngine()
 }
 
 
-/*
+
 void LoadSampleData()
 {
-    
+    /*
+    std::cout << " Samples: " << sampleData.size();
+
     for (int i = 0; i < sampleData.size(); i++)
     {
         ma_resource_manager_data_source_uninit(&sampleData[i]);
@@ -379,13 +385,10 @@ void LoadSampleData()
         ma_resource_manager_data_source_init(&resourceManager, name, MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_ASYNC | MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_DECODE | MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_STREAM, NULL, &newSound);
 
         sampleData.emplace_back(newSound);
-    }
-
-    
-
+    }*/
 
     return;
-}*/
+}
 
 
 

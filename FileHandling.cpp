@@ -251,7 +251,8 @@ void LoadSong(std::string name) // Load the song file with the given name.
     }
 
     // Load the sample data
-    //LoadSampleData();
+    LoadSampleData();
+
 
     loadCurrentFrame();
 
