@@ -12,6 +12,20 @@ void saveCurrentFrame();
 
 void loadCurrentFrame();
 
+UnrolledFrame resizeUnrolledFrameRows(UnrolledFrame frame, int newSize);
+
+UnrolledFrame resizeSongFrameEffectColumns(UnrolledFrame frame);
+
+void copyNotes();
+
+void pasteNotes();
+
+void deleteNotes();
+
+void transposeNotes();
+
+void setNoteSamples();
+
 
 
 
@@ -29,13 +43,15 @@ Frame rollFrame(UnrolledFrame frame)
 
 	//	1 byte: Effect
 	//	1 byte: Effect value
-	//	1 byte: To next effect
+	//	1 byte: To next effect (This is set to 0 for multiple effects per beat.)
 
 	Frame newFrame;
 
 	newFrame.rows = frame.rows.size();
+	newFrame.beatsPerMeasure = frame.beatsPerMeasure;
+	newFrame.channels.resize(loadedSong.numberOfChannels);
 
-	for (int ch = 0; ch < 8; ch++)
+	for (int ch = 0; ch < loadedSong.numberOfChannels; ch++)
 	{
 		newFrame.channels[ch].notes.clear();
 		newFrame.channels[ch].volumes.clear();
@@ -62,15 +78,37 @@ Frame rollFrame(UnrolledFrame frame)
 			}
 			else
 				toNextVolume++;
-			if (frame.rows[i].effect[ch] > -1)
+			/*
+			if (frame.rows[i].effects[ch].cEffect[0] > -1)
 			{
 				newFrame.channels[ch].effects.emplace_back(toNextEffect);
-				newFrame.channels[ch].effects.emplace_back(frame.rows[i].effect[ch]);
-				newFrame.channels[ch].effects.emplace_back(frame.rows[i].effectValue[ch]);
+				newFrame.channels[ch].effects.emplace_back(frame.rows[i].effects[ch].cEffect[0]);
+				newFrame.channels[ch].effects.emplace_back(frame.rows[i].effects[ch].cEffectValue[0]);
 				toNextEffect = 0;
 			}
 			else
 				toNextEffect++;
+				*/
+
+
+			
+			bool effectOnBeat = false;
+			for (int ef = 0; ef < frame.rows[i].effects[ch].cEffect.size(); ef++)
+			{
+				if (frame.rows[i].effects[ch].cEffect[ef] > -1)
+				{
+					newFrame.channels[ch].effects.emplace_back(toNextEffect);
+					newFrame.channels[ch].effects.emplace_back(frame.rows[i].effects[ch].cEffect[ef]);
+					newFrame.channels[ch].effects.emplace_back(frame.rows[i].effects[ch].cEffectValue[ef]);
+					toNextEffect = 255;
+					effectOnBeat = true;
+				}
+			}
+			if (effectOnBeat)
+				toNextEffect = 0;
+			else
+				toNextEffect++;
+				
 
 			if (i == frame.rows.size() - 1)
 			{
@@ -97,24 +135,32 @@ UnrolledFrame unrollFrame(Frame frame)
 	// Frame Format:
 
 	// Each channel
+	//	1 byte: To next note
 	//	1 byte: Note
 	//	1 byte: Instrument
-	//	1 byte: To next note
 
-	//	1 byte:	Volume
 	//	1 byte: To next volume
-
+	//	1 byte:	Volume
+	
+	//	1 byte: To next effect
 	//	1 byte: Effect
 	//	1 byte: Effect value
-	//	1 byte: To next effect
+	
 
 	UnrolledFrame newFrame;
 
-	newFrame.rows.resize(frame.rows);
+	newFrame = resizeUnrolledFrameRows(newFrame, int(frame.rows));
+	newFrame = resizeSongFrameEffectColumns(newFrame);
+	newFrame.beatsPerMeasure = frame.beatsPerMeasure;
+	
+
+	
 
 
-	for (int ch = 0; ch < 8; ch++)	
+	for (int ch = 0; ch < loadedSong.numberOfChannels; ch++)
 	{
+		channels[ch].effectCountPerRow = 1;
+
 		int unrolledNoteIndex = 0;
 
 		for (int i = 0; i < frame.channels[ch].notes.size(); i += 3)
@@ -167,29 +213,52 @@ UnrolledFrame unrollFrame(Frame frame)
 
 
 		unrolledNoteIndex = 0;
+		int effectNum = 0;
 
 		for (int i = 0; i < frame.channels[ch].effects.size(); i += 3)
 		{
 			int toNextNote = frame.channels[ch].effects[i];
 
-			for (int j = unrolledNoteIndex; j < unrolledNoteIndex + toNextNote; j++)
+			
+			if (toNextNote == 255)
 			{
-				newFrame.rows[j].effect[ch] = -1;
-				newFrame.rows[j].effectValue[ch] = -1;
-			}
-
-			unrolledNoteIndex += toNextNote;
-
-
-			if (i < frame.channels[ch].effects.size() - 1)
-			{
+				effectNum++;
+				if (effectNum >= channels[ch].effectCountPerRow)
+				{
+					channels[ch].effectCountPerRow++;
+					newFrame = resizeSongFrameEffectColumns(newFrame);
+				}
+				unrolledNoteIndex--;
 				int nextNote = frame.channels[ch].effects[i + 1];
-				newFrame.rows[unrolledNoteIndex].effect[ch] = nextNote;
+				newFrame.rows[unrolledNoteIndex].effects[ch].cEffect[effectNum] = nextNote;
 				nextNote = frame.channels[ch].effects[i + 2];
-				newFrame.rows[unrolledNoteIndex].effectValue[ch] = nextNote;
+				newFrame.rows[unrolledNoteIndex].effects[ch].cEffectValue[effectNum] = nextNote;
+				unrolledNoteIndex++;
 			}
+			else
+			{
+				effectNum = 0;
+				for (int j = unrolledNoteIndex; j < unrolledNoteIndex + toNextNote; j++)
+				{
+					newFrame.rows[j].effects[ch].cEffect[0] = -1;
+					newFrame.rows[j].effects[ch].cEffectValue[0] = -1;
+				}
 
-			unrolledNoteIndex++;
+
+
+				unrolledNoteIndex += toNextNote;
+
+
+				if (i < frame.channels[ch].effects.size() - 1)
+				{
+					int nextNote = frame.channels[ch].effects[i + 1];
+					newFrame.rows[unrolledNoteIndex].effects[ch].cEffect[0] = nextNote;
+					nextNote = frame.channels[ch].effects[i + 2];
+					newFrame.rows[unrolledNoteIndex].effects[ch].cEffectValue[0] = nextNote;
+				}
+
+				unrolledNoteIndex++;
+			}
 		}
 	}
 
@@ -201,8 +270,8 @@ UnrolledFrame unrollFrame(Frame frame)
 void saveCurrentFrame()
 {
 	loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]] = rollFrame(loadedFrame);
-	drawUIThisFrame = true;
-	drawFrameThisFrame = true;
+	gui.drawUIThisFrame = true;
+	gui.drawFrameThisFrame = true;
 }
 
 
@@ -210,9 +279,278 @@ void saveCurrentFrame()
 void loadCurrentFrame()
 {
 	loadedFrame = unrollFrame(loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]]);
-	frameScroll = 0.0f;
+	gui.frameScroll.y = 0.0f;
 
 	// The interface has changed, and must be redrawn.
-	drawUIThisFrame = true;
-	drawFrameThisFrame = true;
+	gui.drawUIThisFrame = true;
+	gui.drawFrameThisFrame = true;
+	loadedFrame = resizeSongFrameEffectColumns(loadedFrame);
+}
+
+
+
+UnrolledFrame resizeUnrolledFrameRows(UnrolledFrame frame, int newSize)
+{
+	if (newSize > frame.rows.size())
+	{
+		for (int fr = 0; fr < newSize; fr++)
+		{
+			FrameRow newRow;
+			for (int ch = 0; ch < loadedSong.numberOfChannels; ch++)
+			{
+				newRow.note.emplace_back(-1);
+				newRow.instrument.emplace_back(-1);
+				newRow.volume.emplace_back(-1);
+				UnrolledEffects newEffects;
+				newRow.effects.emplace_back(newEffects);
+				//newRow.effect.emplace_back(-1);
+				//newRow.effectValue.emplace_back(-1);
+			}
+			frame.rows.emplace_back(newRow);
+		}
+	}
+	else
+	{
+		frame.rows.resize(newSize);
+		frame.rows.shrink_to_fit();
+	}
+
+	return frame;
+}
+
+
+
+UnrolledFrame resizeSongFrameEffectColumns(UnrolledFrame frame)
+{
+	for (int ch = 0; ch < loadedSong.numberOfChannels; ch++)
+	{
+		for (int fr = 0; fr < frame.rows.size(); fr++)
+		{
+			int oldEffectNum = frame.rows[fr].effects[ch].cEffect.size();
+			frame.rows[fr].effects[ch].cEffect.resize(channels[ch].effectCountPerRow);
+			frame.rows[fr].effects[ch].cEffectValue.resize(channels[ch].effectCountPerRow);
+			for (int i = oldEffectNum; i < channels[ch].effectCountPerRow; i++)
+			{
+				frame.rows[fr].effects[ch].cEffect[i] = -1;
+				frame.rows[fr].effects[ch].cEffectValue[i] = -1;
+			}
+		}
+	}
+
+	return frame;
+}
+
+
+
+
+void copyNotes()
+{
+	// Create mouse selection frame.
+	frameSelection.rows.clear();
+	frameSelection = resizeUnrolledFrameRows(frameSelection, int(editor.noteSelectionEnd.y + 1 - editor.noteSelectionStart.y));
+	int leftMostChannel = findFrameTileByPosition(editor.noteSelectionStart.x).x;
+
+	for (int y = 0; y < frameSelection.rows.size(); y++)
+	{
+		for (int x = 0; x < loadedSong.numberOfChannels; x++)
+		{
+			frameSelection.rows[y].note[x] = -2;
+			frameSelection.rows[y].instrument[x] = -2;
+			frameSelection.rows[y].volume[x] = -2;
+			frameSelection.rows[y].effects[x].cEffect.resize(channels[x].effectCountPerRow);
+			frameSelection.rows[y].effects[x].cEffectValue.resize(channels[x].effectCountPerRow);
+			for (int i = 0; i < channels[x].effectCountPerRow; i++)
+			{
+				frameSelection.rows[y].effects[x].cEffect[i] = -2;
+				frameSelection.rows[y].effects[x].cEffectValue[i] = -2;
+			}
+		}
+
+		for (int x = editor.noteSelectionStart.x; x < editor.noteSelectionEnd.x; x++)
+		{
+			Vector2 selection = findFrameTileByPosition(x);
+			int selectedChannel = selection.x;
+			int selectedPart = selection.y;
+
+			if (selectedPart == -2) // Entire channel selected.
+			{
+				frameSelection.rows[y].note[selectedChannel - leftMostChannel] = loadedFrame.rows[y + editor.noteSelectionStart.y].note[selectedChannel];
+				frameSelection.rows[y].instrument[selectedChannel - leftMostChannel] = loadedFrame.rows[y + editor.noteSelectionStart.y].instrument[selectedChannel];
+				frameSelection.rows[y].volume[selectedChannel - leftMostChannel] = loadedFrame.rows[y + editor.noteSelectionStart.y].volume[selectedChannel];
+				for (int ef = 0; ef < frameSelection.rows[y].effects[0].cEffect.size(); ef++)
+				{
+					frameSelection.rows[y].effects[selectedChannel - leftMostChannel].cEffect[ef] = loadedFrame.rows[y + editor.noteSelectionStart.y].effects[selectedChannel].cEffect[ef];
+					frameSelection.rows[y].effects[selectedChannel - leftMostChannel].cEffectValue[ef] = loadedFrame.rows[y + editor.noteSelectionStart.y].effects[selectedChannel].cEffectValue[ef];
+				}
+			}
+			else if (selectedPart < 6)
+			{
+				frameSelection.rows[y].note[selectedChannel - leftMostChannel] = loadedFrame.rows[y + editor.noteSelectionStart.y].note[selectedChannel];
+				frameSelection.rows[y].instrument[selectedChannel - leftMostChannel] = loadedFrame.rows[y + editor.noteSelectionStart.y].instrument[selectedChannel];
+			}
+			else if (selectedPart < 8)
+				frameSelection.rows[y].volume[selectedChannel - leftMostChannel] = loadedFrame.rows[y + editor.noteSelectionStart.y].volume[selectedChannel];
+
+			if (selectedPart > 6)
+			{
+				int effectPart = (selectedPart - 7) % 5;
+				int effectNum = (selectedPart - 7) / 5;
+
+				if (effectPart == 0)
+					frameSelection.rows[y].effects[selectedChannel - leftMostChannel].cEffect[effectNum] = loadedFrame.rows[y + editor.noteSelectionStart.y].effects[selectedChannel].cEffect[effectNum];
+				else
+					frameSelection.rows[y].effects[selectedChannel - leftMostChannel].cEffectValue[effectNum] = loadedFrame.rows[y + editor.noteSelectionStart.y].effects[selectedChannel].cEffectValue[effectNum];
+			}
+		}
+	}
+
+	return;
+}
+
+
+
+
+void pasteNotes()
+{
+	int leftMostChannel = findFrameTileByPosition(editor.noteSelectionStart.x).x;
+
+	for (int y = 0; y < frameSelection.rows.size(); y++)
+	{
+		if (y + int(editor.noteSelectionStart.y) < loadedFrame.rows.size())
+		{
+			for (int ch = 0; ch < loadedSong.numberOfChannels; ch++)
+			{
+				if (ch + leftMostChannel < loadedSong.numberOfChannels)
+				{
+					if (frameSelection.rows[y].note[ch] > -2)
+						loadedFrame.rows[y + int(editor.noteSelectionStart.y)].note[ch + leftMostChannel] = frameSelection.rows[y].note[ch];
+					if (frameSelection.rows[y].instrument[ch] > -2)
+						loadedFrame.rows[y + int(editor.noteSelectionStart.y)].instrument[ch + leftMostChannel] = frameSelection.rows[y].instrument[ch];
+					if (frameSelection.rows[y].volume[ch] > -2)
+						loadedFrame.rows[y + int(editor.noteSelectionStart.y)].volume[ch + leftMostChannel] = frameSelection.rows[y].volume[ch];
+
+					for (int i = 0; i < channels[ch + leftMostChannel].effectCountPerRow; i++)
+					{
+						if (i < frameSelection.rows[y].effects[ch].cEffect.size())
+						{
+							if (frameSelection.rows[y].effects[ch].cEffect[i] > -2)
+								loadedFrame.rows[y + int(editor.noteSelectionStart.y)].effects[ch + leftMostChannel].cEffect[i] = frameSelection.rows[y].effects[ch].cEffect[i];
+							if (frameSelection.rows[y].effects[ch].cEffectValue[i] > -2)
+								loadedFrame.rows[y + int(editor.noteSelectionStart.y)].effects[ch + leftMostChannel].cEffectValue[i] = frameSelection.rows[y].effects[ch].cEffectValue[i];
+						}
+					}
+				}
+			}
+		}
+	}
+	loadedSong.unsavedChanges = true;
+
+	return;
+}
+
+
+void deleteNotes()
+{
+	for (int y = editor.noteSelectionStart.y; y <= editor.noteSelectionEnd.y; y++)
+	{
+		for (int x = editor.noteSelectionStart.x; x < editor.noteSelectionEnd.x; x++)
+		{
+			Vector2 selection = findFrameTileByPosition(x);
+
+			if (selection.x != -1)
+			{
+				int selectedChannel = selection.x;
+				int selectedPart = selection.y;
+
+				if (selectedPart == -2) // Entire channel selected.
+				{
+					loadedFrame.rows[y].note[selectedChannel] = -1;
+					loadedFrame.rows[y].instrument[selectedChannel] = -1;
+					loadedFrame.rows[y].volume[selectedChannel] = -1;
+					for (int ef = 0; ef < loadedFrame.rows[y].effects[0].cEffect.size(); ef++)
+					{
+						loadedFrame.rows[y].effects[selectedChannel].cEffect[ef] = -1;
+						loadedFrame.rows[y].effects[selectedChannel].cEffectValue[ef] = -1;
+					}
+					x += 2;
+				}
+				else if (selectedPart < 5)
+				{
+					loadedFrame.rows[y].note[selectedChannel] = -1;
+					loadedFrame.rows[y].instrument[selectedChannel] = -1;
+				}
+				else if (selectedPart < 7)
+					loadedFrame.rows[y].volume[selectedChannel] = -1;
+				if (selectedPart > 6)
+				{
+					int effectPart = (selectedPart - 7) % 5;
+					int effectNum = (selectedPart - 7) / 5;
+
+					if (effectPart < 2)
+						loadedFrame.rows[y].effects[selectedChannel].cEffect[effectNum] = -1;
+					else
+						loadedFrame.rows[y].effects[selectedChannel].cEffectValue[effectNum] = -1;
+				}
+			}
+		}
+	}
+	loadedSong.unsavedChanges = true;
+
+	return;
+}
+
+
+
+void transposeNotes()
+{
+	for (int y = editor.noteSelectionStart.y; y <= editor.noteSelectionEnd.y; y++)
+	{
+		for (int x = editor.noteSelectionStart.x; x < editor.noteSelectionEnd.x; x++)
+		{
+			Vector2 selection = findFrameTileByPosition(x);
+
+			if (selection.x != -1)
+			{
+				int selectedChannel = selection.x;
+				int selectedPart = selection.y;
+
+				if (selectedPart < 5)
+				{
+					if (loadedFrame.rows[y].note[selectedChannel] != -1)
+						loadedFrame.rows[y].note[selectedChannel] += editor.transposeValue;
+				}
+			}
+		}
+	}
+	loadedSong.unsavedChanges = true;
+
+	return;
+}
+
+
+
+void setNoteSamples()
+{
+	for (int y = editor.noteSelectionStart.y; y <= editor.noteSelectionEnd.y; y++)
+	{
+		for (int x = editor.noteSelectionStart.x; x < editor.noteSelectionEnd.x; x++)
+		{
+			Vector2 selection = findFrameTileByPosition(x);
+
+			if (selection.x != -1)
+			{
+				int selectedChannel = selection.x;
+				int selectedPart = selection.y;
+
+				if (selectedPart < 5)
+				{
+					if (loadedFrame.rows[y].instrument[selectedChannel] != -1)
+						loadedFrame.rows[y].instrument[selectedChannel] = editor.selectedSample;
+				}
+			}
+		}
+	}
+	loadedSong.unsavedChanges = true;
+
+	return;
 }

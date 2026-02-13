@@ -3,96 +3,401 @@
 #include "Structures.cpp"
 
 
-#include <vector>
-#include <fstream>
-#include <iostream>
-#include <string>
-#include <chrono> // Deals with time
-#include <stdlib.h> // For rand()
+// miniaudio
+//----------------------------------------------------------------------------------
+#define MINIAUDIO_IMPLEMENTATION
+#include "miniaudio.h"
+//----------------------------------------------------------------------------------
+
+
+int calculateSongLength(); // Returns the song's length in seconds.
 
 
 
 float delta = 0.0f; // Time between frames.
 
-bool playingSong = false;
-bool editing = true;
-bool recordingSong = false;
-bool inHelpPage = false;
-
-bool drawScreen = false;
-
-// Tells the program to draw certain parts of the screen.
-bool drawUIThisFrame = true;
-bool drawFrameThisFrame = true;
-
-//int uiColorTheme = 0;
 
 
-Vector2 mouseCoords;
-bool mouseDown = false;
-bool keyDown = false;
-float mouseHoldTime = 0.0f; // The amount of time that the mouse has been held down.
-Vector2 hoveredTile;
-Vector2 screenSize;
-float windowRatio;
+std::vector <Channel> channels;
 
-// 92 x 57 tile ui.
-UIElement activeUI[92][57]; // Active user interface elements on the screen.
-
-Channel channels[8];
+Screen screen;
+GUI gui;
+Editor editor;
+WindowController windowController;
 
 Song loadedSong;
 UnrolledFrame loadedFrame; // The frame currently in the editor.
 std::vector <std::string> fileNameList; // The names of the samples in the "Samples" file.
-std::vector <Sample> loadedSamples; // The names of the samples used in the song.
+//std::vector <Sample> loadedSamples; // The names of the samples used in the song.
+Sample loadedSamples[256]; // The names of the samples used in the song.
+
 UnrolledFrame frameSelection; // A frame containing the portion of the frame that is selected, with that number of rows. All values not used are set to -2.
 
+FileNavigator fileNavigator;
 
-// Editing settings
-int selectedOctave = 3;
-// Selectable Buttons:
-// 0 = Song name
-int selectedButton = -1;
-Vector2 selectedTile;
-int selectedSample = 0;
-int selectedKey = -1;
-int selectedEffect = -1;
-int selectedFile = 0;
-bool filesSampleNotSong = true; // Whether you are loading samples or songs.
+SampleDisplay sampleDisplay;
+PresetMenu presetMenu;
 
 
-int frameListScroll = 0;
-int fileListScroll = 0;
-int sampleListScroll = 0;
-float frameScroll = 0.0f;
 
-Vector2 noteSelectionStart;
-Vector2 noteSelectionEnd;
-
-
-uint8_t uiColors[12][3] =
+Vector2 findFrameTileByPosition(int pos) // Returns the channel and channel part as a Vector2
 {
-	{0, 0, 0}, // Blue/Gray
-	{30, 30, 60},
-	{50, 50, 100},
-	{90, 90, 140},
-	{150, 150,200},
-	{255, 255, 255},
+	int selectedPart = pos;
+	int selectedChannel = 0;
+	bool inChannel = false;
+	while (!inChannel)
+	{
+		int channelSize = 0;
+		
+		if (channels[selectedChannel].compressed)
+			channelSize = 3;
+		else
+		{
+			channelSize = 8 + loadedFrame.rows[0].effects[selectedChannel].cEffect.size() * 4;
+			if (channels[selectedChannel].hasVoiceColumns)
+				channelSize += 5;
+		}
 
-	{63, 100, 100}, // Green/Yellow
-	{127, 190, 0},
-	{255, 255, 0},
+		if (selectedPart >= channelSize)
+		{
+			selectedPart -= channelSize;
+			selectedChannel++;
+			if (selectedChannel >= loadedFrame.rows[0].effects.size())
+			{
+				return { -1, -1 }; // Outside of the frame.
+			}
+		}
+		else
+		{
+			inChannel = true;
+			if (channels[selectedChannel].compressed)
+				selectedPart = -2; // Represents selecting whole channel.
+		}
+	}
 
-	{100, 0, 60}, // Red
-	{160, 0, 40},
-	{255, 0, 0},
+	return { float(selectedChannel), float(selectedPart) };
+}
+
+
+/*
+size_t memory_write_callback(void* pUserData, const void* pData, size_t bytesToWrite)
+{
+	void* data2 = pUserData;
+
+	void* newData = realloc(data2, bytesToWrite);
+
+	data2 = newData;
+	//buffer->capacity = newCapacity;
+
+	memcpy((unsigned char*)data2, pData, bytesToWrite);
+	//memcpy((unsigned char*)buffer->data + buffer->cursor, pData, bytesToWrite);
+
+	//MemoryBuffer* buffer = (MemoryBuffer*)pUserData;
+	return bytesToWrite;
+}*/
+
+
+ma_result onWrite(ma_encoder *pEncoder, const void* pBufferIn, size_t bytesToWrite, unsigned long long *pBytesWritten)
+{
+	
+
+
+	std::vector <char>* pStream = reinterpret_cast<std::vector <char>*>(pEncoder->pUserData);
+
+
+	//size_t bytesActuallyWritten = pStream->write(static_cast<const char*>(pBufferIn), bytesToWrite);
+
+	std::memcpy(pStream, static_cast<const char*>(pBufferIn), bytesToWrite);
+
+	*pBytesWritten = static_cast<unsigned long long>(bytesToWrite);
+
+
+
+	//MemoryStream* pStream = reinterpret_cast<MemoryStream*>(pEncoder->pUserData);
+	// Copy data to buffer
+	//memcpy((unsigned char*)pBufferIn, pBytesWritten, bytesToWrite);
+	//buffer->cursor += bytesToWrite;
+	//buffer->size = buffer->cursor;
+
+
+	/*
+	void* data2 = pUserData;
+
+	void* newData = realloc(data2, bytesToWrite);
+
+	data2 = newData;
+	//buffer->capacity = newCapacity;
+
+	memcpy((unsigned char*)data2, pData, bytesToWrite);
+	//memcpy((unsigned char*)buffer->data + buffer->cursor, pData, bytesToWrite);
+
+	//MemoryBuffer* buffer = (MemoryBuffer*)pUserData;
+	return bytesToWrite;
+	*/
+
+	return MA_SUCCESS;
+}
+
+
+ma_result onSeek(ma_encoder* pEncoder, ma_int64 offset, ma_seek_origin origin)
+{
+	if (pEncoder == nullptr || pEncoder->pUserData == nullptr) {
+		return MA_INVALID_ARGS; // Ensure valid arguments.
+	}
+
+	std::vector <char>* stream = reinterpret_cast<std::vector <char>*>(pEncoder->pUserData);
+	//MemoryStream* stream = reinterpret_cast<MemoryStream*>(pEncoder->pUserData);
+
+	std::vector <char>* pStream = reinterpret_cast<std::vector <char>*>(pEncoder->pUserData);
+
+
+	
+	/*
+	void* data2 = pUserData;
+
+	void* newData = realloc(data2, bytesToWrite);
+
+	data2 = newData;
+	//buffer->capacity = newCapacity;
+
+	memcpy((unsigned char*)data2, pData, bytesToWrite);
+	//memcpy((unsigned char*)buffer->data + buffer->cursor, pData, bytesToWrite);
+
+	//MemoryBuffer* buffer = (MemoryBuffer*)pUserData;
+	return bytesToWrite;
+	*/
+
+	return MA_SUCCESS;
+}
+
+
+
+std::string notesText[18] =
+{
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	""
 };
+
+
+
+
+int calculateSongLength() // Returns the song's length in seconds.
+{
+	float length = 0;
+	float calcTempo = loadedSong.startingBPM;
+
+	
+
+	for (int fr = 0; fr < loadedSong.frameSequence.size(); fr++)
+	{
+		std::vector <int> effectIndex = {};
+		std::vector <int>  effectTime = {};
+
+		effectIndex.resize(channels.size());
+		effectTime.resize(channels.size());
+
+
+		for (int ch = 0; ch < channels.size(); ch++)
+		{
+			effectIndex[ch] = 0;
+			effectTime[ch] = 0;
+
+			
+
+			if (effectIndex[ch] < loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects.size())
+			{
+				effectTime[ch] = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[0];
+				effectIndex[ch]++;
+			}
+			else
+				return 0;
+		}
+
+		for (int i = 0; i < loadedSong.frames[loadedSong.frameSequence[fr]].rows; i++)
+		{
+			for (int ch = 0; ch < channels.size(); ch++)
+			{
+				effectTime[ch] -= 1;
+
+				if (effectTime[ch] < 0) // Read next effect.
+				{
+					bool readingEffects = true;
+					int effectNum = 0;
+
+
+					while (readingEffects)
+					{
+						if (effectIndex[ch] < loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects.size())
+						{
+							int effect = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[effectIndex[ch]];
+							effectIndex[ch]++;
+							int effectValue = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[effectIndex[ch]];
+							effectIndex[ch]++;
+
+							if (effect == 19) // Set tempo.
+							{
+								calcTempo = effectValue;
+								if (calcTempo < 1)
+									calcTempo = 1;
+							}
+
+							if (effectIndex[ch] < loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects.size())
+							{
+								effectTime[ch] = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[effectIndex[ch]];
+								effectIndex[ch]++;
+								if (effectTime[ch] == 255) // Read multiple effects on one beat.
+								{
+									effectTime[ch] = -1;
+									effectNum++;
+									//loadedSong.effectChannelIndex[ch]--;
+								}
+								else
+									readingEffects = false;
+							}
+							else
+							{
+								effectTime[ch] = 256; // No more notes in this channel in the frame.
+								readingEffects = false;
+							}
+						}
+						else
+							readingEffects = false;
+					}
+				}
+			}
+
+
+			// Add row to time.
+			length += ((60000.0f / (calcTempo * 4.0f)) * 48.0f / 48000.0f);
+		}
+	}
+
+	return int(length);
+}
+
+
+
+int calculateSongPosition() // Returns the song's current position in seconds.
+{
+	float length = 0;
+	float calcTempo = loadedSong.startingBPM;
+
+
+
+	for (int fr = 0; fr < loadedSong.currentFrame + 1; fr++)
+	{
+		std::vector <int> effectIndex = {};
+		std::vector <int>  effectTime = {};
+
+		effectIndex.resize(channels.size());
+		effectTime.resize(channels.size());
+
+
+		for (int ch = 0; ch < channels.size(); ch++)
+		{
+			effectIndex[ch] = 0;
+			effectTime[ch] = 0;
+
+
+
+			if (effectIndex[ch] < loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects.size())
+			{
+				effectTime[ch] = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[0];
+				effectIndex[ch]++;
+			}
+			else
+				return 0;
+		}
+
+		for (int i = 0; i < loadedSong.frames[loadedSong.frameSequence[fr]].rows; i++)
+		{
+			for (int ch = 0; ch < channels.size(); ch++)
+			{
+				effectTime[ch] -= 1;
+
+				if (effectTime[ch] < 0) // Read next effect.
+				{
+					bool readingEffects = true;
+					int effectNum = 0;
+
+
+					while (readingEffects)
+					{
+						if (effectIndex[ch] < loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects.size())
+						{
+							int effect = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[effectIndex[ch]];
+							effectIndex[ch]++;
+							int effectValue = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[effectIndex[ch]];
+							effectIndex[ch]++;
+
+							if (effect == 19) // Set tempo.
+							{
+								calcTempo = effectValue;
+								if (calcTempo < 1)
+									calcTempo = 1;
+							}
+
+							if (effectIndex[ch] < loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects.size())
+							{
+								effectTime[ch] = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[effectIndex[ch]];
+								effectIndex[ch]++;
+								if (effectTime[ch] == 255) // Read multiple effects on one beat.
+								{
+									effectTime[ch] = -1;
+									effectNum++;
+									//loadedSong.effectChannelIndex[ch]--;
+								}
+								else
+									readingEffects = false;
+							}
+							else
+							{
+								effectTime[ch] = 256; // No more notes in this channel in the frame.
+								readingEffects = false;
+							}
+						}
+						else
+							readingEffects = false;
+					}
+				}
+			}
+
+
+			// Add row to time.
+			length += ((60000.0f / (calcTempo * 4.0f)) * 48.0f / 48000.0f);
+
+			if (fr == loadedSong.currentFrame && i >= loadedSong.currentNote)
+				i = loadedSong.frames[loadedSong.frameSequence[fr]].rows;
+		}
+	}
+
+	return int(length);
+}
+
+
+
 
 
 
 std::vector <std::string> helpPageText =
 {
-	"WELCOME TO SUPER SOUND",
+	"WELCOME TO SUPER SOUND!",
 	"",
 	"",
 	"",
@@ -226,7 +531,7 @@ std::vector <std::string> helpPageText =
 	"",
 	"    After that is the volume value.",
 	"    This sets the volume for the note and all future notes until changed again.",
-	"    Volume is in hexadecimal, and ranges from 00 to 40.",
+	"    Volume is in decimal, and ranges from 00 to 99.",
 	"",
 	"    Then is the effect Type.",
 	"    This sets the effect for the note and all future notes until changed again.",
@@ -235,7 +540,7 @@ std::vector <std::string> helpPageText =
 	"    To the furthest right is the effect value.",
 	"    This specifies a parameter or two for the specified effect.",
 	"    What is does depends on the effect.",
-	"    The effect value is in hexadecimal, and ranges from 00 to FF.",
+	"    The effect value is in decimal, and ranges from 00 to 99.",
 	"",
 	"",
 	"",
@@ -250,7 +555,7 @@ std::vector <std::string> helpPageText =
 	"",
 	"    Set Pan",
 	"",
-	"        This effect sets the spacial position of the channel audio,",
+	"        This effect sets the panning position of the channel audio,",
 	"        from left (00), to right (FF).",
 	"",
 	"    Volume Slide",
