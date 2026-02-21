@@ -246,7 +246,7 @@ void RunEngine()
     // Initialize decoders.
     ResizeDecoders(loadedSong.numberOfChannels);
 
-
+    
 
     // Create the initial song.
     //LoadSong("NewSong.wav");
@@ -258,8 +258,13 @@ void RunEngine()
 
     loadedFrame = resizeUnrolledFrameRows(loadedFrame, 32);
 
+    
+
     saveCurrentFrame();
+
     loadCurrentFrame();
+
+    
     
     //unrollFrame(firstFrame);
     //LoadSong("Bob.song");
@@ -530,32 +535,28 @@ void RunEngine()
                 
                 if (sampleDisplay.visible && windowController.windows[i].name == "Instrument Editor")
                 {
-                    glUseProgram(sampleShaderProgram);
+                    if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
+                    {
+                        glUseProgram(sampleShaderProgram);
 
-                    glBindTexture(GL_TEXTURE_2D, sampleTex);
-                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 528, 192, 0, GL_RGB, GL_UNSIGNED_BYTE, sampleDisplay.pixelData);
-                    glBindVertexArray(sampleVAO);
+                        glBindTexture(GL_TEXTURE_2D, sampleTex);
+                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 528, 192, 0, GL_RGB, GL_UNSIGNED_BYTE, sampleDisplay.pixelData);
+                        glBindVertexArray(sampleVAO);
 
-                    GLint ratioInUIShader3 = glGetUniformLocation(sampleShaderProgram, "windowRatio");
-                    glUniform1f(ratioInUIShader3, screen.windowRatio);
-
-
-                    GLint posInShader3 = glGetUniformLocation(sampleShaderProgram, "offset");
-                    glUniform2f(posInShader3, sampleDisplay.position.x, sampleDisplay.position.y);
-
-                    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 1); // Draw the sprites.
+                        GLint ratioInUIShader3 = glGetUniformLocation(sampleShaderProgram, "windowRatio");
+                        glUniform1f(ratioInUIShader3, screen.windowRatio);
 
 
-                    glUseProgram(uiShaderProgram);
-                    glBindTexture(GL_TEXTURE_2D, gui.uiTexture);
-                    glBindVertexArray(sVAO);
+                        GLint posInShader3 = glGetUniformLocation(sampleShaderProgram, "offset");
+                        glUniform2f(posInShader3, sampleDisplay.position.x, sampleDisplay.position.y + 0.5f);
 
-                    
-
+                        glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 1); // Draw the sprites.
 
 
-
-                    
+                        glUseProgram(uiShaderProgram);
+                        glBindTexture(GL_TEXTURE_2D, gui.uiTexture);
+                        glBindVertexArray(sVAO);
+                    }
                 }
 
                 if (i == 0) // Draw scrollbars.
@@ -809,8 +810,8 @@ void processInput(GLFWwindow* window)
     {
         for (int wind = 0; wind < windowController.windows.size(); wind++)
         {
-            Vector2 posTL = windowController.windows[wind].position;
-            Vector2 posBR = posTL;
+            Vector2i posTL = windowController.windows[wind].position;
+            Vector2i posBR = posTL;
             posBR.x += windowController.windows[wind].size.x + 1;
             posBR.y += windowController.windows[wind].size.y;
             if (gui.hoveredTile.y >= posTL.y && gui.hoveredTile.y < posBR.y)
@@ -831,8 +832,8 @@ void processInput(GLFWwindow* window)
     {
         for (int wind = 0; wind < windowController.windows.size(); wind++)
         {
-            Vector2 posTL = windowController.windows[wind].position;
-            Vector2 posBR = posTL;
+            Vector2i posTL = windowController.windows[wind].position;
+            Vector2i posBR = posTL;
             posBR.x += windowController.windows[wind].size.x + 1;
             posBR.y += windowController.windows[wind].size.y;
             if (gui.hoveredTile.y >= posTL.y && gui.hoveredTile.y < posBR.y)
@@ -909,41 +910,47 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         {
             if (editor.selectedButton == 0) // Delete text (Song name)
             {
-                int selectedChar = gui.selectedTile.x - 45;
-                if (loadedSong.songName.length() > 0 && selectedChar > -1)
+                if (gui.uiDisplayMenuOption != 2) // Effect GUI covers name.
                 {
-                    if (selectedChar == loadedSong.songName.length())
+                    int selectedChar = gui.selectedTile.x - 45;
+                    if (loadedSong.songName.length() > 0 && selectedChar > -1)
                     {
-                        loadedSong.songName = loadedSong.songName.substr(0, selectedChar);
+                        if (selectedChar == loadedSong.songName.length())
+                        {
+                            loadedSong.songName = loadedSong.songName.substr(0, selectedChar);
+                        }
+                        else
+                        {
+                            loadedSong.songName = loadedSong.songName.substr(0, selectedChar) + loadedSong.songName.substr(selectedChar + 1, loadedSong.songName.length());
+                        }
+
+                        if (selectedChar > 0)
+                            gui.selectedTile.x--;
                     }
-                    else
-                    {
-                        loadedSong.songName = loadedSong.songName.substr(0, selectedChar) + loadedSong.songName.substr(selectedChar + 1, loadedSong.songName.length());
-                    }
-                    
-                    if (selectedChar > 0)
-                        gui.selectedTile.x--;
+                    loadedSong.unsavedChanges = true;
                 }
-                loadedSong.unsavedChanges = true;
             }
             else if (editor.selectedButton == 6) // Delete text (Artist name)
             {
-                int selectedChar = gui.selectedTile.x - 48;
-                if (loadedSong.artistName.length() > 0 && selectedChar > -1)
+                if (gui.uiDisplayMenuOption != 2) // Effect GUI covers name.
                 {
-                    if (selectedChar == loadedSong.artistName.length())
+                    int selectedChar = gui.selectedTile.x - 48;
+                    if (loadedSong.artistName.length() > 0 && selectedChar > -1)
                     {
-                        loadedSong.artistName = loadedSong.artistName.substr(0, selectedChar);
-                    }
-                    else
-                    {
-                        loadedSong.artistName = loadedSong.artistName.substr(0, selectedChar) + loadedSong.artistName.substr(selectedChar + 1, loadedSong.artistName.length());
-                    }
+                        if (selectedChar == loadedSong.artistName.length())
+                        {
+                            loadedSong.artistName = loadedSong.artistName.substr(0, selectedChar);
+                        }
+                        else
+                        {
+                            loadedSong.artistName = loadedSong.artistName.substr(0, selectedChar) + loadedSong.artistName.substr(selectedChar + 1, loadedSong.artistName.length());
+                        }
 
-                    if (selectedChar > 0)
-                        gui.selectedTile.x--;
+                        if (selectedChar > 0)
+                            gui.selectedTile.x--;
+                    }
+                    loadedSong.unsavedChanges = true;
                 }
-                loadedSong.unsavedChanges = true;
             }
             else if (editor.selectedButton == 8) // Delete text (Sample name)
             {
@@ -964,29 +971,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
                 }
                 loadedSong.unsavedChanges = true;
             }
-            else if (editor.selectedButton > 8 && editor.selectedButton < 28) // Delete text (Notes)
-            {
-                int selectedChar = gui.selectedWindowTile.x - 2;
-                if (notesText[int(gui.selectedWindowTile.y - 1)].length() > 0 && selectedChar > -1)
-                {
-                    if (selectedChar == notesText[int(gui.selectedWindowTile.y - 1)].length())
-                    {
-                        notesText[int(gui.selectedWindowTile.y - 1)] = notesText[int(gui.selectedWindowTile.y - 1)].substr(0, selectedChar);
-                    }
-                    else
-                    {
-                        notesText[int(gui.selectedWindowTile.y - 1)] = notesText[int(gui.selectedWindowTile.y - 1)].substr(0, selectedChar) + notesText[int(gui.selectedWindowTile.y - 1)].substr(selectedChar + 1, notesText[int(gui.selectedWindowTile.y - 1)].length());
-                    }
-
-                    if (selectedChar > 0)
-                    {
-                        gui.selectedTile.x--;
-                        gui.selectedWindowTile.x--;
-                    }
-                }
-                loadedSong.unsavedChanges = true;
-            }
-            else if (!editor.playingSong) // Delete notes
+            else // Delete notes
             {
                 deleteNotes();
             }
@@ -1022,42 +1007,36 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         }
         if (key == GLFW_KEY_LEFT || key == GLFW_KEY_KP_4) // Move left
         {
-            if (!editor.playingSong)
+            if (editor.noteSelectionStart.x > 0)
             {
-                if (editor.noteSelectionStart.x > 0)
-                {
-                    int selectedPart = int(editor.noteSelectionStart.x) % 12;
+                int selectedPart = int(editor.noteSelectionStart.x) % 12;
 
-                    if (selectedPart == 0)
-                    {
-                        editor.noteSelectionStart.x -= 2;
-                    }
-                    else
-                    {
-                        editor.noteSelectionStart.x -= 1;
-                    }
-                    editor.noteSelectionEnd.x = editor.noteSelectionStart.x + 1;
+                if (selectedPart == 0)
+                {
+                    editor.noteSelectionStart.x -= 2;
                 }
+                else
+                {
+                    editor.noteSelectionStart.x -= 1;
+                }
+                editor.noteSelectionEnd.x = editor.noteSelectionStart.x + 1;
             }
         }
         if (key == GLFW_KEY_RIGHT || key == GLFW_KEY_KP_6) // Move right
         {
-            if (!editor.playingSong)
+            if (editor.noteSelectionStart.x < loadedSong.numberOfChannels * 12)
             {
-                if (editor.noteSelectionStart.x < loadedSong.numberOfChannels * 12)
-                {
-                    int selectedPart = int(editor.noteSelectionStart.x) % 11;
+                int selectedPart = int(editor.noteSelectionStart.x) % 11;
 
-                    if (selectedPart == 9)
-                    {
-                        editor.noteSelectionStart.x += 2;
-                    }
-                    else
-                    {
-                        editor.noteSelectionStart.x += 1;
-                    }
-                    editor.noteSelectionEnd.x = editor.noteSelectionStart.x + 1;
+                if (selectedPart == 9)
+                {
+                    editor.noteSelectionStart.x += 2;
                 }
+                else
+                {
+                    editor.noteSelectionStart.x += 1;
+                }
+                editor.noteSelectionEnd.x = editor.noteSelectionStart.x + 1;
             }
         }
 
@@ -1066,13 +1045,19 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             StartOrStopSong();
         }
 
-        if (key == GLFW_KEY_ENTER && !editor.playingSong) // Return to start of song
+        if (key == GLFW_KEY_ENTER) // Return to start of song
         {
             loadedSong.currentNote = 0;
             gui.frameScroll.y = 0.0f;
+
+            if (editor.playingSong) // Restart the frame if playing.
+            {
+                StartOrStopSong();
+                StartOrStopSong();
+            }
         }
 
-        if (key == GLFW_KEY_TAB && !editor.playingSong) // Create stop note
+        if (key == GLFW_KEY_TAB) // Create stop note
         {
             Vector2 selection = findFrameTileByPosition(editor.noteSelectionStart.x);
             int selectedChannel = selection.x;
@@ -1102,7 +1087,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if (key == GLFW_KEY_ESCAPE)
     {
         if (loadedSong.unsavedChanges)
-            windowController.InitializeWindow("Save and Exit", gui.hoveredTile, { 20, 16 });
+            windowController.InitializeWindow("Save and Exit", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 20, 16 });
         else
             glfwSetWindowShouldClose(window, true);
     }
@@ -1226,47 +1211,53 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
 
         if (editor.selectedButton == 0) // Song name
         {
-            writing = true;
-            if (loadedSong.songName.length() < 21)
+            if (gui.uiDisplayMenuOption != 2) // Effect GUI covers name.
             {
-                int selectedChar = gui.selectedTile.x - 45;
-
-                if (loadedSong.songName.length() == 0)
-                    loadedSong.songName = input;
-                else if (selectedChar >= loadedSong.songName.length() - 1)
+                writing = true;
+                if (loadedSong.songName.length() < 21)
                 {
-                    loadedSong.songName = loadedSong.songName + input;
-                }
-                else
-                {
-                    loadedSong.songName = loadedSong.songName.substr(0, selectedChar + 1) + input + loadedSong.songName.substr(selectedChar + 1, loadedSong.songName.length());
-                }
+                    int selectedChar = gui.selectedTile.x - 45;
 
-                gui.selectedTile.x++;
+                    if (loadedSong.songName.length() == 0)
+                        loadedSong.songName = input;
+                    else if (selectedChar >= loadedSong.songName.length() - 1)
+                    {
+                        loadedSong.songName = loadedSong.songName + input;
+                    }
+                    else
+                    {
+                        loadedSong.songName = loadedSong.songName.substr(0, selectedChar + 1) + input + loadedSong.songName.substr(selectedChar + 1, loadedSong.songName.length());
+                    }
+
+                    gui.selectedTile.x++;
+                }
+                loadedSong.unsavedChanges = true;
             }
-            loadedSong.unsavedChanges = true;
         }
         else if (editor.selectedButton == 6) // Artist name
         {
-            writing = true;
-            if (loadedSong.artistName.length() < 18)
+            if (gui.uiDisplayMenuOption != 2) // Effect GUI covers name.
             {
-                int selectedChar = gui.selectedTile.x - 45;
-
-                if (loadedSong.artistName.length() == 0)
-                    loadedSong.artistName = input;
-                else if (selectedChar >= loadedSong.artistName.length() - 1)
+                writing = true;
+                if (loadedSong.artistName.length() < 18)
                 {
-                    loadedSong.artistName = loadedSong.artistName + input;
-                }
-                else
-                {
-                    loadedSong.artistName = loadedSong.artistName.substr(0, selectedChar + 1) + input + loadedSong.artistName.substr(selectedChar + 1, loadedSong.artistName.length());
-                }
+                    int selectedChar = gui.selectedTile.x - 45;
 
-                gui.selectedTile.x++;
+                    if (loadedSong.artistName.length() == 0)
+                        loadedSong.artistName = input;
+                    else if (selectedChar >= loadedSong.artistName.length() - 1)
+                    {
+                        loadedSong.artistName = loadedSong.artistName + input;
+                    }
+                    else
+                    {
+                        loadedSong.artistName = loadedSong.artistName.substr(0, selectedChar + 1) + input + loadedSong.artistName.substr(selectedChar + 1, loadedSong.artistName.length());
+                    }
+
+                    gui.selectedTile.x++;
+                }
+                loadedSong.unsavedChanges = true;
             }
-            loadedSong.unsavedChanges = true;
         }
         if (editor.selectedButton == 8) // Sample name
         {
@@ -1344,12 +1335,16 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                     newRow.note.resize(loadedSong.numberOfChannels);
                     newRow.instrument.resize(loadedSong.numberOfChannels);
                     newRow.volume.resize(loadedSong.numberOfChannels);
+                    newRow.voiceSamples.resize(loadedSong.numberOfChannels);
                     newRow.effects.resize(loadedSong.numberOfChannels);
                     for (int ch = 0; ch < loadedSong.numberOfChannels; ch++)
                     {
                         newRow.note[ch] = -1;
                         newRow.instrument[ch] = -1;
                         newRow.volume[ch] = -1;
+                        for (int sample = 0; sample < 5; sample++)
+                            newRow.voiceSamples[ch].sample[sample] = 44;
+
                         for (int ef = 0; ef < loadedFrame.rows[0].effects[ch].cEffect.size(); ef++)
                         {
                             newRow.effects[ch].cEffect.emplace_back(-1);
@@ -1416,7 +1411,7 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
         }
     }
 
-    if (!editor.playingSong && editor.focusOnNotes) // Create notes
+    if (editor.focusOnNotes) // Create notes
     {
         Vector2 notePos = findFrameTileByPosition(editor.noteSelectionStart.x);
         int selectedPart = notePos.y;
@@ -1436,7 +1431,7 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
             
             if (noteNum != -1)
             {
-                if (!screen.keyDown && !editor.playingSong) // Play the note sound.
+                if (!screen.keyDown) // Play the note sound.
                 {
                     channels[selectedChannel].volume = 64.0f;
 
@@ -1446,6 +1441,11 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                 }
                 loadedFrame.rows[loadedSong.currentNote].note[selectedChannel] = noteNum;
                 loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = editor.selectedSample;
+
+                if (editor.playingSong)
+                {
+                    saveCurrentFrame();
+                }
 
                 loadedSong.unsavedChanges = true;
             }
@@ -1513,11 +1513,20 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
         {
             if (channels[selectedChannel].hasVoiceColumns)
                 selectedPart -= 5;
+            
 
-
-            if (selectedPart < 0) // Sample voice samples
+            if (selectedPart < 7) // Voice samples
             {
                 selectedPart += 5;
+
+                int inputLetter = editor.findVoiceSamplePlayed(input);
+                editor.selectedVoiceSample = inputLetter;
+
+                loadedFrame.rows[loadedSong.currentNote].voiceSamples[selectedChannel].sample[selectedPart - 7] = inputLetter;
+                loadedSong.unsavedChanges = true;
+                gui.drawFrameThisFrame = true;
+                saveCurrentFrame();
+
                 return;
             }
             else
@@ -1668,8 +1677,8 @@ void pressButton(GLFWwindow* window)
     gui.clickingOnFloatingWind = false;
     for (int wind = 0; wind < windowController.windows.size(); wind++)
     {
-        Vector2 posTL = windowController.windows[wind].position;
-        Vector2 posBR = posTL;
+        Vector2i posTL = windowController.windows[wind].position;
+        Vector2i posBR = posTL;
         posBR.x += windowController.windows[wind].size.x + 1;
         posBR.y += windowController.windows[wind].size.y;
         if (gui.hoveredTile.y >= posTL.y && gui.hoveredTile.y < posBR.y)
@@ -1738,7 +1747,7 @@ void pressButton(GLFWwindow* window)
         else if (gui.hoveredTile.x == 90 || gui.hoveredTile.x == 91) // Close program
         {
             if (loadedSong.unsavedChanges)
-                windowController.InitializeWindow("Save and Exit", gui.hoveredTile, { 20, 16 });
+                windowController.InitializeWindow("Save and Exit", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 20, 16 });
             else
                 glfwSetWindowShouldClose(window, true);
         }
@@ -1748,19 +1757,19 @@ void pressButton(GLFWwindow* window)
 
 
 
-    if (gui.hoveredTile.x > 18 && gui.hoveredTile.x < 35 && !editor.playingSong)
+    if (gui.hoveredTile.x > 18 && gui.hoveredTile.x < 35)
     {
         if (gui.hoveredTile.y == 8) // Open File window.
         {
-            windowController.InitializeWindow("File", gui.hoveredTile, { 16, 11 });
+            windowController.InitializeWindow("File", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 16, 11 });
         }
         else if (gui.hoveredTile.y == 9) // Open Configure window.
         {
-            windowController.InitializeWindow("Settings", gui.hoveredTile, { 16, 34 });
+            windowController.InitializeWindow("Settings", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 16, 34 });
         }
         else if (gui.hoveredTile.y == 10) // Read Help Page
         {
-            windowController.InitializeWindow("Help", gui.hoveredTile, { 40, 40 });
+            windowController.InitializeWindow("Help", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 40, 40 });
         }
         else if (gui.hoveredTile.y == 11) // Open sample editor.
         {
@@ -1774,13 +1783,13 @@ void pressButton(GLFWwindow* window)
                 }
             }
 
-            windowController.InitializeWindow("Instrument Editor", gui.hoveredTile, { 34, 40 });
+            windowController.InitializeWindow("Instrument Editor", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 34, 40 });
 
             sampleDisplay.visible = true;
-            toDrawSampleDisplay = true;
             sampleDisplay.drawing = false; // Stop sample drawing.
             sampleDisplay.zoomed = false; // Reset zoom.
             sampleDisplay.selectedOperator = 0; // Select the first sample operator.
+            DrawSampleDisplay();
         }
     }
 
@@ -1979,7 +1988,7 @@ void pressButton(GLFWwindow* window)
     
 
     
-    if (gui.hoveredTile.y > 1 && gui.hoveredTile.y < 12 && !editor.playingSong) // Select song frame.
+    if (gui.hoveredTile.y > 1 && gui.hoveredTile.y < 12) // Select song frame.
     {
         if (gui.hoveredTile.x > 0 && gui.hoveredTile.x < 6)
         {
@@ -1988,6 +1997,12 @@ void pressButton(GLFWwindow* window)
             if (loadedSong.currentFrame >= loadedSong.frameSequence.size()) // Snap to end of song.
                 loadedSong.currentFrame = loadedSong.frameSequence.size() - 1;
             loadCurrentFrame();
+        }
+
+        if (editor.playingSong) // Restart the frame if playing.
+        {
+            StartOrStopSong();
+            StartOrStopSong();
         }
     }
 
@@ -2060,7 +2075,7 @@ void pressButton(GLFWwindow* window)
 
             if (sampleDisplay.visible)
             {
-                toDrawSampleDisplay = true;
+                DrawSampleDisplay();
             }
         }
     }
@@ -2218,12 +2233,17 @@ void pressButton(GLFWwindow* window)
                 newRow.note.resize(loadedSong.numberOfChannels);
                 newRow.instrument.resize(loadedSong.numberOfChannels);
                 newRow.volume.resize(loadedSong.numberOfChannels);
+                newRow.voiceSamples.resize(loadedSong.numberOfChannels);
                 newRow.effects.resize(loadedSong.numberOfChannels);
                 for (int ch = 0; ch < loadedSong.numberOfChannels; ch++)
                 {
                     newRow.note[ch] = -1;
                     newRow.instrument[ch] = -1;
                     newRow.volume[ch] = -1;
+
+                    for (int sample = 0; sample < 5; sample++)
+                        newRow.voiceSamples[ch].sample[sample] = 44;
+
                     for (int ef = 0; ef < loadedFrame.rows[0].effects[ch].cEffect.size(); ef++)
                     {
                         newRow.effects[ch].cEffect.emplace_back(-1);
@@ -2397,7 +2417,7 @@ void pressAndHoldButton(GLFWwindow* window)
 
 
 
-    if (gui.hoveredTile.y > 11 && gui.hoveredTile.y < 16 && !editor.playingSong) // Select channel mute buttons.
+    if (gui.hoveredTile.y > 11 && gui.hoveredTile.y < 16) // Select channel mute buttons.
     {
         int selectedX = hoveredXScrolled - 4.0f;
         int selectedChannel = 0;
@@ -2606,12 +2626,17 @@ void pressAndHoldButton(GLFWwindow* window)
                 newRow.note.resize(loadedSong.numberOfChannels);
                 newRow.instrument.resize(loadedSong.numberOfChannels);
                 newRow.volume.resize(loadedSong.numberOfChannels);
+                newRow.voiceSamples.resize(loadedSong.numberOfChannels);
                 newRow.effects.resize(loadedSong.numberOfChannels);
                 for (int ch = 0; ch < loadedSong.numberOfChannels; ch++)
                 {
                     newRow.note[ch] = -1;
                     newRow.instrument[ch] = -1;
                     newRow.volume[ch] = -1;
+
+                    for (int sample = 0; sample < 5; sample++)
+                        newRow.voiceSamples[ch].sample[sample] = 44;
+
                     for (int ef = 0; ef < loadedFrame.rows[0].effects[ch].cEffect.size(); ef++)
                     {
                         newRow.effects[ch].cEffect.emplace_back(-1);
@@ -2759,8 +2784,8 @@ void rightClickButton(GLFWwindow* window)
     // Floating windows.
     for (int wind = 0; wind < windowController.windows.size(); wind++)
     {
-        Vector2 posTL = windowController.windows[wind].position;
-        Vector2 posBR = posTL;
+        Vector2i posTL = windowController.windows[wind].position;
+        Vector2i posBR = posTL;
         posBR.x += windowController.windows[wind].size.x + 1;
         posBR.y += windowController.windows[wind].size.y;
         if (gui.hoveredTile.y >= posTL.y && gui.hoveredTile.y < posBR.y)
@@ -2797,9 +2822,9 @@ void rightClickButton(GLFWwindow* window)
     // Open the Selection window.
     if (gui.hoveredTile.y > 15 && !editor.playingSong)
     {
-        windowController.InitializeWindow("Selection", gui.hoveredTile, { 16, 16 });
+        windowController.InitializeWindow("Selection", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 16, 16 });
     }
-    else if (gui.hoveredTile.y > 11 && gui.hoveredTile.y < 15 && !editor.playingSong) // Select channel.
+    else if (gui.hoveredTile.y > 11 && gui.hoveredTile.y < 15) // Select channel.
     {
         int selectedX = hoveredXScrolled - 4.0f;
         int selectedChannel = 0;
@@ -2853,7 +2878,7 @@ void rightClickButton(GLFWwindow* window)
                 if (selectedX < 8 + channels[selectedChannel].effectCountPerRow * 4)
                 {
                     editor.selectedChannel = selectedChannel;
-                    windowController.InitializeWindow("Channel", gui.hoveredTile, { 16, 34 }); // Open the channel menu.
+                    windowController.InitializeWindow("Channel", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 16, 34 }); // Open the channel menu.
                 }
                 gui.drawFrameThisFrame = true; // The interface has changed, and must be redrawn.
             }

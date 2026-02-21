@@ -41,6 +41,9 @@ Frame rollFrame(UnrolledFrame frame)
 	//	1 byte:	Volume
 	//	1 byte: To next volume
 
+	//	5 bytes: Voice sample
+	//	1 byte: To next voice sample
+
 	//	1 byte: Effect
 	//	1 byte: Effect value
 	//	1 byte: To next effect (This is set to 0 for multiple effects per beat.)
@@ -55,9 +58,11 @@ Frame rollFrame(UnrolledFrame frame)
 	{
 		newFrame.channels[ch].notes.clear();
 		newFrame.channels[ch].volumes.clear();
+		newFrame.channels[ch].voiceSamples.clear();
 		newFrame.channels[ch].effects.clear();
 		int toNextNote = 0;
 		int toNextVolume = 0;
+		int toNextVoiceSample = 0;
 		int toNextEffect = 0;
 		for (int i = 0; i < frame.rows.size(); i++)
 		{
@@ -78,6 +83,24 @@ Frame rollFrame(UnrolledFrame frame)
 			}
 			else
 				toNextVolume++;
+
+			bool rowHasVoiceSample = false;
+			for (int vSample = 0; vSample < 5; vSample++)
+			{
+				if (frame.rows[i].voiceSamples[ch].sample[vSample] != 44)
+					rowHasVoiceSample = true;
+			}
+			if (rowHasVoiceSample)
+			{
+				newFrame.channels[ch].voiceSamples.emplace_back(toNextVoiceSample);
+				for (int vSample = 0; vSample < 5; vSample++)
+				{
+					newFrame.channels[ch].voiceSamples.emplace_back(frame.rows[i].voiceSamples[ch].sample[vSample]);
+				}
+				toNextVoiceSample = 0;
+			}
+			else
+				toNextVoiceSample++;
 			/*
 			if (frame.rows[i].effects[ch].cEffect[0] > -1)
 			{
@@ -116,6 +139,8 @@ Frame rollFrame(UnrolledFrame frame)
 					newFrame.channels[ch].notes.emplace_back(toNextNote);
 				if (newFrame.channels[ch].volumes.size() == 0)
 					newFrame.channels[ch].volumes.emplace_back(toNextVolume);
+				if (newFrame.channels[ch].voiceSamples.size() == 0)
+					newFrame.channels[ch].voiceSamples.emplace_back(toNextVoiceSample);
 				if (newFrame.channels[ch].effects.size() == 0)
 					newFrame.channels[ch].effects.emplace_back(toNextEffect);
 			}
@@ -152,8 +177,6 @@ UnrolledFrame unrollFrame(Frame frame)
 	newFrame = resizeUnrolledFrameRows(newFrame, int(frame.rows));
 	newFrame = resizeSongFrameEffectColumns(newFrame);
 	newFrame.beatsPerMeasure = frame.beatsPerMeasure;
-	
-
 	
 
 
@@ -213,6 +236,34 @@ UnrolledFrame unrollFrame(Frame frame)
 
 
 		unrolledNoteIndex = 0;
+
+		for (int i = 0; i < frame.channels[ch].voiceSamples.size(); i += 6)
+		{
+			int toNextNote = frame.channels[ch].voiceSamples[i];
+
+			for (int j = unrolledNoteIndex; j < unrolledNoteIndex + toNextNote; j++)
+			{
+				newFrame.rows[j].voiceSamples[ch] = { 44, 44, 44, 44, 44 };
+			}
+
+			unrolledNoteIndex += toNextNote;
+
+
+
+			if (i + 5 < frame.channels[ch].voiceSamples.size())
+			{
+				for (int vSample = 0; vSample < 5; vSample++)
+				{
+					int nextNote = frame.channels[ch].voiceSamples[i + vSample + 1];
+					newFrame.rows[unrolledNoteIndex].voiceSamples[ch].sample[vSample] = nextNote;
+				}
+			}
+
+			unrolledNoteIndex++;
+		}
+
+
+		unrolledNoteIndex = 0;
 		int effectNum = 0;
 
 		for (int i = 0; i < frame.channels[ch].effects.size(); i += 3)
@@ -262,6 +313,8 @@ UnrolledFrame unrollFrame(Frame frame)
 		}
 	}
 
+	
+
 	return newFrame;
 }
 
@@ -301,6 +354,11 @@ UnrolledFrame resizeUnrolledFrameRows(UnrolledFrame frame, int newSize)
 				newRow.note.emplace_back(-1);
 				newRow.instrument.emplace_back(-1);
 				newRow.volume.emplace_back(-1);
+
+				UnrolledVoiceSamples vSamples;
+				for (int sample = 0; sample < 5; sample++)
+					newRow.voiceSamples.emplace_back(vSamples);
+
 				UnrolledEffects newEffects;
 				newRow.effects.emplace_back(newEffects);
 				//newRow.effect.emplace_back(-1);
@@ -345,6 +403,12 @@ UnrolledFrame resizeSongFrameEffectColumns(UnrolledFrame frame)
 
 void copyNotes()
 {
+	if (editor.playingSong) // Set the selected area to the playing position.
+	{
+		editor.noteSelectionStart.y = loadedSong.currentNote;
+		editor.noteSelectionEnd.y = loadedSong.currentNote;
+	}
+
 	// Create mouse selection frame.
 	frameSelection.rows.clear();
 	frameSelection = resizeUnrolledFrameRows(frameSelection, int(editor.noteSelectionEnd.y + 1 - editor.noteSelectionStart.y));
@@ -357,6 +421,7 @@ void copyNotes()
 			frameSelection.rows[y].note[x] = -2;
 			frameSelection.rows[y].instrument[x] = -2;
 			frameSelection.rows[y].volume[x] = -2;
+			frameSelection.rows[y].voiceSamples[x] = { -2, -2, -2, -2, -2 };
 			frameSelection.rows[y].effects[x].cEffect.resize(channels[x].effectCountPerRow);
 			frameSelection.rows[y].effects[x].cEffectValue.resize(channels[x].effectCountPerRow);
 			for (int i = 0; i < channels[x].effectCountPerRow; i++)
@@ -393,13 +458,27 @@ void copyNotes()
 
 			if (selectedPart > 6)
 			{
-				int effectPart = (selectedPart - 7) % 5;
-				int effectNum = (selectedPart - 7) / 5;
+				selectedPart -= 7;
 
-				if (effectPart == 0)
+				if (channels[selectedChannel].hasVoiceColumns)
+					selectedPart -= 5;
+
+				if (selectedPart < 0) // Voice sample
+				{
+					if (channels[selectedChannel].hasVoiceColumns)
+					{
+						for (int voiceNum = 0; voiceNum < 5; voiceNum++)
+							frameSelection.rows[y].voiceSamples[selectedChannel - leftMostChannel].sample[voiceNum] = loadedFrame.rows[y + editor.noteSelectionStart.y].voiceSamples[selectedChannel].sample[voiceNum];
+					}
+				}
+				else // Effect
+				{
+					int effectPart = (selectedPart) % 4;
+					int effectNum = (selectedPart) / 4;
+
 					frameSelection.rows[y].effects[selectedChannel - leftMostChannel].cEffect[effectNum] = loadedFrame.rows[y + editor.noteSelectionStart.y].effects[selectedChannel].cEffect[effectNum];
-				else
 					frameSelection.rows[y].effects[selectedChannel - leftMostChannel].cEffectValue[effectNum] = loadedFrame.rows[y + editor.noteSelectionStart.y].effects[selectedChannel].cEffectValue[effectNum];
+				}
 			}
 		}
 	}
@@ -412,6 +491,12 @@ void copyNotes()
 
 void pasteNotes()
 {
+	if (editor.playingSong) // Set the selected area to the playing position.
+	{
+		editor.noteSelectionStart.y = loadedSong.currentNote;
+		editor.noteSelectionEnd.y = loadedSong.currentNote;
+	}
+
 	int leftMostChannel = findFrameTileByPosition(editor.noteSelectionStart.x).x;
 
 	for (int y = 0; y < frameSelection.rows.size(); y++)
@@ -428,6 +513,15 @@ void pasteNotes()
 						loadedFrame.rows[y + int(editor.noteSelectionStart.y)].instrument[ch + leftMostChannel] = frameSelection.rows[y].instrument[ch];
 					if (frameSelection.rows[y].volume[ch] > -2)
 						loadedFrame.rows[y + int(editor.noteSelectionStart.y)].volume[ch + leftMostChannel] = frameSelection.rows[y].volume[ch];
+
+					if (channels[ch].hasVoiceColumns)
+					{
+						if (frameSelection.rows[y].voiceSamples[ch].sample[0] != -2)
+						{
+							for (int voiceNum = 0; voiceNum < 5; voiceNum++)
+								loadedFrame.rows[y + int(editor.noteSelectionStart.y)].voiceSamples[ch + leftMostChannel] = frameSelection.rows[y].voiceSamples[ch];
+						}
+					}
 
 					for (int i = 0; i < channels[ch + leftMostChannel].effectCountPerRow; i++)
 					{
@@ -451,6 +545,12 @@ void pasteNotes()
 
 void deleteNotes()
 {
+	if (editor.playingSong) // Set the selected area to the playing position.
+	{
+		editor.noteSelectionStart.y = loadedSong.currentNote;
+		editor.noteSelectionEnd.y = loadedSong.currentNote;
+	}
+
 	for (int y = editor.noteSelectionStart.y; y <= editor.noteSelectionEnd.y; y++)
 	{
 		for (int x = editor.noteSelectionStart.x; x < editor.noteSelectionEnd.x; x++)
@@ -481,15 +581,26 @@ void deleteNotes()
 				}
 				else if (selectedPart < 7)
 					loadedFrame.rows[y].volume[selectedChannel] = -1;
-				if (selectedPart > 6)
+				else
 				{
-					int effectPart = (selectedPart - 7) % 5;
-					int effectNum = (selectedPart - 7) / 5;
+					selectedPart -= 7;
 
-					if (effectPart < 2)
+					if (channels[selectedChannel].hasVoiceColumns)
+						selectedPart -= 5;
+
+					if (selectedPart < 0) // Voice sample
+					{
+						int voiceNum = (selectedPart + 5);
+						loadedFrame.rows[y].voiceSamples[selectedChannel].sample[voiceNum] = 44;
+					}
+					else // Effect
+					{
+						int effectPart = (selectedPart) % 4;
+						int effectNum = (selectedPart) / 4;
+
 						loadedFrame.rows[y].effects[selectedChannel].cEffect[effectNum] = -1;
-					else
 						loadedFrame.rows[y].effects[selectedChannel].cEffectValue[effectNum] = -1;
+					}
 				}
 			}
 		}

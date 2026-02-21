@@ -31,6 +31,9 @@ void SaveInstrumentPreset(int presetNum, Sample* sample);
 
 void LoadInstrumentPreset(int presetNum, Sample* sample);
 
+void SaveVoiceFile();
+
+void LoadVoiceFile();
 
 
 
@@ -46,6 +49,7 @@ void SaveInstrumentPreset(int presetNum, Sample* sample)
     // Clear jump points
     // Set waveform to false;
     // 
+    // (1 byte) opWave1 + opWave2 + opWave3 + opWave4
     // 
     // (1 byte) Glide
     // (1 byte) Algorithm type
@@ -67,7 +71,7 @@ void SaveInstrumentPreset(int presetNum, Sample* sample)
     //  (1 byte) Boolean flags
     //  Set loop start to sample start (3 bytes) Loop start
     //  Set loop end to sample end (3 bytes) Loop end
-    //  (15 bytes) frequencies
+    //  (11 bytes) frequencies
 
     
     if (!std::filesystem::exists("Presets.bin"))
@@ -75,9 +79,10 @@ void SaveInstrumentPreset(int presetNum, Sample* sample)
         std::ofstream newPFile("Presets.bin", std::ios::out | std::ios::binary);
 
         int fillVar = 0;
-        for (int s = 0; s < 114; s++)
+        for (int s = 0; s < 192; s++)
         {
             fillVar = 0;
+            newPFile.write((char*)&fillVar, 1);
             newPFile.write((char*)&fillVar, 1);
             newPFile.write((char*)&fillVar, 1);
             fillVar = 75;
@@ -106,7 +111,7 @@ void SaveInstrumentPreset(int presetNum, Sample* sample)
                 newPFile.write((char*)&fillVar, 1);
                 fillVar = 7.0f;
                 newPFile.write((char*)&fillVar, 1);
-                for (int i = 0; i < 15; i++)
+                for (int i = 0; i < 11; i++)
                 {
                     fillVar = 0;
                     newPFile.write((char*)&fillVar, 1);
@@ -123,8 +128,7 @@ void SaveInstrumentPreset(int presetNum, Sample* sample)
 
     if (presetFile.is_open())
     {
-        // (1 byte) Glide
-        // (1 byte) Algorithm type
+        // (1 byte) opWave1 + opWave2 + opWave3 + opWave4
         // 
         // (1 byte) Glide
         // (1 byte) Algorithm type
@@ -146,11 +150,13 @@ void SaveInstrumentPreset(int presetNum, Sample* sample)
         //  (1 byte) Boolean flags
         //  Set loop start to sample start (3 bytes) Loop start
         //  Set loop end to sample end (3 bytes) Loop end
-        //  (15 bytes) frequencies
+        //  (11 bytes) frequencies
 
-        int readPos = 114 * presetNum;
+        int readPos = 99 * presetNum;
         presetFile.seekp(readPos);
 
+        uint8_t opWaves = sample->operatorWavesToUse[3] * 64.0f + sample->operatorWavesToUse[2] * 16.0f + sample->operatorWavesToUse[1] * 4.0f + sample->operatorWavesToUse[0];
+        presetFile.write((char*)&opWaves, 1);
         uint8_t writeVar = sample->glide * 16.0f;
         presetFile.write((char*)&writeVar, 1);
         writeVar = sample->algorithmType;
@@ -158,6 +164,7 @@ void SaveInstrumentPreset(int presetNum, Sample* sample)
 
         if (sample->arpSpeed > 0.9375f) sample->arpSpeed = 0.9375f;
         writeVar = int((sample->arpSpeed * 16.0f) * 16.0f) + int(sample->arpLength);
+
         presetFile.write((char*)&writeVar, 1);
         for (int i = 0; i < 15; i++)
         {
@@ -193,16 +200,25 @@ void SaveInstrumentPreset(int presetNum, Sample* sample)
             if (sample->waveforms[wave].release > 0.9375f) sample->waveforms[wave].release = 0.9375f;
             writeVar = int(sample->waveforms[wave].decay * 16.0f) * 16.0f + int(sample->waveforms[wave].release * 16.0f);
             presetFile.write((char*)&writeVar, 1);
-            writeVar = (int)sample->waveforms[wave].generateFromSines * 16.0f + (int)sample->waveforms[wave].reverseFrames * 8.0f + (int)sample->waveforms[wave].sustainForever * 4.0f + (int)sample->waveforms[wave].pitchToNote * 2.0f + (int)sample->waveforms[wave].continueNote;
+
+            // Boolean flags.
+            bool stereo1 = false;
+            bool stereo2 = false;
+            if (sample->waveforms[wave].stereo == 1)
+                stereo1 = true;
+            else if (sample->waveforms[wave].stereo == 2)
+                stereo2 = true;
+
+            writeVar = (int)stereo1 * 64.0f + (int)stereo2 * 32.0f + (int)sample->waveforms[wave].generateFromSines * 16.0f + (int)sample->waveforms[wave].reverseFrames * 8.0f + (int)sample->waveforms[wave].sustainForever * 4.0f + (int)sample->waveforms[wave].pitchToNote * 2.0f + (int)sample->waveforms[wave].continueNote;
             presetFile.write((char*)&writeVar, 1);
-            for (int i = 0; i < 15; i++)
+
+            for (int i = 0; i < 11; i++)
             {
                 writeVar = sample->waveforms[wave].frequencies[i];
                 presetFile.write((char*)&writeVar, 1);
             }
         }
     }
-
 
 
     presetFile.close();
@@ -215,13 +231,14 @@ void SaveInstrumentPreset(int presetNum, Sample* sample)
 
 void LoadInstrumentPreset(int presetNum, Sample* sample)
 {
+
     std::ifstream presetFile("Presets.bin", std::ios::binary | std::ios::in);
 
     if (presetFile.is_open())
     {
 
+        // (1 byte) opWave1 + opWave2 + opWave3 + opWave4
         // 
-        //      (1 byte) Volume
         //      (1 byte) Glide
         //      (1 byte) Algorithm type
         // 
@@ -249,11 +266,10 @@ void LoadInstrumentPreset(int presetNum, Sample* sample)
         presetFile.seekg(0, std::ios::end);
         int end = presetFile.tellg();
 
-        int readPos = 114 * presetNum;
+        int readPos = 99 * presetNum;
 
         if (readPos >= end) // The sample is beyond the file length.
         {
-            std::cout << "out of range";
             return;
         }
 
@@ -262,6 +278,18 @@ void LoadInstrumentPreset(int presetNum, Sample* sample)
 
 
         uint8_t readVar;
+        presetFile.read((char*)&readVar, 1);
+        float op1 = int(readVar / 64.0f);
+        float op2 = int(readVar / 16.0f) - (op1 * 4.0f);
+        float op3 = int(readVar / 4.0f) - (op1 * 16.0f + op2 * 4.0f);
+        float op4 = int(readVar) - (op1 * 64.0f + op2 * 16.0f + op3 * 4.0f);
+
+        sample->operatorWavesToUse[0] = op4;
+        sample->operatorWavesToUse[1] = op3;
+        sample->operatorWavesToUse[2] = op2;
+        sample->operatorWavesToUse[3] = op1;
+
+
         presetFile.read((char*)&readVar, 1);
         sample->glide = float(readVar) / 16.0f;
         presetFile.read((char*)&readVar, 1);
@@ -323,19 +351,43 @@ void LoadInstrumentPreset(int presetNum, Sample* sample)
             sample->waveforms[wave].decay = var1 / 16.0f;
             sample->waveforms[wave].release = var2 / 16.0f;
             presetFile.read((char*)&readVar, 1);
-            float varE = int(readVar / 16.0f);
-            float varD = int(readVar / 8.0f) - (varE * 16.0f);
-            float varC = int(readVar / 4.0f) - (varE * 16.0f + varD * 8.0f);
-            float varB = int(readVar / 2.0f) - (varE * 16.0f + varD * 8.0f + varC * 4.0f);
-            float varA = int(readVar) - (varE * 16.0f + varD * 8.0f + varC * 4.0f + varB * 2.0f);
+
+            float stereo1 = int(readVar / 64.0f);
+            float stereo2 = int(readVar / 32.0f) - (stereo1 * 64.0f);
+            float varE = int(readVar / 16.0f) - (stereo1 * 64.0f + stereo2 * 32.0f);
+            float varD = int(readVar / 8.0f) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f);
+            float varC = int(readVar / 4.0f) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f);
+            float varB = int(readVar / 2.0f) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f + varC * 4.0f);
+            float varA = int(readVar) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f + varC * 4.0f + varB * 2.0f);
             sample->waveforms[wave].generateFromSines = (bool)varE;
             sample->waveforms[wave].reverseFrames = (bool)varD;
             sample->waveforms[wave].sustainForever = (bool)varC;
             sample->waveforms[wave].pitchToNote = (bool)varB;
             sample->waveforms[wave].continueNote = (bool)varA;
-            
 
-            for (int i = 0; i < 15; i++)
+            if (stereo2 == 1)
+                sample->waveforms[wave].stereo = 2;
+            else if (stereo1 == 1)
+                sample->waveforms[wave].stereo = 1;
+            else
+                sample->waveforms[wave].stereo = 0;
+
+
+            //////////////////////////////////////////////////////
+            // Boolean flags.
+            //bool stereo1 = false;
+            //bool stereo2 = false;
+            //if (sample->waveforms[wave].stereo == 1)
+            //    stereo1 = true;
+            //else if (sample->waveforms[wave].stereo == 2)
+            //    stereo2 = true;
+            //
+            //writeVar = (int)stereo1 * 64.0f + (int)stereo2 * 32.0f + (int)sample->waveforms[wave].generateFromSines * 16.0f + (int)sample->waveforms[wave].reverseFrames * 8.0f + (int)sample->waveforms[wave].sustainForever * 4.0f + (int)sample->waveforms[wave].pitchToNote * 2.0f + (int)sample->waveforms[wave].continueNote;
+            //presetFile.write((char*)&writeVar, 1);
+            //////////////////////////////////////////////////////
+
+            
+            for (int i = 0; i < 11; i++)
             {
                 presetFile.read((char*)&readVar, 1);
                 sample->waveforms[wave].frequencies[i] = readVar;
@@ -351,8 +403,7 @@ void LoadInstrumentPreset(int presetNum, Sample* sample)
 
 
 
-    toGenerateAllWaves = true;
-    toGenerateAdditiveWave = true;
+    GenerateAllInstrumentWaves();
 
     presetFile.close();
 
@@ -384,7 +435,7 @@ void SaveSong() // Save the currently loaded song.
 
         if (loadedSong.unusedFrames)
         {
-            windowController.InitializeWindow("Delete Frames", gui.hoveredTile, { 20, 16 });
+            windowController.InitializeWindow("Delete Frames", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 20, 16 });
             return;
         }
     }
@@ -409,7 +460,7 @@ void SaveSong() // Save the currently loaded song.
             indexName.erase(0, 1);
             if (indexName == loadedSong.songName + ".song")
             {
-                windowController.InitializeWindow("Overwrite Song", gui.hoveredTile, { 20, 16 });
+                windowController.InitializeWindow("Overwrite Song", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 20, 16 });
                 return;
             }
         }
@@ -448,6 +499,9 @@ void SaveSong() // Save the currently loaded song.
     //              1 byte: # of volumes.
     //              For each volume:
     //                  1 byte: volume value.
+    //              1 byte: # of voice samples.
+    //              For each voice sample:
+    //                  1 bytes: sample value.
     //              1 byte: # of effects.
     //              For each effect:
     //                  1 byte: note effect.
@@ -468,7 +522,8 @@ void SaveSong() // Save the currently loaded song.
     //      (1 byte) # of jump points.
     //      For each jump point:
     //           4 bytes: Jump point position.
-    //    
+    // 
+    //      (1 byte) Operator waves
     //      (1 byte) Volume
     //      (1 byte) Glide
     //      (1 byte) Algorithm type
@@ -498,7 +553,7 @@ void SaveSong() // Save the currently loaded song.
     //          (1 byte) Boolean flags
     //          (4 bytes) Loop start
     //          (4 bytes) Loop end
-    //          (15 bytes) frequencies
+    //          (11 bytes) frequencies
     
 
     saveCurrentFrame();
@@ -528,8 +583,13 @@ void SaveSong() // Save the currently loaded song.
         {
             uint8_t compressed = 0;
             if (channels[j].compressed)
-                uint8_t compressed = 1;
+                compressed = 1;
             songFile.write((char*)&compressed, 1);
+
+            uint8_t voice = 0;
+            if (channels[j].hasVoiceColumns)
+                voice = 1;
+            songFile.write((char*)&voice, 1);
         }
         uint8_t bpm = int(loadedSong.startingBPM); // BPM
         songFile.write((char*)&bpm, 1);
@@ -577,6 +637,14 @@ void SaveSong() // Save the currently loaded song.
                     songFile.write((char*)&volume, 1);
                 }
 
+                uint8_t voiceSampleSize = loadedSong.frames[i].channels[ch].voiceSamples.size();
+                songFile.write((char*)&voiceSampleSize, 1);
+                for (int j = 0; j < voiceSampleSize; j++)
+                {
+                    uint8_t voice = loadedSong.frames[i].channels[ch].voiceSamples[j];
+                    songFile.write((char*)&voice, 1);
+                }
+
                 uint8_t effectSize = loadedSong.frames[i].channels[ch].effects.size();
                 songFile.write((char*)&effectSize, 1);
                 for (int j = 0; j < effectSize; j++)
@@ -619,6 +687,8 @@ void SaveSong() // Save the currently loaded song.
                     songFile.write((char*)&point, 4);
                 }
 
+                uint8_t opWaves = loadedSamples[i].operatorWavesToUse[3] * 64.0f + loadedSamples[i].operatorWavesToUse[2] * 16.0f + loadedSamples[i].operatorWavesToUse[1] * 4.0f + loadedSamples[i].operatorWavesToUse[0];
+                songFile.write((char*)&opWaves, 1);
                 uint8_t volume = loadedSamples[i].volume * 16.0f;
                 songFile.write((char*)&volume, 1);
                 uint8_t glide = loadedSamples[i].glide * 16.0f;
@@ -630,6 +700,7 @@ void SaveSong() // Save the currently loaded song.
                 if (loadedSamples[i].arpSpeed > 0.9375f) loadedSamples[i].arpSpeed = 0.9375f;
                 uint8_t arpVar = int((loadedSamples[i].arpSpeed * 16.0f) * 16.0f) + int(loadedSamples[i].arpLength);
                 songFile.write((char*)&arpVar, 1);
+
                 for (int arp = 0; arp < 15; arp++)
                 {
                     arpVar = loadedSamples[i].arpPitches[arp] * 4.0f;
@@ -644,72 +715,87 @@ void SaveSong() // Save the currently loaded song.
                     songFile.write((char*)&modPath, 1);
                 }
 
-                int modsUsed = 1;
-                if (algo < 1) modsUsed = 1;
-                else if (algo < 3) modsUsed = 2;
-                else if (algo < 8) modsUsed = 3;
-                else modsUsed = 4;
+                bool modsUsed[4] = { false, false, false, false };
+
+                for (int j = 0; j < 4; j++)
+                {
+                    modsUsed[loadedSamples[i].operatorWavesToUse[j]] = true;
+                }
+                
 
                 // For each used sample.
-                for (int j = 0; j < modsUsed; j++)
+                for (int j = 0; j < 4; j++)
                 {
-                    int frameCount = loadedSamples[i].waveforms[j].pcmFrames.size();
-                    songFile.write((char*)&frameCount, 4);
-
-                    for (int fr = 0; fr < frameCount; fr++)
+                    if (modsUsed[j])
                     {
-                        float scaledFrame = ((loadedSamples[i].waveforms[j].pcmFrames[fr] * 128.0f) + 128.0f);
-                        uint8_t frameVal = uint8_t(scaledFrame);
-                        songFile.write((char*)&frameVal, 1);
+                        int frameCount = loadedSamples[i].waveforms[j].pcmFrames.size();
+                        songFile.write((char*)&frameCount, 4);
+
+                        for (int fr = 0; fr < frameCount; fr++)
+                        {
+                            float scaledFrame = ((loadedSamples[i].waveforms[j].pcmFrames[fr] * 128.0f) + 128.0f);
+                            uint8_t frameVal = uint8_t(scaledFrame);
+                            songFile.write((char*)&frameVal, 1);
+                        }
+
+                        uint8_t isWaveform = 0;
+                        isWaveform = loadedSamples[i].waveforms[j].operatorType;
+                        songFile.write((char*)&isWaveform, 1);
+
+                        uint8_t waveVar = 0;
+
+                        if (loadedSamples[i].waveforms[j].operatorType == 0) // Waveform-specific data.
+                        {
+                            waveVar = int(loadedSamples[i].waveforms[j].dutyCycle * 16.0f);
+                            songFile.write((char*)&waveVar, 1);
+                            waveVar = int(loadedSamples[i].waveforms[j].smoothness * 16.0f);
+                            songFile.write((char*)&waveVar, 1);
+                            waveVar = loadedSamples[i].waveforms[j].numOfSineWaves;
+                            songFile.write((char*)&waveVar, 1);
+                        }
+
+
+
+                        waveVar = loadedSamples[i].waveforms[j].waveType * 16.0f + loadedSamples[i].waveforms[j].loopType;
+                        songFile.write((char*)&waveVar, 1);
+                        if (loadedSamples[i].waveforms[j].offset > 0.9375f) loadedSamples[i].waveforms[j].offset = 0.9375f;
+                        waveVar = int((loadedSamples[i].waveforms[j].offset * 16.0f) * 16.0f) + int(loadedSamples[i].waveforms[j].lfo);
+                        songFile.write((char*)&waveVar, 1);
+                        if (loadedSamples[i].waveforms[j].attack > 0.9375f) loadedSamples[i].waveforms[j].attack = 0.9375f;
+                        if (loadedSamples[i].waveforms[j].sustain > 0.9375f) loadedSamples[i].waveforms[j].sustain = 0.9375f;
+                        waveVar = int(loadedSamples[i].waveforms[j].attack * 16.0f) * 16.0f + int(loadedSamples[i].waveforms[j].sustain * 16.0f);
+                        songFile.write((char*)&waveVar, 1);
+                        if (loadedSamples[i].waveforms[j].decay > 0.9375f) loadedSamples[i].waveforms[j].decay = 0.9375f;
+                        if (loadedSamples[i].waveforms[j].release > 0.9375f) loadedSamples[i].waveforms[j].release = 0.9375f;
+                        waveVar = int(loadedSamples[i].waveforms[j].decay * 16.0f) * 16.0f + int(loadedSamples[i].waveforms[j].release * 16.0f);
+                        songFile.write((char*)&waveVar, 1);
+
+
+
+                        // Boolean flags
+                        bool stereo1 = false;
+                        bool stereo2 = false;
+                        if (loadedSamples[i].waveforms[j].stereo == 1)
+                            stereo1 = true;
+                        else if (loadedSamples[i].waveforms[j].stereo == 2)
+                            stereo2 = true;
+
+                        waveVar = (int)stereo1 * 64.0f + (int)stereo2 * 32.0f + (int)loadedSamples[i].waveforms[j].generateFromSines * 16.0f + (int)loadedSamples[i].waveforms[j].reverseFrames * 8.0f + (int)loadedSamples[i].waveforms[j].sustainForever * 4.0f + (int)loadedSamples[i].waveforms[j].pitchToNote * 2.0f + (int)loadedSamples[i].waveforms[j].continueNote;
+                        songFile.write((char*)&waveVar, 1);
+
+                        int loopStart = loadedSamples[i].waveforms[j].loopStart;
+                        songFile.write((char*)&loopStart, 4);
+                        int loopEnd = loadedSamples[i].waveforms[j].loopEnd;
+                        songFile.write((char*)&loopEnd, 4);
+
+                        for (int f = 0; f < 11; f++)
+                        {
+                            waveVar = loadedSamples[i].waveforms[j].frequencies[f];
+                            songFile.write((char*)&waveVar, 1);
+                        }
                     }
 
-                    uint8_t isWaveform = 0;
-                    if (loadedSamples[i].waveforms[j].waveform) isWaveform = 1;
-                    songFile.write((char*)&isWaveform, 1);
-
-                    uint8_t waveVar = 0;
-
-                    if (loadedSamples[i].waveforms[j].waveform) // Waveform-specific data.
-                    {
-                        waveVar = int(loadedSamples[i].waveforms[j].dutyCycle * 16.0f);
-                        songFile.write((char*)&waveVar, 1);
-                        waveVar = int(loadedSamples[i].waveforms[j].smoothness * 16.0f);
-                        songFile.write((char*)&waveVar, 1);
-                        waveVar = loadedSamples[i].waveforms[j].numOfSineWaves;
-                        songFile.write((char*)&waveVar, 1);
-                    }
-
-
-
-                    waveVar = loadedSamples[i].waveforms[j].waveType * 16.0f + loadedSamples[i].waveforms[j].loopType;
-                    songFile.write((char*)&waveVar, 1);
-                    if (loadedSamples[i].waveforms[j].offset > 0.9375f) loadedSamples[i].waveforms[j].offset = 0.9375f;
-                    waveVar = int((loadedSamples[i].waveforms[j].offset * 16.0f) * 16.0f) + int(loadedSamples[i].waveforms[j].lfo);
-                    songFile.write((char*)&waveVar, 1);
-                    if (loadedSamples[i].waveforms[j].attack > 0.9375f) loadedSamples[i].waveforms[j].attack = 0.9375f;
-                    if (loadedSamples[i].waveforms[j].sustain > 0.9375f) loadedSamples[i].waveforms[j].sustain = 0.9375f;
-                    waveVar = int(loadedSamples[i].waveforms[j].attack * 16.0f) * 16.0f + int(loadedSamples[i].waveforms[j].sustain * 16.0f);
-                    songFile.write((char*)&waveVar, 1);
-                    if (loadedSamples[i].waveforms[j].decay > 0.9375f) loadedSamples[i].waveforms[j].decay = 0.9375f;
-                    if (loadedSamples[i].waveforms[j].release > 0.9375f) loadedSamples[i].waveforms[j].release = 0.9375f;
-                    waveVar = int(loadedSamples[i].waveforms[j].decay * 16.0f) * 16.0f + int(loadedSamples[i].waveforms[j].release * 16.0f);
-                    songFile.write((char*)&waveVar, 1);
-                    waveVar = (int)loadedSamples[i].waveforms[j].generateFromSines * 16.0f + (int)loadedSamples[i].waveforms[j].reverseFrames * 8.0f + (int)loadedSamples[i].waveforms[j].sustainForever * 4.0f + (int)loadedSamples[i].waveforms[j].pitchToNote * 2.0f + (int)loadedSamples[i].waveforms[j].continueNote;
-                    songFile.write((char*)&waveVar, 1);
-
-                    int loopStart = loadedSamples[i].waveforms[j].loopStart;
-                    songFile.write((char*)&loopStart, 4);
-                    int loopEnd = loadedSamples[i].waveforms[j].loopEnd;
-                    songFile.write((char*)&loopEnd, 4);
-
-                    for (int f = 0; f < 15; f++)
-                    {
-                        waveVar = loadedSamples[i].waveforms[j].frequencies[f];
-                        songFile.write((char*)&waveVar, 1);
-                    }
                 }
-
-                
             }
         }
 
@@ -731,7 +817,7 @@ void LoadSong(std::string name) // Load the song file with the given name.
     if (loadedSong.unsavedChanges)
     {
         editor.fileToLoad = name;
-        windowController.InitializeWindow("Save and Load", gui.hoveredTile, { 20, 16 });
+        windowController.InitializeWindow("Save and Load", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 20, 16 });
         //promptWind.AskSaveBeforeLoadingSong();
         return;
     }
@@ -776,6 +862,9 @@ void LoadSong(std::string name) // Load the song file with the given name.
     //              1 byte: # of volumes.
     //              For each volume:
     //                  1 byte: volume value.
+    //              1 byte: # of voice samples.
+    //              For each voice sample:
+    //                  1 bytes: sample value.
     //              1 byte: # of effects.
     //              For each effect:
     //                  1 byte: note effect.
@@ -796,6 +885,7 @@ void LoadSong(std::string name) // Load the song file with the given name.
     //      For each jump point:
     //           4 bytes: Jump point position.
     //    
+    //      (1 byte) Operator waves
     //      (1 byte) Volume
     //      (1 byte) Glide
     //      (1 byte) Algorithm type
@@ -828,7 +918,7 @@ void LoadSong(std::string name) // Load the song file with the given name.
     //          (1 byte) Boolean flags
     //          (4 bytes) Loop start
     //          (4 bytes) Loop end
-    //          (15 bytes) frequencies
+    //          (11 bytes) frequencies
 
 
         ////////////////////// SONG
@@ -855,10 +945,13 @@ void LoadSong(std::string name) // Load the song file with the given name.
         {
             uint8_t compressed;
             songFile.read((char*)&compressed, 1);
-            if (compressed == 0)
-                channels[ch].compressed = false;
-            else
-                channels[ch].compressed = true;
+            if (compressed == 0) channels[ch].compressed = false;
+            else channels[ch].compressed = true;
+
+            uint8_t voice;
+            songFile.read((char*)&voice, 1);
+            if (voice == 0) channels[ch].hasVoiceColumns = false;
+            else channels[ch].hasVoiceColumns = true;
         }
 
         uint8_t bpm;
@@ -881,6 +974,7 @@ void LoadSong(std::string name) // Load the song file with the given name.
         {
             songFile.read((char*)&loadedSong.frameSequence[i], 1);
         }
+
 
 
         // Frames
@@ -922,6 +1016,17 @@ void LoadSong(std::string name) // Load the song file with the given name.
                     uint8_t volume;
                     songFile.read((char*)&volume, 1);
                     loadedSong.frames[i].channels[ch].volumes[j] = volume;
+                }
+
+                uint8_t voiceSampleNum;
+                songFile.read((char*)&voiceSampleNum, 1);
+                loadedSong.frames[i].channels[ch].voiceSamples.clear();
+                loadedSong.frames[i].channels[ch].voiceSamples.resize(voiceSampleNum);
+                for (int j = 0; j < voiceSampleNum; j++)
+                {
+                    uint8_t voice;
+                    songFile.read((char*)&voice, 1);
+                    loadedSong.frames[i].channels[ch].voiceSamples[j] = voice;
                 }
 
                 uint8_t effectNum;
@@ -967,14 +1072,31 @@ void LoadSong(std::string name) // Load the song file with the given name.
                 }
                 loadedSamples[i].sampleName = sampleName;
 
+
                 // Jump points
                 uint8_t jumpPoints;
                 songFile.read((char*)&jumpPoints, 1);
+                loadedSamples[i].jumpPoints.clear();
 
                 for (int j = 0; j < jumpPoints; j++)
                 {
-                    songFile.read((char*)&loadedSamples[i].jumpPoints[j], 4);
+                    int newJumpPoint = 0;
+                    songFile.read((char*)&newJumpPoint, 4);
+                    loadedSamples[i].jumpPoints.emplace_back(newJumpPoint);
                 }
+
+
+                uint8_t opWaves;
+                songFile.read((char*)&opWaves, 1);
+                float op1 = int(opWaves / 64.0f);
+                float op2 = int(opWaves / 16.0f) - (op1 * 4.0f);
+                float op3 = int(opWaves / 4.0f) - (op1 * 16.0f + op2 * 4.0f);
+                float op4 = int(opWaves) - (op1 * 64.0f + op2 * 16.0f + op3 * 4.0f);
+
+                loadedSamples[i].operatorWavesToUse[0] = op4;
+                loadedSamples[i].operatorWavesToUse[1] = op3;
+                loadedSamples[i].operatorWavesToUse[2] = op2;
+                loadedSamples[i].operatorWavesToUse[3] = op1;
 
                 uint8_t volume;
                 songFile.read((char*)&volume, 1);
@@ -992,15 +1114,6 @@ void LoadSong(std::string name) // Load the song file with the given name.
 
 
                 // Arp
-                //uint8_t arpVar = int((loadedSamples[i].arpSpeed * 15.0f) * 16.0f) + int(loadedSamples[i].arpLength);
-                //songFile.write((char*)&arpVar, 1);
-                //for (int arp = 0; arp < loadedSamples[i].arpLength + 1; arp++)
-                //{
-                //    arpVar = loadedSamples[i].arpPitches[arp] * 4.0f;
-                //    songFile.write((char*)&arpVar, 1);
-                //}
-
-
                 songFile.read((char*)&readVar, 1);
                 var1 = int(readVar / 16.0f);
                 var2 = readVar - var1 * 16.0f;
@@ -1024,91 +1137,106 @@ void LoadSong(std::string name) // Load the song file with the given name.
                     loadedSamples[i].lPResonances[mod] = var2 / 16.0f;
                 }
 
-                int modsUsed = 1;
-                if (algo < 1) modsUsed = 1;
-                else if (algo < 3) modsUsed = 2;
-                else if (algo < 8) modsUsed = 3;
-                else modsUsed = 4;
-
+                bool modUsed[4] = { false, false, false, false };
+                
+                for (int j = 0; j < 4; j++)
+                {
+                    modUsed[loadedSamples[i].operatorWavesToUse[j]] = true;
+                }
 
                 // For each used sample.
-                for (int j = 0; j < modsUsed; j++)
+                for (int j = 0; j < 4; j++)
                 {
-                    int frameCount = 0;
-                    songFile.read((char*)&frameCount, 4);
-                    loadedSamples[i].waveforms[j].pcmFrames.clear();
-
-                    for (int fr = 0; fr < frameCount; fr++)
+                    if (modUsed[j])
                     {
-                        int frameVal = 0;
-                        songFile.read((char*)&frameVal, 1);
-                        float scaledFrame = float(frameVal) - 128.0f;
-                        scaledFrame /= 128.0f;
-                        loadedSamples[i].waveforms[j].pcmFrames.emplace_back(scaledFrame);
-                    }
+                        int frameCount = 0;
+                        songFile.read((char*)&frameCount, 4);
+                        loadedSamples[i].waveforms[j].pcmFrames.clear();
 
-                    uint8_t waveform;
-                    songFile.read((char*)&waveform, 1);
-                    if (waveform > 0) loadedSamples[i].waveforms[j].waveform = true;
-                    else loadedSamples[i].waveforms[j].waveform = false;
-                    
+                        for (int fr = 0; fr < frameCount; fr++)
+                        {
+                            int frameVal = 0;
+                            songFile.read((char*)&frameVal, 1);
+                            float scaledFrame = float(frameVal) - 128.0f;
+                            scaledFrame /= 128.0f;
+                            loadedSamples[i].waveforms[j].pcmFrames.emplace_back(scaledFrame);
+                        }
 
-                    uint8_t waveVar = 0;
-
-                    if (loadedSamples[i].waveforms[j].waveform) // Waveform-specific data.
-                    {
-                        songFile.read((char*)&waveVar, 1);
-                        loadedSamples[i].waveforms[j].dutyCycle = float(waveVar) / 16.0f;
-                        songFile.read((char*)&waveVar, 1);
-                        loadedSamples[i].waveforms[j].smoothness = float(waveVar) / 16.0f;
-                        songFile.read((char*)&waveVar, 1);
-                        loadedSamples[i].waveforms[j].numOfSineWaves = float(waveVar);
-                    }
+                        uint8_t waveform;
+                        songFile.read((char*)&waveform, 1);
+                        loadedSamples[i].waveforms[j].operatorType = waveform;
 
 
-                    songFile.read((char*)&readVar, 1);
-                    var1 = int(readVar / 16.0f);
-                    var2 = readVar - var1 * 16.0f;
-                    loadedSamples[i].waveforms[j].waveType = var1;
-                    loadedSamples[i].waveforms[j].loopType = var2;
-                    songFile.read((char*)&readVar, 1);
-                    var1 = int(readVar / 16.0f);
-                    var2 = readVar - var1 * 16.0f;
-                    loadedSamples[i].waveforms[j].offset = float(var1) / 16.0f;
-                    loadedSamples[i].waveforms[j].lfo = var2;
-                    songFile.read((char*)&readVar, 1);
-                    var1 = int(readVar / 16.0f);
-                    var2 = readVar - var1 * 16.0f;
-                    loadedSamples[i].waveforms[j].attack = float(var1) / 16.0f;
-                    loadedSamples[i].waveforms[j].sustain = float(var2) / 16.0f;
-                    songFile.read((char*)&readVar, 1);
-                    var1 = int(readVar / 16.0f);
-                    var2 = readVar - var1 * 16.0f;
-                    loadedSamples[i].waveforms[j].decay = float(var1) / 16.0f;
-                    loadedSamples[i].waveforms[j].release = float(var2) / 16.0f;
-                    songFile.read((char*)&readVar, 1);
-                    float varE = int(readVar / 16.0f);
-                    float varD = int(readVar / 8.0f) - (varE * 16.0f);
-                    float varC = int(readVar / 4.0f) - (varE * 16.0f + varD * 8.0f);
-                    float varB = int(readVar / 2.0f) - (varE * 16.0f + varD * 8.0f + varC * 4.0f);
-                    float varA = int(readVar) - (varE * 16.0f + varD * 8.0f + varC * 4.0f + varB * 2.0f);
-                    loadedSamples[i].waveforms[j].generateFromSines = (bool)varE;
-                    loadedSamples[i].waveforms[j].reverseFrames = (bool)varD;
-                    loadedSamples[i].waveforms[j].sustainForever = (bool)varC;
-                    loadedSamples[i].waveforms[j].pitchToNote = (bool)varB;
-                    loadedSamples[i].waveforms[j].continueNote = (bool)varA;
+                        uint8_t waveVar = 0;
 
-                    int loopStart = 0;
-                    songFile.read((char*)&loopStart, 4);
-                    loadedSamples[i].waveforms[j].loopStart = loopStart;
-                    int loopEnd = 0;
-                    songFile.read((char*)&loopEnd, 4);
-                    loadedSamples[i].waveforms[j].loopEnd = loopEnd;
+                        if (loadedSamples[i].waveforms[j].operatorType == 0) // Waveform-specific data.
+                        {
+                            songFile.read((char*)&waveVar, 1);
+                            loadedSamples[i].waveforms[j].dutyCycle = float(waveVar) / 16.0f;
+                            songFile.read((char*)&waveVar, 1);
+                            loadedSamples[i].waveforms[j].smoothness = float(waveVar) / 16.0f;
+                            songFile.read((char*)&waveVar, 1);
+                            loadedSamples[i].waveforms[j].numOfSineWaves = float(waveVar);
+                        }
 
-                    for (int f = 0; f < 15; f++)
-                    {
-                        songFile.read((char*)&waveVar, 1);
-                        loadedSamples[i].waveforms[j].frequencies[f] = waveVar;
+
+                        songFile.read((char*)&readVar, 1);
+                        var1 = int(readVar / 16.0f);
+                        var2 = readVar - var1 * 16.0f;
+                        loadedSamples[i].waveforms[j].waveType = var1;
+                        loadedSamples[i].waveforms[j].loopType = var2;
+                        songFile.read((char*)&readVar, 1);
+                        var1 = int(readVar / 16.0f);
+                        var2 = readVar - var1 * 16.0f;
+                        loadedSamples[i].waveforms[j].offset = float(var1) / 16.0f;
+                        loadedSamples[i].waveforms[j].lfo = var2;
+                        songFile.read((char*)&readVar, 1);
+                        var1 = int(readVar / 16.0f);
+                        var2 = readVar - var1 * 16.0f;
+                        loadedSamples[i].waveforms[j].attack = float(var1) / 16.0f;
+                        loadedSamples[i].waveforms[j].sustain = float(var2) / 16.0f;
+                        songFile.read((char*)&readVar, 1);
+                        var1 = int(readVar / 16.0f);
+                        var2 = readVar - var1 * 16.0f;
+                        loadedSamples[i].waveforms[j].decay = float(var1) / 16.0f;
+                        loadedSamples[i].waveforms[j].release = float(var2) / 16.0f;
+
+
+                        
+                        // Boolean flags
+                        songFile.read((char*)&readVar, 1);
+                        float stereo1 = int(readVar / 64.0f);
+                        float stereo2 = int(readVar / 32.0f) - (stereo1 * 64.0f);
+                        float varE = int(readVar / 16.0f) - (stereo1 * 64.0f + stereo2 * 32.0f);
+                        float varD = int(readVar / 8.0f) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f);
+                        float varC = int(readVar / 4.0f) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f);
+                        float varB = int(readVar / 2.0f) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f + varC * 4.0f);
+                        float varA = int(readVar) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f + varC * 4.0f + varB * 2.0f);
+                        loadedSamples[i].waveforms[j].generateFromSines = (bool)varE;
+                        loadedSamples[i].waveforms[j].reverseFrames = (bool)varD;
+                        loadedSamples[i].waveforms[j].sustainForever = (bool)varC;
+                        loadedSamples[i].waveforms[j].pitchToNote = (bool)varB;
+                        loadedSamples[i].waveforms[j].continueNote = (bool)varA;
+
+                        if (stereo2 == 1)
+                            loadedSamples[i].waveforms[j].stereo = 2;
+                        else if (stereo1 == 1)
+                            loadedSamples[i].waveforms[j].stereo = 1;
+                        else
+                            loadedSamples[i].waveforms[j].stereo = 0;
+
+                        int loopStart = 0;
+                        songFile.read((char*)&loopStart, 4);
+                        loadedSamples[i].waveforms[j].loopStart = loopStart;
+                        int loopEnd = 0;
+                        songFile.read((char*)&loopEnd, 4);
+                        loadedSamples[i].waveforms[j].loopEnd = loopEnd;
+
+                        for (int f = 0; f < 11; f++)
+                        {
+                            songFile.read((char*)&waveVar, 1);
+                            loadedSamples[i].waveforms[j].frequencies[f] = waveVar;
+                        }
                     }
                 }
             }
@@ -1170,7 +1298,7 @@ void LoadSong(std::string name) // Load the song file with the given name.
     loadCurrentFrame();
 
 
-    toDrawSampleDisplay = true;
+    DrawSampleDisplay();
 
     return;
 }
@@ -1182,7 +1310,13 @@ void LoadSong(std::string name) // Load the song file with the given name.
 void LoadGUIThemes()
 {
     int sizeX, sizeY, comps;
-    unsigned char* data = stbi_load("ThemeColors.png", &sizeX, &sizeY, &comps, 3);
+    unsigned char* data;
+
+    if (gui.lightMode)
+        data = stbi_load("LightColorThemes.png", &sizeX, &sizeY, &comps, 3);
+    else
+        data = stbi_load("ThemeColors.png", &sizeX, &sizeY, &comps, 3);
+    
 
     if (data)
     {
@@ -1205,8 +1339,6 @@ void LoadGUIThemes()
             gui.themes.emplace_back(newTheme);
         }
     }
-
-    
 
     stbi_image_free(data);
 
@@ -1273,5 +1405,68 @@ void LoadSettings()
 
 
 
+void SaveVoiceFile()
+{
+    std::ofstream voiceFile("Voice Samples.bin", std::ios::binary | std::ios::out);
+
+    if (voiceFile.is_open())
+    {
+        for (int i = 0; i < 44; i++)
+        {
+            // Loop
+            uint8_t loop = voiceSynth.phonemes[i].loop;
+            voiceFile.write((char*)&loop, 1);
+
+            int frameCount = voiceSynth.phonemes[i].pcmFrames.size();
+            voiceFile.write((char*)&frameCount, 4);
+
+            for (int fr = 0; fr < frameCount; fr++)
+            {
+                float scaledFrame = ((voiceSynth.phonemes[i].pcmFrames[fr] * 128.0f) + 128.0f);
+                uint8_t frameVal = uint8_t(scaledFrame);
+                voiceFile.write((char*)&frameVal, 1);
+            }
+        }
+
+        voiceFile.close();
+    }
+
+    return;
+}
 
 
+void LoadVoiceFile()
+{
+    std::ifstream voiceFile("Voice Samples.bin", std::ios::binary | std::ios::out);
+
+    if (voiceFile.is_open())
+    {
+        for (int i = 0; i < 44; i++)
+        {
+            // Loop
+            uint8_t looping;
+            voiceFile.read((char*)&looping, 1);
+            voiceSynth.phonemes[i].loop = looping;
+
+            // Size of sample
+            int frameCount;
+            voiceFile.read((char*)&frameCount, 4);
+
+            voiceSynth.phonemes[i].pcmFrames.clear();
+
+            for (int fr = 0; fr < frameCount; fr++)
+            {
+                int frameVal = 0;
+                voiceFile.read((char*)&frameVal, 1);
+                float scaledFrame = float(frameVal) - 128.0f;
+                scaledFrame /= 128.0f;
+                voiceSynth.phonemes[i].pcmFrames.emplace_back(scaledFrame);
+            }
+        }
+        
+
+        voiceFile.close();
+    }
+
+    return;
+}

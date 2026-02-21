@@ -38,6 +38,7 @@ FileNavigator fileNavigator;
 SampleDisplay sampleDisplay;
 PresetMenu presetMenu;
 
+VoiceSynth voiceSynth;
 
 
 Vector2 findFrameTileByPosition(int pos) // Returns the channel and channel part as a Vector2
@@ -169,30 +170,6 @@ ma_result onSeek(ma_encoder* pEncoder, ma_int64 offset, ma_seek_origin origin)
 
 	return MA_SUCCESS;
 }
-
-
-
-std::string notesText[18] =
-{
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	"",
-	""
-};
 
 
 

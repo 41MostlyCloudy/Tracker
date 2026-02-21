@@ -22,17 +22,25 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <thread>
+#include <mutex>
+
+
+
+// The thread lock to make sure that the audio and main threads do not interfere.
+std::mutex mtx;
+
 
 
 // Floating-point 2d position
 struct Vector2 { float x = 0; float y = 0; };
-
+struct Vector2i { int x = 0; int y = 0; };
 
 
 // A square of the screen GUI
 struct UIElement
 {
-	Vector2 sprite;
+	Vector2i sprite;
 	int textCol = 0; int bgCol = 0; // Colors for text and background.
 };
 
@@ -48,7 +56,7 @@ struct RGBColor
 
 struct SampleWave
 {
-	bool waveform = true;
+	int operatorType = 0; // 0=Wave, 1=sample, 2=voice
 
 	// Wave types: Sine, Square, Triangle, Saw, Noise, Bell thing
 	int waveType = 0; // -1: Constantly open (so that the modulator can be used as a standalone wave.)
@@ -58,6 +66,7 @@ struct SampleWave
 	int loopEnd = 0;
 
 	std::vector <float> pcmFrames;
+	float fineTuneToC = 1.0f; // Since samples have an integer length, this value is used to scale their pitch to be in-tune.
 
 	// The duty cycle.
 	float dutyCycle = 1.0f;
@@ -73,10 +82,12 @@ struct SampleWave
 
 	int lfo = 0; // 0=1, 1=0.1, 2=0.01, 3=0.001
 
+	int stereo = 0; // 0=Mix, 1=Left, 2=Right
+
 
 	// Frequencies (1 = fundemental frequency)
-	// (1/8) (1/7) (1/6) (1/5) (1/4) (1/3) (1/2) (1) (2) (3) (4) (5) (6) (7) (8)
-	float frequencies[15] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+	// (1/4) (1/3) (1/2) (1) (2) (3) (4) (5) (6) (7) (8)
+	float frequencies[11] = { 0,0,0,0,0,0,0,0,0,0,0 };
 
 
 	// Boolean flags
@@ -97,6 +108,8 @@ struct Sample
 	bool enabled = false;
 
 	SampleWave waveforms[4];
+	int operatorWavesToUse[4] = { 0, 1, 2, 3 }; // Which sample is mapped to each operator.
+
 	int modulationTypes[4] = { 0,0,0,0 };
 	float lPResonances[4] = { 0.0f,0.0f,0.0f,0.0f }; // Low-pass filter resonance values.
 
@@ -113,6 +126,49 @@ struct Sample
 };
 
 
+struct voiceSample
+{
+	std::vector <float> pcmFrames;
+	bool loop = false;
+};
+
+
+struct VoiceSynth
+{
+	voiceSample phonemes[44];
+
+
+	float findFrequencyInSample(std::vector <float> sample, float frequency)
+	{
+		// Finds the volume of a given frequency in a sample using the Goertzel Algorithm.
+		float volume = 0.0f;
+
+
+		int sampleSize = sample.size();
+		float freq = (frequency * float(sampleSize)) / 48000.0f;
+		float omega = 2.0f * 3.141593 * (freq / float(sampleSize));
+		float coeff = 2.0f * cos(omega);
+
+		float sPrev2 = 0.0f, sPrev1 = 0.0f, sCurr = 0.0f;
+
+		for (int n = 0; n < sampleSize; ++n)
+		{
+			sCurr = sample[n] + coeff * sPrev1 - sPrev2;
+			sPrev2 = sPrev1;
+			sPrev1 = sCurr;
+		}
+
+		float real = sPrev1 - sPrev2 * cos(omega);
+		float imag = sPrev2 * sin(omega);
+		float magnitude = sqrt(real * real + imag * imag);
+
+		volume = magnitude / (sampleSize / 2.0f);
+
+		return volume;
+	}
+};
+
+
 
 struct GUITheme
 {
@@ -122,7 +178,7 @@ struct GUITheme
 
 struct ScrollBar
 {
-	Vector2 topLeft;
+	Vector2i topLeft;
 	float position = 0.0f;
 	float length = 10.0f;
 	bool horizontal = false;
@@ -162,7 +218,7 @@ struct GUI
 	int frameListScroll = 0;
 	int fileListScroll = 0;
 	int sampleListScroll = 0;
-	Vector2 frameScroll;
+	Vector2i frameScroll;
 
 
 	int songLength = 0; // Song length in seconds.
@@ -172,12 +228,13 @@ struct GUI
 	int uiColorTheme = 26;
 	std::vector <GUITheme> themes = {};
 	bool background = false;
+	bool lightMode = false;
 	int uiDisplayMenuOption = 0; // 0 = Piano, 1 = Effects
 
 	unsigned int uiTexture;
 
 
-	std::string graphemes[44] =
+	std::string phonemes[44] =
 	{
 		"b",
 		"d",
@@ -205,7 +262,7 @@ struct GUI
 		"y (you)",
 		"a (cat)",
 		"a (say)",
-		"e (end)"
+		"e (end)",
 		"e (be)",
 		"i (it)",
 		"i (sky)",
@@ -215,8 +272,8 @@ struct GUI
 		"u (blood)",
 		"oo (who)",
 		"oi (join)",
-		"ow, (how)",
-		"e, (ladder)",
+		"ow (how)",
+		"e (ladder)",
 		"air",
 		"a (also)",
 		"er (fern)",
@@ -228,28 +285,28 @@ struct GUI
 
 	float uiColors[54] =
 	{
-		0.0, 0.0, 0.0, // Blue/Gray\n"
-		30.0 / 255.0, 30.0 / 255.0, 60.0 / 255.0,
-		50.0 / 255.0, 50.0 / 255.0, 100.0 / 255.0,
-		90.0 / 255.0, 90.0 / 255.0, 140.0 / 255.0,
-		150.0 / 255.0, 150.0 / 255.0, 200.0 / 255.0,
-		1.0, 1.0, 1.0,
+		0.0f, 0.0f, 0.0f, // Blue/Gray\n"
+		30.0f / 255.0f, 30.0f / 255.0f, 60.0f / 255.0f,
+		50.0f / 255.0f, 50.0f / 255.0f, 100.0f / 255.0f,
+		90.0f / 255.0f, 90.0f / 255.0f, 140.0f / 255.0f,
+		150.0f / 255.0f, 150.0f / 255.0f, 200.0f / 255.0f,
+		1.0f, 1.0f, 1.0f,
 
-		63.0 / 255.0, 100.0 / 255.0, 100.0 / 255.0, // Green/Yellow
-		127.0 / 255.0, 190.0 / 255.0, 0.0,
-		1.0, 1.0, 0.0,
+		63.0f / 255.0f, 100.0f / 255.0f, 100.0f / 255.0f, // Green/Yellow
+		127.0f / 255.0f, 190.0f / 255.0f, 0.0f,
+		1.0f, 1.0f, 0.0f,
 
-		100.0 / 255.0, 0.0, 60.0 / 255.0, // Red
-		160.0 / 255.0, 0.0, 40.0 / 255.0,
-		1.0, 0.0, 0.0,
+		100.0f / 255.0f, 0.0f, 60.0f / 255.0f, // Red
+		160.0f / 255.0f, 0.0f, 40.0f / 255.0f,
+		1.0f, 0.0f, 0.0f,
 
-		0.0, 0.0, 120.0 / 255.0, // Blue
-		0.0, 90.0 / 255.0, 180.0 / 255.0,
-		0.0, 180.0 / 255.0, 1.0,
+		0.0f, 0.0f, 120.0f / 255.0f, // Blue
+		0.0f, 90.0f / 255.0f, 180.0f / 255.0f,
+		0.0f, 180.0f / 255.0f, 1.0f,
 
-		63.0 / 255.0, 100.0 / 255.0, 100.0 / 255.0, // Accent colors
-		127.0 / 255.0, 190.0 / 255.0, 0.0,
-		1.0, 1.0, 0.0,
+		63.0f / 255.0f, 100.0f / 255.0f, 100.0f / 255.0f, // Accent colors
+		127.0f / 255.0f, 190.0f / 255.0f, 0.0f,
+		1.0f, 1.0f, 0.0f,
 	};
 
 
@@ -293,6 +350,7 @@ struct Editor
 	int selectedKey = -1;
 	int selectedFile = 0;
 	int selectedChannel = 0;
+	int selectedVoiceSample = 0;
 
 	Vector2 noteSelectionStart;
 	Vector2 noteSelectionEnd;
@@ -405,22 +463,21 @@ struct Editor
 		else if (input == 105) noteNum = 29;
 		else if (input == 111) noteNum = 30;
 		else if (input == 112) noteNum = 31;
-		else if (input == 123) noteNum = 32;
-		else if (input == 91) noteNum = 33;
-		else if (input == 93) noteNum = 34;
+		else if (input == 91) noteNum = 32;
+		else if (input == 93) noteNum = 33;
 
-		else if (input == 49) noteNum = 35;
-		else if (input == 50) noteNum = 36;
-		else if (input == 51) noteNum = 37;
-		else if (input == 52) noteNum = 38;
-		else if (input == 53) noteNum = 39;
-		else if (input == 54) noteNum = 40;
-		else if (input == 55) noteNum = 41;
-		else if (input == 56) noteNum = 42;
-		else if (input == 57) noteNum = 43;
-		else if (input == 48) noteNum = 44;
-		else if (input == 45) noteNum = 45;
-		else if (input == 61) noteNum = 46;
+		else if (input == 49) noteNum = 34;
+		else if (input == 50) noteNum = 35;
+		else if (input == 51) noteNum = 36;
+		else if (input == 52) noteNum = 37;
+		else if (input == 53) noteNum = 38;
+		else if (input == 54) noteNum = 49;
+		else if (input == 55) noteNum = 40;
+		else if (input == 56) noteNum = 41;
+		else if (input == 57) noteNum = 42;
+		else if (input == 48) noteNum = 43;
+		else if (input == 45) noteNum = 44;
+		else if (input == 61) noteNum = 45;
 
 		selectedKey = noteNum - 1;
 
@@ -436,6 +493,60 @@ struct Editor
 		}
 
 		return(noteNum);
+	}
+
+
+	int findVoiceSamplePlayed(int input)
+	{
+		if (input == 122) return 0;
+		else if (input == 120) return 1;
+		else if (input == 99) return 2;
+		else if (input == 118) return 3;
+		else if (input == 98) return 4;
+		else if (input == 110) return 5;
+		else if (input == 109) return 6;
+		else if (input == 44) return 7;
+		else if (input == 46) return 8;
+		else if (input == 47) return 9;
+
+		else if (input == 97) return 10;
+		else if (input == 115) return 11;
+		else if (input == 100) return 12;
+		else if (input == 102) return 13;
+		else if (input == 103) return 14;
+		else if (input == 104) return 15;
+		else if (input == 106) return 16;
+		else if (input == 107) return 17;
+		else if (input == 108) return 18;
+		else if (input == 59) return 19;
+		else if (input == 39)  return 20;
+
+		else if (input == 113) return 21;
+		else if (input == 119) return 22;
+		else if (input == 101) return 23;
+		else if (input == 114) return 24;
+		else if (input == 116) return 25;
+		else if (input == 121) return 26;
+		else if (input == 117) return 27;
+		else if (input == 105) return 28;
+		else if (input == 111) return 29;
+		else if (input == 112) return 30;
+		else if (input == 91) return 31;
+		else if (input == 93) return 32;
+
+		else if (input == 49) return 33;
+		else if (input == 50) return 34;
+		else if (input == 51) return 35;
+		else if (input == 52) return 36;
+		else if (input == 53) return 37;
+		else if (input == 54) return 38;
+		else if (input == 55) return 39;
+		else if (input == 56) return 40;
+		else if (input == 57) return 41;
+		else if (input == 48) return 42;
+		else if (input == 45) return 43;
+		else if (input == 61) return 44;
+		else return 44;
 	}
 };
 
@@ -510,6 +621,8 @@ struct Channel
 	bool compressed = false;
 	bool toUninitialize = false;
 
+	bool noteStopped = false; // When true, skip sustain and go to release.
+
 	bool hasVoiceColumns = false; // If enables, the channel has columns for voice sounds.
 
 	
@@ -525,7 +638,13 @@ struct Channel
 	float pitchSlide = 0.0f;
 
 	float retrigger = 0.0f;
-	float retriggerTimer = 0.0f;
+	float retriggerSlide = 0.0f;
+
+	float fuzzLevel = 1.0f; // Larger values add more fuzz.
+	float fuzzSlide = 0.0f;
+
+	float sampleRate = 1.0f;
+	float sampleRateSlide = 0.0f;
 
 
 	// Channel arp pitches.
@@ -562,6 +681,13 @@ struct Channel
 	float prevHighPassSampleR = 0.0f;      // Previous output sample (for filtering)
 	float prevHighPassSampleLI = 0.0f;      // Previous output sample (for filtering)
 	float prevHighPassSampleRI = 0.0f;      // Previous output sample (for filtering)
+
+	/*
+	float reverbCombVolL = 0.0f;
+	float reverbCombVolR = 0.0f;
+	float pastVolsL[128] = {0.0f};
+	float pastVolsR[128] = {0.0f};
+	*/
 };
 
 
@@ -597,6 +723,11 @@ struct UnrolledEffects
 };
 
 
+struct UnrolledVoiceSamples
+{
+	int sample[5] = { 44, 44, 44, 44, 44 };
+};
+
 
 // 1 row of an unrolled frame.
 struct FrameRow
@@ -607,7 +738,7 @@ struct FrameRow
 	std::vector <UnrolledEffects> effects = { };
 	
 	// Optional voice samples.
-	std::vector <int> voiceSamples = { };
+	std::vector <UnrolledVoiceSamples> voiceSamples = { };
 };
 
 
@@ -668,7 +799,7 @@ struct SampleDisplay
 
 	bool displayArp = false;
 
-	Vector2 position;
+	Vector2i position;
 	RGBColor pixelData[528 * 192]; // Screen data (528 x 160) pixels.
 
 	//float zoomFactor = 1.0f; // Increase to zoom in on the sample.
@@ -676,7 +807,6 @@ struct SampleDisplay
 	bool playingSample = false;
 
 	bool drawing = false;
-	bool toDrawSample = false;
 	Vector2 drawWavePos; // { pos in frames, volume }
 
 	int sampleStartPos = 0;
@@ -733,10 +863,10 @@ struct SampleDisplay
 struct FloatingWindow
 {
 	std::string name = "Floating Window";
-	Vector2 position;
-	Vector2 size;
+	Vector2i position;
+	Vector2i size;
 	bool dragWindow = false;
-	Vector2 dragPoint;
+	Vector2i dragPoint;
 };
 
 
@@ -762,7 +892,7 @@ struct WindowController
 	};
 
 
-	void InitializeWindow(std::string windowName, Vector2 windPos, Vector2 windSize)
+	void InitializeWindow(std::string windowName, Vector2i windPos, Vector2i windSize)
 	{
 		if (HasWindow(windowName)) // Don't create copies of existing windows.
 			return;
@@ -782,7 +912,7 @@ struct WindowController
 		if (windPos.y < 0) windPos.y = 0;
 		if (windPos.y + windSize.y > 56)windPos.y = 56 - windSize.y;
 
-		if (windSize.x < windowName.length() + 6) windSize.x = windowName.length() + 6;
+		if (windSize.x < windowName.length() + 6) windSize.x = (float)windowName.length() + 6;
 		if (windSize.y < 3)  windSize.y = 3;
 		if (windSize.y > 56)  windSize.y = 56;
 
