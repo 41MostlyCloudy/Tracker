@@ -10,7 +10,7 @@
 //----------------------------------------------------------------------------------
 
 
-int calculateSongLength(); // Returns the song's length in seconds.
+float calculateSongLength(); // Returns the song's length in seconds.
 
 
 
@@ -26,12 +26,12 @@ Editor editor;
 WindowController windowController;
 
 Song loadedSong;
-UnrolledFrame loadedFrame; // The frame currently in the editor.
+UnrolledPattern loadedPattern; // The frame currently in the editor.
 std::vector <std::string> fileNameList; // The names of the samples in the "Samples" file.
 //std::vector <Sample> loadedSamples; // The names of the samples used in the song.
-Sample loadedSamples[256]; // The names of the samples used in the song.
+Instrument loadedInstruments[256]; // The names of the samples used in the song.
 
-UnrolledFrame frameSelection; // A frame containing the portion of the frame that is selected, with that number of rows. All values not used are set to -2.
+UnrolledPattern patternSelection; // A frame containing the portion of the frame that is selected, with that number of rows. All values not used are set to -2.
 
 FileNavigator fileNavigator;
 
@@ -39,6 +39,11 @@ SampleDisplay sampleDisplay;
 PresetMenu presetMenu;
 
 VoiceSynth voiceSynth;
+
+
+
+
+
 
 
 Vector2 findFrameTileByPosition(int pos) // Returns the channel and channel part as a Vector2
@@ -54,7 +59,7 @@ Vector2 findFrameTileByPosition(int pos) // Returns the channel and channel part
 			channelSize = 3;
 		else
 		{
-			channelSize = 8 + loadedFrame.rows[0].effects[selectedChannel].cEffect.size() * 4;
+			channelSize = 8 + loadedPattern.rows[0].effects[selectedChannel].cEffect.size() * 4;
 			if (channels[selectedChannel].hasVoiceColumns)
 				channelSize += 5;
 		}
@@ -63,7 +68,7 @@ Vector2 findFrameTileByPosition(int pos) // Returns the channel and channel part
 		{
 			selectedPart -= channelSize;
 			selectedChannel++;
-			if (selectedChannel >= loadedFrame.rows[0].effects.size())
+			if (selectedChannel >= loadedPattern.rows[0].effects.size())
 			{
 				return { -1, -1 }; // Outside of the frame.
 			}
@@ -174,14 +179,14 @@ ma_result onSeek(ma_encoder* pEncoder, ma_int64 offset, ma_seek_origin origin)
 
 
 
-int calculateSongLength() // Returns the song's length in seconds.
+float calculateSongLength() // Returns the song's length in seconds.
 {
 	float length = 0;
 	float calcTempo = loadedSong.startingBPM;
 
 	
 
-	for (int fr = 0; fr < loadedSong.frameSequence.size(); fr++)
+	for (int fr = 0; fr < loadedSong.patternSequence.size(); fr++)
 	{
 		std::vector <int> effectIndex = {};
 		std::vector <int>  effectTime = {};
@@ -197,16 +202,16 @@ int calculateSongLength() // Returns the song's length in seconds.
 
 			
 
-			if (effectIndex[ch] < loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects.size())
+			if (effectIndex[ch] < loadedSong.patterns[loadedSong.patternSequence[fr]].channels[ch].effects.size())
 			{
-				effectTime[ch] = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[0];
+				effectTime[ch] = loadedSong.patterns[loadedSong.patternSequence[fr]].channels[ch].effects[0];
 				effectIndex[ch]++;
 			}
 			else
 				return 0;
 		}
 
-		for (int i = 0; i < loadedSong.frames[loadedSong.frameSequence[fr]].rows; i++)
+		for (int i = 0; i < loadedSong.patterns[loadedSong.patternSequence[fr]].rows; i++)
 		{
 			for (int ch = 0; ch < channels.size(); ch++)
 			{
@@ -220,11 +225,11 @@ int calculateSongLength() // Returns the song's length in seconds.
 
 					while (readingEffects)
 					{
-						if (effectIndex[ch] < loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects.size())
+						if (effectIndex[ch] < loadedSong.patterns[loadedSong.patternSequence[fr]].channels[ch].effects.size())
 						{
-							int effect = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[effectIndex[ch]];
+							int effect = loadedSong.patterns[loadedSong.patternSequence[fr]].channels[ch].effects[effectIndex[ch]];
 							effectIndex[ch]++;
-							int effectValue = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[effectIndex[ch]];
+							int effectValue = loadedSong.patterns[loadedSong.patternSequence[fr]].channels[ch].effects[effectIndex[ch]];
 							effectIndex[ch]++;
 
 							if (effect == 19) // Set tempo.
@@ -234,9 +239,9 @@ int calculateSongLength() // Returns the song's length in seconds.
 									calcTempo = 1;
 							}
 
-							if (effectIndex[ch] < loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects.size())
+							if (effectIndex[ch] < loadedSong.patterns[loadedSong.patternSequence[fr]].channels[ch].effects.size())
 							{
-								effectTime[ch] = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[effectIndex[ch]];
+								effectTime[ch] = loadedSong.patterns[loadedSong.patternSequence[fr]].channels[ch].effects[effectIndex[ch]];
 								effectIndex[ch]++;
 								if (effectTime[ch] == 255) // Read multiple effects on one beat.
 								{
@@ -265,19 +270,19 @@ int calculateSongLength() // Returns the song's length in seconds.
 		}
 	}
 
-	return int(length);
+	return length;
 }
 
 
 
-int calculateSongPosition() // Returns the song's current position in seconds.
+float calculateSongPosition() // Returns the song's current position in seconds.
 {
 	float length = 0;
 	float calcTempo = loadedSong.startingBPM;
 
 
 
-	for (int fr = 0; fr < loadedSong.currentFrame + 1; fr++)
+	for (int fr = 0; fr < loadedSong.currentPattern + 1; fr++)
 	{
 		std::vector <int> effectIndex = {};
 		std::vector <int>  effectTime = {};
@@ -293,16 +298,16 @@ int calculateSongPosition() // Returns the song's current position in seconds.
 
 
 
-			if (effectIndex[ch] < loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects.size())
+			if (effectIndex[ch] < loadedSong.patterns[loadedSong.patternSequence[fr]].channels[ch].effects.size())
 			{
-				effectTime[ch] = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[0];
+				effectTime[ch] = loadedSong.patterns[loadedSong.patternSequence[fr]].channels[ch].effects[0];
 				effectIndex[ch]++;
 			}
 			else
 				return 0;
 		}
 
-		for (int i = 0; i < loadedSong.frames[loadedSong.frameSequence[fr]].rows; i++)
+		for (int i = 0; i < loadedSong.patterns[loadedSong.patternSequence[fr]].rows; i++)
 		{
 			for (int ch = 0; ch < channels.size(); ch++)
 			{
@@ -316,11 +321,11 @@ int calculateSongPosition() // Returns the song's current position in seconds.
 
 					while (readingEffects)
 					{
-						if (effectIndex[ch] < loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects.size())
+						if (effectIndex[ch] < loadedSong.patterns[loadedSong.patternSequence[fr]].channels[ch].effects.size())
 						{
-							int effect = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[effectIndex[ch]];
+							int effect = loadedSong.patterns[loadedSong.patternSequence[fr]].channels[ch].effects[effectIndex[ch]];
 							effectIndex[ch]++;
-							int effectValue = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[effectIndex[ch]];
+							int effectValue = loadedSong.patterns[loadedSong.patternSequence[fr]].channels[ch].effects[effectIndex[ch]];
 							effectIndex[ch]++;
 
 							if (effect == 19) // Set tempo.
@@ -330,9 +335,9 @@ int calculateSongPosition() // Returns the song's current position in seconds.
 									calcTempo = 1;
 							}
 
-							if (effectIndex[ch] < loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects.size())
+							if (effectIndex[ch] < loadedSong.patterns[loadedSong.patternSequence[fr]].channels[ch].effects.size())
 							{
-								effectTime[ch] = loadedSong.frames[loadedSong.frameSequence[fr]].channels[ch].effects[effectIndex[ch]];
+								effectTime[ch] = loadedSong.patterns[loadedSong.patternSequence[fr]].channels[ch].effects[effectIndex[ch]];
 								effectIndex[ch]++;
 								if (effectTime[ch] == 255) // Read multiple effects on one beat.
 								{
@@ -359,12 +364,12 @@ int calculateSongPosition() // Returns the song's current position in seconds.
 			// Add row to time.
 			length += ((60000.0f / (calcTempo * 4.0f)) * 48.0f / 48000.0f);
 
-			if (fr == loadedSong.currentFrame && i >= loadedSong.currentNote)
-				i = loadedSong.frames[loadedSong.frameSequence[fr]].rows;
+			if (fr == loadedSong.currentPattern && i >= loadedSong.currentNote)
+				i = loadedSong.patterns[loadedSong.patternSequence[fr]].rows;
 		}
 	}
 
-	return int(length);
+	return length;
 }
 
 

@@ -59,18 +59,15 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected);
 
 void DrawEverything()
 {
+	std::lock_guard<std::mutex> lock(mtx);
 
 	// Scroll vertically when playing the song.
 	if (editor.playingSong)
 	{
 		gui.frameScroll.y = loadedSong.currentNote - 8;
 
-		if (gui.frameScroll.y > float(loadedFrame.rows.size()) - 40)
-			gui.frameScroll.y = float(loadedFrame.rows.size()) - 40;
-
-
-		if (gui.frameScroll.y < 0)
-			gui.frameScroll.y = 0;
+		if (gui.frameScroll.y > loadedPattern.rows.size() - 40) gui.frameScroll.y = loadedPattern.rows.size() - 40;
+		if (gui.frameScroll.y < 0) gui.frameScroll.y = 0;
 	}
 
 	gui.drawScreen = true;
@@ -79,9 +76,10 @@ void DrawEverything()
 	{
 		DrawMute();
 		DrawFrameBorder();
+
 		
 		int xStart = 5;
-		for (int i = 0; i < loadedSong.numberOfChannels; i++)
+		for (int i = 0; i < channels.size(); i++)
 		{
 			if (channels[i].compressed)
 				DrawChannelCompressed(i, xStart - gui.frameScroll.x);
@@ -172,12 +170,12 @@ void  DrawTopUI()
 
 	for (int y = 0; y < 10; y++)
 	{
-		if (y + gui.frameListScroll < loadedSong.frameSequence.size())
+		if (y + gui.frameListScroll < loadedSong.patternSequence.size())
 		{
 			
-			if (y + gui.frameListScroll == loadedSong.currentFrame)
+			if (y + gui.frameListScroll == loadedSong.currentPattern)
 			{
-				DrawHex(loadedSong.frameSequence[y + gui.frameListScroll], 4, 2 + y, 5, 3, -1, -1);
+				DrawHex(loadedSong.patternSequence[y + gui.frameListScroll], 4, 2 + y, 5, 3, -1, -1);
 				DrawHex(y + int(gui.frameListScroll), 1, 2 + y, 4, 3, -1, -1);
 				gui.activeUI[3][y + 2].sprite = { 5, 4 };
 
@@ -189,7 +187,7 @@ void  DrawTopUI()
 			}
 			else
 			{
-				DrawHex(loadedSong.frameSequence[y + gui.frameListScroll], 4, 2 + y, 5, 0, -1, -1);
+				DrawHex(loadedSong.patternSequence[y + gui.frameListScroll], 4, 2 + y, 5, 0, -1, -1);
 				DrawHex(y + int(gui.frameListScroll), 1, 2 + y, 3, 0, -1, -1);
 			}
 		}
@@ -263,9 +261,9 @@ void  DrawTopUI()
 	DrawGUIText("OCT", 11, 14, 6, 3, 0);
 	DrawNum(editor.selectedOctave, 15, 16, 6, 4, 0, -1, 3);
 	DrawGUIText("ROW", 11, 14, 8, 3, 0);
-	DrawNum(loadedFrame.rows.size(), 15, 18, 8, 4, 0, -1, 4);
+	DrawNum(loadedPattern.rows.size(), 15, 18, 8, 4, 0, -1, 4);
 	DrawGUIText("BEAT", 11, 15, 10, 3, 0);
-	DrawNum(loadedFrame.beatsPerMeasure, 15, 17, 10, 4, 0, -1, 5);
+	DrawNum(loadedPattern.beatsPerMeasure, 15, 17, 10, 4, 0, -1, 5);
 
 
 
@@ -353,7 +351,7 @@ void  DrawTopUI()
 	{
 		if (y - 2 + gui.sampleListScroll < 256 && y - 2 + gui.sampleListScroll >= 0) // Draw samples
 		{
-			if (!loadedSamples[y - 2 + gui.sampleListScroll].enabled)
+			if (!loadedInstruments[y - 2 + gui.sampleListScroll].enabled)
 			{
 				if (y - 2 + gui.sampleListScroll == editor.selectedSample)
 				{
@@ -383,12 +381,12 @@ void  DrawTopUI()
 					if (editor.selectedButton == 8)
 					{
 						if (gui.lightMode)
-							DrawGUIText(loadedSamples[y - 2 + gui.sampleListScroll].sampleName, 72, 91, y, 5, 2, -1, 8);
+							DrawGUIText(loadedInstruments[y - 2 + gui.sampleListScroll].sampleName, 72, 91, y, 5, 2, -1, 8);
 						else
-							DrawGUIText(loadedSamples[y - 2 + gui.sampleListScroll].sampleName, 72, 91, y, 5, 1, -1, 8);
+							DrawGUIText(loadedInstruments[y - 2 + gui.sampleListScroll].sampleName, 72, 91, y, 5, 1, -1, 8);
 					}
 					else
-						DrawGUIText(loadedSamples[y - 2 + gui.sampleListScroll].sampleName, 72, 91, y, 5, 3);
+						DrawGUIText(loadedInstruments[y - 2 + gui.sampleListScroll].sampleName, 72, 91, y, 5, 3);
 					gui.activeUI[71][y].sprite = { 5, 4 };
 					DrawHex(y - 2 + int(gui.sampleListScroll), 69, y, 4, 3);
 					gui.activeUI[90][y].sprite = { 31, 9 }; // Delete button
@@ -403,7 +401,7 @@ void  DrawTopUI()
 				}
 				else
 				{
-					DrawGUIText(loadedSamples[y - 2 + gui.sampleListScroll].sampleName, 72, 91, y, 4, 0);
+					DrawGUIText(loadedInstruments[y - 2 + gui.sampleListScroll].sampleName, 72, 91, y, 4, 0);
 					DrawHex(y - 2 + int(gui.sampleListScroll), 69, y, 3, 0);
 				}
 			}
@@ -418,14 +416,24 @@ void  DrawTopUI()
 
 	
 
+	gui.activeUI[86][0].sprite = { 29, 12 }; // Minimize program button
+	gui.activeUI[87][0].sprite = { 30, 12 };
 
-	gui.activeUI[88][0].sprite = { 29, 10 }; // Minimize program button
-	gui.activeUI[89][0].sprite = { 30, 10 };
+	if (screen.windowed)
+	{
+		gui.activeUI[88][0].sprite = { 29, 11 }; // Window program button
+		gui.activeUI[89][0].sprite = { 30, 11 };
+	}
+	else
+	{
+		gui.activeUI[88][0].sprite = { 29, 10 }; // Window program button
+		gui.activeUI[89][0].sprite = { 30, 10 };
+	}
+
 	gui.activeUI[90][0].sprite = { 29, 9 }; // Exit program button
 	gui.activeUI[91][0].sprite = { 30, 9 };
 	
-	
-	
+
 
 	gui.activeUI[68][1].sprite = { 0, 3 };
 	gui.activeUI[71][1].sprite = { 3, 3 };
@@ -558,20 +566,54 @@ void  DrawTopUI()
 	if (gui.uiDisplayMenuOption == 0) // Song GUI.
 	{
 		gui.songLength = calculateSongLength();
-		int songSecs = gui.songLength % 60;
-		int songMins = gui.songLength / 60;
+		int songSecs = (int)gui.songLength % 60;
+		int songMins = (int)gui.songLength / 60;
 		DrawGUIText("Song Length:", 44, 56, 6, 3, 0);
 		DrawNum(songMins, 56, 58, 6, 4, 0);
 		DrawGUIText(":", 58, 59, 6, 4, 0);
 		DrawNum(songSecs, 59, 61, 6, 4, 0);
 
+
 		gui.songPos = calculateSongPosition();
-		songSecs = gui.songPos % 60;
-		songMins = gui.songPos / 60;
+		songSecs = (int)gui.songPos % 60;
+		songMins = (int)gui.songPos / 60;
 		DrawGUIText("Current Position:", 44, 61, 8, 3, 0);
 		DrawNum(songMins, 61, 63, 8, 4, 0);
 		DrawGUIText(":", 63, 64, 8, 4, 0);
 		DrawNum(songSecs, 64, 66, 8, 4, 0);
+
+		// Song position bar.
+		float posInSong = (gui.songPos / gui.songLength) * 23.0f;
+		int xVal = 44;
+		int yVal = 7;
+
+		if (posInSong > 0.5f)
+			gui.activeUI[xVal][yVal].sprite = { 15, 23 };
+		else if (posInSong > 0.0f)
+			gui.activeUI[xVal][yVal].sprite = { 14, 23 };
+		else
+			gui.activeUI[xVal][yVal].sprite = { 13, 23 };
+
+		for (int i = 1; i < 23; i++)
+		{
+			if (i < posInSong)
+			{
+				if (posInSong - float(i) <= 0.5f)
+					gui.activeUI[xVal + i][yVal].sprite = { 12, 21 };
+				else
+					gui.activeUI[xVal + i][yVal].sprite = { 13, 21 };
+			}
+			else
+			{
+				gui.activeUI[xVal + i][yVal].sprite = { 11, 21 };
+			}
+		}
+
+		if (posInSong > 22.0f)
+			gui.activeUI[xVal + 22][yVal].sprite = { 15, 21 };
+		else
+			gui.activeUI[xVal + 22][yVal].sprite = { 14, 21 };
+		//////////////////////////////////////////////////
 	}
 	else if (gui.uiDisplayMenuOption == 1) // Key GUI.
 	{
@@ -1896,7 +1938,7 @@ void DrawFrameBorder()
 		gui.activeUI[4][y].sprite = { 2, 4 };
 
 		// Beat numbering.
-		if (loadedFrame.beatsPerMeasure > 0 && (y - 16 + int(gui.frameScroll.y)) % loadedFrame.beatsPerMeasure == 0)
+		if (loadedPattern.beatsPerMeasure > 0 && (y - 16 + int(gui.frameScroll.y)) % loadedPattern.beatsPerMeasure == 0)
 			DrawNum(y - 16 + gui.frameScroll.y, 1, 4, y, 4, 0);
 		else
 			DrawNum(y - 16 + gui.frameScroll.y, 1, 4, y, 2, 0);
@@ -2166,10 +2208,6 @@ void DrawVolumeBars()
 
 void DrawChannel(int channelNum, int offsetX)
 {
-	if (loadedSong.currentNote >= loadedFrame.rows.size())
-		return;
-
-
 	for (int y = 0; y < 40; y++)
 	{
 		DrawChannelLine(channelNum, offsetX, y);
@@ -2195,18 +2233,23 @@ void DrawChannelLine(int channelNum, int offsetX, int y)
 		bgColor = 2;
 		textColor = 3;
 	}
-	else if (loadedFrame.beatsPerMeasure > 0 && y + intScrollY < loadedFrame.rows.size() && (y + intScrollY) % loadedFrame.beatsPerMeasure == 0)
+	else if (loadedPattern.beatsPerMeasure > 0 && y + intScrollY < loadedPattern.rows.size() && (y + intScrollY) % loadedPattern.beatsPerMeasure == 0)
 	{
 		bgColor = 1;
 		textColor = 2;
 	}
 
 
-	if (channels[channelNum].muted || intScrollY + y >= loadedFrame.rows.size())
+	if (channels[channelNum].muted || intScrollY + y >= loadedPattern.rows.size())
 	{
 		bgColor--;
-		if (bgColor < 0) bgColor = 0;
 		textColor--;
+		if (gui.lightMode)
+		{
+			bgColor -= 3;
+			textColor -= 3;
+		}
+		if (bgColor < 0) bgColor = 0;
 		if (textColor < 0) textColor = 0;
 	}
 
@@ -2218,6 +2261,12 @@ void DrawChannelLine(int channelNum, int offsetX, int y)
 			bgColor = 5 - bgColor;
 		if (textColor < 6 && textColor >= 0)
 			textColor = 5 - textColor;
+
+		if (y + intScrollY == loadedSong.currentNote) // Note position marker.
+		{
+			textColor = 17;
+			bgColor = 15;
+		}
 	}
 	
 
@@ -2325,25 +2374,51 @@ void DrawChannelLineValues(int channelNum, int offsetX, int y)
 	int textColor = 5;
 
 
-	if (channels[channelNum].muted || y >= loadedFrame.rows.size())
-	{
-		bgColor--;
-		if (bgColor < 0)
-			bgColor = 0;
-		textColor -= 2;
-	}
-
 	if (y + intScrollY == loadedSong.currentNote) // Note position marker.
 	{
 		bgColor = 2;
 	}
-	else if (loadedFrame.beatsPerMeasure > 0 && y + intScrollY < loadedFrame.rows.size() && (y + intScrollY) % loadedFrame.beatsPerMeasure == 0)
-		bgColor = 1;
-
-
-	if (y + intScrollY < loadedFrame.rows.size())
+	else if (loadedPattern.beatsPerMeasure > 0 && y + intScrollY < loadedPattern.rows.size() && (y + intScrollY) % loadedPattern.beatsPerMeasure == 0)
 	{
-		if (loadedFrame.rows[y + intScrollY].note[channelNum] == 255) // Stop Note
+		bgColor = 1;
+	}
+
+
+
+	if (channels[channelNum].muted || intScrollY + y >= loadedPattern.rows.size())
+	{
+		bgColor--;
+		textColor--;
+
+		if (bgColor < 0) bgColor = 0;
+		if (textColor < 0) textColor = 0;
+	}
+
+	if (gui.lightMode)
+	{
+		if (y + intScrollY == loadedSong.currentNote) // Note position marker.
+		{
+			bgColor = 15;
+		}
+	}
+
+
+	//if (y + intScrollY >= loadedFrame.rows.size())
+	//	return;
+
+	//if (intScrollY == 0)
+	//	return;
+
+	//if (loadedSong.currentNote < 0)
+	//	std::cout << " -1 ";
+	
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	if (y + intScrollY < loadedPattern.rows.size())
+	{
+
+		if (loadedPattern.rows[y + intScrollY].note[channelNum] == 255) // Stop Note
 		{
 			for (int i = 0; i < 5; i++)
 			{
@@ -2354,30 +2429,35 @@ void DrawChannelLineValues(int channelNum, int offsetX, int y)
 		}
 		else
 		{
-			if (loadedFrame.rows[y + intScrollY].note[channelNum] > -1) // Note
+			if (loadedPattern.rows[y + intScrollY].note[channelNum] > -1) // Note
 			{
 				if (xOffset > 4 && xOffset + 2 < 91)
 				{
-					DrawEDONote(uint8_t(loadedFrame.rows[y + intScrollY].note[channelNum]), xOffset, y + 16, textColor, bgColor, -1, -1);
+					DrawEDONote(uint8_t(loadedPattern.rows[y + intScrollY].note[channelNum]), xOffset, y + 16, textColor, bgColor, -1, -1);
 				}
 			}
 
+			
+
 			xOffset += 3;
-			if (loadedFrame.rows[y + intScrollY].instrument[channelNum] > -1) // Instrument
+			if (loadedPattern.rows[y + intScrollY].instrument[channelNum] > -1) // Instrument
 			{
 				if (xOffset > 4 && xOffset + 1 < 91)
-					DrawHex(uint8_t(loadedFrame.rows[y + intScrollY].instrument[channelNum]), xOffset, y + 16, textColor + 3, bgColor, -1, -1);
+					DrawHex(uint8_t(loadedPattern.rows[y + intScrollY].instrument[channelNum]), xOffset, y + 16, textColor + 3, bgColor, -1, -1);
 			}
 			xOffset += 2;
 		}
+		
 
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-		if (loadedFrame.rows[y + intScrollY].volume[channelNum] > -1) // Volume
+		if (loadedPattern.rows[y + intScrollY].volume[channelNum] > -1) // Volume
 		{
 			if (xOffset > 4 && xOffset + 1 < 91)
-				DrawHex(int(loadedFrame.rows[y + intScrollY].volume[channelNum]), xOffset, y + 16, textColor + 6, bgColor);
+				DrawHex(int(loadedPattern.rows[y + intScrollY].volume[channelNum]), xOffset, y + 16, textColor + 6, bgColor);
 		}
 		xOffset += 2;
+
 
 		float tempVar = 0;
 		// Voice samples (if enabled in channel).
@@ -2387,7 +2467,7 @@ void DrawChannelLineValues(int channelNum, int offsetX, int y)
 			{
 				if (xOffset > 4 && xOffset < 91)
 				{
-					int voiceNum = loadedFrame.rows[y + intScrollY].voiceSamples[channelNum].sample[i];
+					int voiceNum = loadedPattern.rows[y + intScrollY].voiceSamples[channelNum].sample[i];
 					if (voiceNum < 44) // Note
 					{
 						if (voiceNum < 22)
@@ -2397,12 +2477,12 @@ void DrawChannelLineValues(int channelNum, int offsetX, int y)
 
 						gui.activeUI[xOffset][y + 16].textCol = textColor + 9;
 					}
-					/*
-					else
+					else if (voiceNum == 45) // Cut note
 					{
-						gui.activeUI[xOffset][y + 16].sprite = { 16, 0 };
-						gui.activeUI[xOffset][y + 16].textCol = gui.activeUI[xOffset][y + 16].bgCol;
-					}*/
+						gui.activeUI[xOffset][y + 16].sprite = { 11, 0 };
+						gui.activeUI[xOffset][y + 16].textCol = textColor + 6;
+					}
+
 					xOffset++;
 				}
 			}
@@ -2411,11 +2491,11 @@ void DrawChannelLineValues(int channelNum, int offsetX, int y)
 
 		for (int ef = 0; ef < channels[channelNum].effectCountPerRow; ef++)
 		{
-			int effectVal = loadedFrame.rows[y + intScrollY].effects[channelNum].cEffectValue[ef];
+			int effectVal = loadedPattern.rows[y + intScrollY].effects[channelNum].cEffectValue[ef];
 
-			if (loadedFrame.rows[y + intScrollY].effects[channelNum].cEffect[ef] > -1) // Effect
+			if (loadedPattern.rows[y + intScrollY].effects[channelNum].cEffect[ef] > -1) // Effect
 			{
-				int effectNum = loadedFrame.rows[y + intScrollY].effects[channelNum].cEffect[ef];
+				int effectNum = loadedPattern.rows[y + intScrollY].effects[channelNum].cEffect[ef];
 				int offset = 0;
 
 				if (effectNum > 99)
@@ -2470,6 +2550,7 @@ void DrawChannelLineValues(int channelNum, int offsetX, int y)
 		}
 	}
 
+	
 
 	if (y + intScrollY >= editor.noteSelectionStart.y && y + intScrollY <= editor.noteSelectionEnd.y) // Draw selected notes.
 	{
@@ -2507,7 +2588,7 @@ void DrawChannelLineValues(int channelNum, int offsetX, int y)
 
 void DrawChannelCompressed(int channelNum, int offsetX)
 {
-	if (loadedSong.currentNote >= loadedFrame.rows.size())
+	if (loadedSong.currentNote >= loadedPattern.rows.size())
 		return;
 
 	int intScrollY = int(gui.frameScroll.y);
@@ -2518,7 +2599,7 @@ void DrawChannelCompressed(int channelNum, int offsetX)
 		int bgColor = 0;
 		int textColor = 5;
 
-		if (channels[channelNum].muted || y >= loadedFrame.rows.size())
+		if (channels[channelNum].muted || y >= loadedPattern.rows.size())
 		{
 			bgColor--;
 			if (bgColor < 0)
@@ -2530,7 +2611,7 @@ void DrawChannelCompressed(int channelNum, int offsetX)
 		{
 			bgColor = 2;
 		}
-		else if (loadedFrame.beatsPerMeasure > 0 && y + intScrollY < loadedFrame.rows.size() && (y + intScrollY) % loadedFrame.beatsPerMeasure == 0)
+		else if (loadedPattern.beatsPerMeasure > 0 && y + intScrollY < loadedPattern.rows.size() && (y + intScrollY) % loadedPattern.beatsPerMeasure == 0)
 			bgColor = 1;
 
 
@@ -2551,7 +2632,7 @@ void DrawChannelCompressed(int channelNum, int offsetX)
 			gui.activeUI[offsetX][y + 16].sprite = { 16, 0 };
 			gui.activeUI[offsetX][y + 16].bgCol = bgColor;
 			gui.activeUI[offsetX][y + 16].textCol = bgColor + 1;
-			if (channels[channelNum].muted || y >= loadedFrame.rows.size())
+			if (channels[channelNum].muted || y >= loadedPattern.rows.size())
 				gui.activeUI[offsetX][y + 16].textCol = 0;
 		}
 		if (offsetX > 3 && offsetX < 90)
@@ -2559,7 +2640,7 @@ void DrawChannelCompressed(int channelNum, int offsetX)
 			gui.activeUI[1 + offsetX][y + 16].sprite = { 16, 0 };
 			gui.activeUI[1 + offsetX][y + 16].bgCol = bgColor;
 			gui.activeUI[1 + offsetX][y + 16].textCol = bgColor + 1;
-			if (channels[channelNum].muted || y >= loadedFrame.rows.size())
+			if (channels[channelNum].muted || y >= loadedPattern.rows.size())
 				gui.activeUI[offsetX + 1][y + 16].textCol = 0;
 		}
 		
@@ -2567,13 +2648,13 @@ void DrawChannelCompressed(int channelNum, int offsetX)
 
 
 
-		if (y + intScrollY < loadedFrame.rows.size())
+		if (y + intScrollY < loadedPattern.rows.size())
 		{
-			if (loadedFrame.rows[y + intScrollY].note[channelNum] > -1) // Note
+			if (loadedPattern.rows[y + intScrollY].note[channelNum] > -1) // Note
 			{
 				if (offsetX > 4)
 				{
-					if (loadedFrame.rows[y + intScrollY].volume[channelNum] > -1) // Volume
+					if (loadedPattern.rows[y + intScrollY].volume[channelNum] > -1) // Volume
 					{
 						if (channels[channelNum].muted)
 							gui.activeUI[offsetX][y + 16].sprite = { 23, 11 };
@@ -2590,7 +2671,7 @@ void DrawChannelCompressed(int channelNum, int offsetX)
 					
 					//DrawNote(uint8_t(loadedFrame.rows[y + intScrollY].note[channelNum]), offsetX, y + 16, textColor, bgColor, -1, -1);
 				}
-				else if (loadedFrame.rows[y + intScrollY].volume[channelNum] > -1) // Volume
+				else if (loadedPattern.rows[y + intScrollY].volume[channelNum] > -1) // Volume
 				{
 					if (channels[channelNum].muted)
 						gui.activeUI[offsetX][y + 16].sprite = { 23, 12 };
@@ -2600,7 +2681,7 @@ void DrawChannelCompressed(int channelNum, int offsetX)
 			}
 			else // No note
 			{
-				if (loadedFrame.rows[y + intScrollY].volume[channelNum] > -1) // Volume
+				if (loadedPattern.rows[y + intScrollY].volume[channelNum] > -1) // Volume
 				{
 					if (channels[channelNum].muted)
 						gui.activeUI[offsetX][y + 16].sprite = { 23, 12 };
@@ -2616,7 +2697,7 @@ void DrawChannelCompressed(int channelNum, int offsetX)
 
 				for (int ef = 0; ef < channels[channelNum].effectCountPerRow; ef++)
 				{
-					if (loadedFrame.rows[y + intScrollY].effects[channelNum].cEffect[ef] > -1) // Effect
+					if (loadedPattern.rows[y + intScrollY].effects[channelNum].cEffect[ef] > -1) // Effect
 					{
 						effectExists = true;
 					}
@@ -2624,7 +2705,7 @@ void DrawChannelCompressed(int channelNum, int offsetX)
 
 				if (effectExists)
 				{
-					if (loadedFrame.rows[y + intScrollY].volume[channelNum] > -1) // Volume
+					if (loadedPattern.rows[y + intScrollY].volume[channelNum] > -1) // Volume
 					{
 						if (channels[channelNum].muted)
 							gui.activeUI[offsetX + 1][y + 16].sprite = { 24, 11 };
@@ -2639,7 +2720,7 @@ void DrawChannelCompressed(int channelNum, int offsetX)
 							gui.activeUI[offsetX + 1][y + 16].sprite = { 26, 10 };
 					}
 				}
-				else if (loadedFrame.rows[y + intScrollY].volume[channelNum] > -1) // Volume
+				else if (loadedPattern.rows[y + intScrollY].volume[channelNum] > -1) // Volume
 				{
 					if (channels[channelNum].muted)
 						gui.activeUI[offsetX + 1][y + 16].sprite = { 24, 12 };
@@ -2650,7 +2731,7 @@ void DrawChannelCompressed(int channelNum, int offsetX)
 
 
 			// Draw stop note
-			if (loadedFrame.rows[y + intScrollY].note[channelNum] == 255) // Stop Note
+			if (loadedPattern.rows[y + intScrollY].note[channelNum] == 255) // Stop Note
 			{
 				if (offsetX > 4 && offsetX < 91)
 					gui.activeUI[offsetX][y + 16].sprite = { 22, 10 };
@@ -3074,11 +3155,14 @@ void DrawHex(uint8_t num, int textStart, int textY, int textCol, int bgCol, int 
 	else
 		textSprite = { value1 - 10, 1 };
 
+	if (textStart < 0 || textStart > 91)
+		return;
+
 	gui.activeUI[textStart][textY].sprite = textSprite;
 	gui.activeUI[textStart][textY].textCol = textCol;
 	gui.activeUI[textStart][textY].bgCol = bgCol;
 
-	if (textStart > 89)
+	if (textStart + 1 < 0 || textStart + 1 > 91)
 		return;
 
 	if (value2 < 10)
@@ -3507,7 +3591,6 @@ void DrawVoiceKey(int key, Vector2i pos)
 
 void DrawFloatingWindow(FloatingWindow* wind)
 {
-	//std::cout << wind->name;
 	// Top
 	gui.activeUI[int(wind->position.x)][int(wind->position.y)].sprite = { 20, 5 };
 	for (int i = wind->position.x + 1; i < wind->position.x + wind->size.x; i++)
@@ -3553,11 +3636,11 @@ void DrawFloatingWindow(FloatingWindow* wind)
 	{
 		std::string themeText[32] = {
 			"RED", "BROWN PINK", "CLAY", "MAGNOLIA",
-			"PALE", "MAHOGANY", "CLOUDY", "RED SAND",
-			"SAND", "GOLD", "BURNT", "WHITE",
-			"NEUTRAL GREY","BLUE GREEN", "CREEK", "TOXIC",
+			"PALE", "BLUE", "CLOUDY", "RED SAND",
+			"SAND", "AMBER", "BURNT", "WHITE",
+			"NEUTRAL GREY","LIGHT BLUE", "CREEK", "TOXIC",
 			"RUST", "FOREST", "EMERALD", "BLUE GOLD",
-			"LOTIS", "SEA FOAM", "NAUTICAL", "SILVER",
+			"LOTIS", "ORANGE", "NAUTICAL", "SILVER",
 			"LUNAR", "BLUE GLASS", "STANDARD", "PLASTIC",
 			"DEEP SEA", "BRIGHT PINK", "PURPLE", "COSMIC",
 		};
@@ -3885,51 +3968,51 @@ void DrawFloatingWindow(FloatingWindow* wind)
 
 		// Sample name
 		DrawGUIText("INSTRUMENT NAME: ", wind->position.x + 1, wind->position.x + 17, wind->position.y + 1, 3, 1);
-		if (!loadedSamples[editor.selectedSample].enabled)
+		if (!loadedInstruments[editor.selectedSample].enabled)
 			DrawGUIText("NO SAMPLE LOADED", wind->position.x + 17, wind->position.x + 34, wind->position.y + 1, 3, 1);
 		else
-			DrawGUIText(loadedSamples[editor.selectedSample].sampleName, wind->position.x + 14, wind->position.x + 34, wind->position.y + 1, 3, 1);
+			DrawGUIText(loadedInstruments[editor.selectedSample].sampleName, wind->position.x + 14, wind->position.x + 34, wind->position.y + 1, 3, 1);
 
 		// Volume/Arp speed
 		if (sampleDisplay.displayArp)
 		{
 			DrawGUIText("Speed:", wind->position.x + 18, wind->position.x + 25, wind->position.y + 2, 3, 0);
-			DrawHorizontalSlider(int(wind->position.x + 25), int(wind->position.y + 2), loadedSamples[editor.selectedSample].arpSpeed);
+			DrawHorizontalSlider(int(wind->position.x + 25), int(wind->position.y + 2), loadedInstruments[editor.selectedSample].arpSpeed);
 		}
 		else
 		{
 			DrawGUIText("Volume:", wind->position.x + 18, wind->position.x + 25, wind->position.y + 2, 3, 0);
-			DrawHorizontalSlider(int(wind->position.x + 25), int(wind->position.y + 2), loadedSamples[editor.selectedSample].volume);
+			DrawHorizontalSlider(int(wind->position.x + 25), int(wind->position.y + 2), loadedInstruments[editor.selectedSample].volume);
 		}
 
 		// waveform or sample.
 		gui.activeUI[int(wind->position.x + 2)][int(wind->position.y + 2)].sprite = { 5, 26 };
-		if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 0)
+		if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 0)
 			DrawGUIText("WAVEFORM", wind->position.x + 3, wind->position.x + 12, wind->position.y + 2, 4, -1);
-		else if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 1)
+		else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 1)
 			DrawGUIText("SAMPLE", wind->position.x + 3, wind->position.x + 12, wind->position.y + 2, 4, -1);
 		else
 			DrawGUIText("VOICE", wind->position.x + 3, wind->position.x + 12, wind->position.y + 2, 4, -1);
 		gui.activeUI[int(wind->position.x + 12)][int(wind->position.y + 2)].sprite = { 6, 26 };
 
 
-		if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 0)
+		if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 0)
 		{
-			if (loadedSamples[editor.selectedSample].enabled)
+			if (loadedInstruments[editor.selectedSample].enabled)
 			{
 				DrawGUIText("SHAPE", wind->position.x + 3, wind->position.x + 12, wind->position.y + 3, 3, 0);
-				DrawWaveTypeButton(loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].waveType, int(wind->position.x) + 3, int(wind->position.y) + 4);
+				DrawWaveTypeButton(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].waveType, int(wind->position.x) + 3, int(wind->position.y) + 4);
 
 				// Reverse wave toggle.
 				DrawGUIText("Reverse:", wind->position.x + 1, wind->position.x + 10, wind->position.y + 11, 3, 0);
-				if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].reverseFrames)
+				if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].reverseFrames)
 					gui.activeUI[int(wind->position.x + 9)][int(wind->position.y + 11)].sprite = { 24, 6 };
 				else
 					gui.activeUI[int(wind->position.x + 9)][int(wind->position.y + 11)].sprite = { 23, 6 };
 
 				// Offset
 				DrawGUIText("Offset:", wind->position.x + 1, wind->position.x + 10, wind->position.y + 16, 3, 0);
-				DrawHorizontalSlider(int(wind->position.x + 9), int(wind->position.y + 16), loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].offset);
+				DrawHorizontalSlider(int(wind->position.x + 9), int(wind->position.y + 16), loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].offset);
 			}
 		}
 
@@ -3938,7 +4021,7 @@ void DrawFloatingWindow(FloatingWindow* wind)
 		{
 			if (sampleDisplay.displayArp)
 			{
-				if (x > loadedSamples[editor.selectedSample].arpLength)
+				if (x > loadedInstruments[editor.selectedSample].arpLength)
 				{
 					for (int y = 1; y < 14; y++)
 						gui.activeUI[int(wind->position.x + 18 + x)][int(wind->position.y + 16 - y)].sprite = { 10, 19 };
@@ -3949,7 +4032,7 @@ void DrawFloatingWindow(FloatingWindow* wind)
 					{
 						int offsetSprite = 0;
 
-						float arpVal = loadedSamples[editor.selectedSample].arpPitches[x];
+						float arpVal = loadedInstruments[editor.selectedSample].arpPitches[x];
 
 						bool onOct = (y == 13 || y == 10 || y == 7 || y == 4 || y == 1);
 						bool overOct = (y - 1 == 13 || y - 1 == 10 || y - 1 == 7 || y - 1 == 4 || y - 1 == 1);
@@ -3997,13 +4080,13 @@ void DrawFloatingWindow(FloatingWindow* wind)
 						gui.activeUI[int(wind->position.x + 18 + x)][int(wind->position.y + 16 - y)].sprite = { 11 + offsetSprite, 20 };
 					}
 
-					if (x == loadedSamples[editor.selectedSample].arpLength)
+					if (x == loadedInstruments[editor.selectedSample].arpLength)
 						gui.activeUI[int(wind->position.x + 18 + x)][int(wind->position.y + 16)].sprite = { 9, 19 };
 					else
 						gui.activeUI[int(wind->position.x + 18 + x)][int(wind->position.y + 16)].sprite = { 8, 19 };
 				}
 			}
-			else if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 0 && x > 3)
+			else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 0 && x > 3)
 			{
 				int offsetSprite = 0;
 				if (x == 0 || x == 4 || x == 6 || x == 8 || x == 10 || x == 14)
@@ -4014,13 +4097,13 @@ void DrawFloatingWindow(FloatingWindow* wind)
 
 				for (int y = 0; y < 14; y++)
 				{
-					if (y < loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].frequencies[x - 4])
+					if (y < loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].frequencies[x - 4])
 					{
-						if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].frequencies[x - 4] - y == 0.25)
+						if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].frequencies[x - 4] - y == 0.25)
 							gui.activeUI[int(wind->position.x + 18 + x)][int(wind->position.y + 16 - y)].sprite = { 7, 20 + offsetSprite };
-						else if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].frequencies[x - 4] - y == 0.5)
+						else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].frequencies[x - 4] - y == 0.5)
 							gui.activeUI[int(wind->position.x + 18 + x)][int(wind->position.y + 16 - y)].sprite = { 8, 20 + offsetSprite };
-						else if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].frequencies[x - 4] - y == 0.75)
+						else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].frequencies[x - 4] - y == 0.75)
 							gui.activeUI[int(wind->position.x + 18 + x)][int(wind->position.y + 16 - y)].sprite = { 9, 20 + offsetSprite };
 						else
 							gui.activeUI[int(wind->position.x + 18 + x)][int(wind->position.y + 16 - y)].sprite = { 10, 20 + offsetSprite };
@@ -4033,10 +4116,19 @@ void DrawFloatingWindow(FloatingWindow* wind)
 			}
 		}
 		
-
+		if (!sampleDisplay.displayArp)
+		{
+			for (int y = 0; y < 14; y++)
+			{
+				gui.activeUI[int(wind->position.x + 21)][int(wind->position.y + y + 3)].sprite = { 6, 23 };
+				gui.activeUI[int(wind->position.x + 33)][int(wind->position.y + y + 3)].sprite = { 7, 23 };
+			}
+		}
+		//gui.activeUI[int(wind->position.x + 22)][int(wind->position.y + 16)].sprite.y += 3;
+		//gui.activeUI[int(wind->position.x + 32)][int(wind->position.y + 16)].sprite.y += 2;
 
 		// Draw the play and pause buttons.
-		if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
+		if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
 		{
 			if (sampleDisplay.playingSample)
 			{
@@ -4063,7 +4155,7 @@ void DrawFloatingWindow(FloatingWindow* wind)
 				gui.activeUI[int(wind->position.x) + 4][int(wind->position.y) + 39].sprite = { 19, 8 };
 			}
 		}
-		if (loadedSamples[editor.selectedSample].enabled && loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 1)
+		if (loadedInstruments[editor.selectedSample].enabled && loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 1)
 		{
 			if (sampleDisplay.drawing) // Draw the drawing button.
 			{
@@ -4098,10 +4190,10 @@ void DrawFloatingWindow(FloatingWindow* wind)
 
 		
 		
-		if (loadedSamples[editor.selectedSample].enabled)
+		if (loadedInstruments[editor.selectedSample].enabled)
 		{
-			float frameCount = float(loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size()) * loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].fineTuneToC;
-			if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
+			float frameCount = float(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size()) * loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].fineTuneToC;
+			if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
 			{
 			// Sample length display
 			gui.activeUI[int(wind->position.x + 6)][int(wind->position.y + 38)].sprite = { 5, 26 };
@@ -4124,9 +4216,9 @@ void DrawFloatingWindow(FloatingWindow* wind)
 			// Loop button
 				DrawGUIText("LOOP", wind->position.x + 3, wind->position.x + 7, wind->position.y + 8, 3, 0);
 				gui.activeUI[int(wind->position.x + 2)][int(wind->position.y + 9)].sprite = { 5, 26 };
-				if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopType == 0)
+				if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopType == 0)
 					DrawGUIText("NONE", wind->position.x + 3, wind->position.x + 12, wind->position.y + 9, 4, -1);
-				else if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopType == 1)
+				else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopType == 1)
 					DrawGUIText("FORWARDS", wind->position.x + 3, wind->position.x + 12, wind->position.y + 9, 4, -1);
 				else
 					DrawGUIText("BOUNCE", wind->position.x + 3, wind->position.x + 12, wind->position.y + 9, 4, -1);
@@ -4144,54 +4236,54 @@ void DrawFloatingWindow(FloatingWindow* wind)
 
 				// ASDR
 				DrawGUIText("Attack:", wind->position.x + 1, wind->position.x + 10, wind->position.y + 12, 3, 0);
-				DrawHorizontalSlider(int(wind->position.x + 9), int(wind->position.y + 12), loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].attack);
+				DrawHorizontalSlider(int(wind->position.x + 9), int(wind->position.y + 12), loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].attack);
 				DrawGUIText("Sustain:", wind->position.x + 1, wind->position.x + 10, wind->position.y + 13, 3, 0);
-				if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustainForever)
+				if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustainForever)
 					gui.activeUI[int(wind->position.x + 8)][int(wind->position.y + 13)].sprite = { 5, 22 };
 				else
 				{
 					gui.activeUI[int(wind->position.x + 8)][int(wind->position.y + 13)].sprite = { 4, 22 };
-					DrawHorizontalSlider(int(wind->position.x + 9), int(wind->position.y + 13), loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustain);
+					DrawHorizontalSlider(int(wind->position.x + 9), int(wind->position.y + 13), loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustain);
 				}
 				DrawGUIText("Decay:", wind->position.x + 1, wind->position.x + 10, wind->position.y + 14, 3, 0);
-				DrawHorizontalSlider(int(wind->position.x + 9), int(wind->position.y + 14), loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].decay);
+				DrawHorizontalSlider(int(wind->position.x + 9), int(wind->position.y + 14), loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].decay);
 				DrawGUIText("Release:", wind->position.x + 1, wind->position.x + 10, wind->position.y + 15, 3, 0);
-				DrawHorizontalSlider(int(wind->position.x + 9), int(wind->position.y + 15), loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].release);
+				DrawHorizontalSlider(int(wind->position.x + 9), int(wind->position.y + 15), loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].release);
 			}
 
 
 
 			// Glide
 			DrawGUIText("Glide:", wind->position.x + 1, wind->position.x + 10, wind->position.y + 17, 3, 0);
-			DrawHorizontalSlider(int(wind->position.x + 9), int(wind->position.y + 17), loadedSamples[editor.selectedSample].glide);
+			DrawHorizontalSlider(int(wind->position.x + 9), int(wind->position.y + 17), loadedInstruments[editor.selectedSample].glide);
 
 			// Stereo
 			DrawGUIText("Stereo:", wind->position.x + 1, wind->position.x + 8, wind->position.y + 18, 3, 0);
 			gui.activeUI[int(wind->position.x + 8)][int(wind->position.y + 18)].sprite = { 5, 26 };
-			if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].stereo == 0)
+			if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].stereo == 0)
 				DrawGUIText("MIX", wind->position.x + 9, wind->position.x + 14, wind->position.y + 18, 4, -1);
-			else if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].stereo == 1)
+			else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].stereo == 1)
 				DrawGUIText("LEFT", wind->position.x + 9, wind->position.x + 14, wind->position.y + 18, 4, -1);
 			else
 				DrawGUIText("RIGHT", wind->position.x + 9, wind->position.x + 14, wind->position.y + 18, 4, -1);
 			gui.activeUI[int(wind->position.x + 14)][int(wind->position.y + 18)].sprite = { 6, 26 };
 
-			if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
+			if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
 			{
 				// Pitch to note
 				DrawGUIText("Pitch to Note:", wind->position.x + 1, wind->position.x + 16, wind->position.y + 19, 3, 0);
-				if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pitchToNote)
+				if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pitchToNote)
 					gui.activeUI[int(wind->position.x + 15)][int(wind->position.y + 19)].sprite = { 24, 6 };
 				else
 					gui.activeUI[int(wind->position.x + 15)][int(wind->position.y + 19)].sprite = { 23, 6 };
 				// LFO
 				DrawGUIText("USE AS LFO:", wind->position.x + 1, wind->position.x + 16, wind->position.y + 20, 3, 0);
 				gui.activeUI[int(wind->position.x + 13)][int(wind->position.y + 20)].sprite = { 5, 26 };
-				DrawGUIText(std::to_string(int(loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].lfo)), wind->position.x + 14, wind->position.x + 16, wind->position.y + 20, 4, -1);
+				DrawGUIText(std::to_string(int(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].lfo)), wind->position.x + 14, wind->position.x + 16, wind->position.y + 20, 4, -1);
 				gui.activeUI[int(wind->position.x + 16)][int(wind->position.y + 20)].sprite = { 6, 26 };
 				// Continue note
 				DrawGUIText("Continue Note:", wind->position.x + 1, wind->position.x + 16, wind->position.y + 21, 3, 0);
-				if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].continueNote)
+				if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].continueNote)
 					gui.activeUI[int(wind->position.x + 15)][int(wind->position.y + 21)].sprite = { 24, 6 };
 				else
 					gui.activeUI[int(wind->position.x + 15)][int(wind->position.y + 21)].sprite = { 23, 6 };
@@ -4203,22 +4295,22 @@ void DrawFloatingWindow(FloatingWindow* wind)
 			{
 				gui.activeUI[int(wind->position.x + 2)][int(wind->position.y + 22 + mod)].sprite = { 5, 28 };
 				DrawGUIText("MOD" + std::to_string(mod + 1), wind->position.x + 13, wind->position.x + 17, wind->position.y + 22 + mod, 3, 0);
-				if (loadedSamples[editor.selectedSample].modulationTypes[mod] == 0)
+				if (loadedInstruments[editor.selectedSample].modulationTypes[mod] == 0)
 					DrawGUIText("FM", wind->position.x + 3, wind->position.x + 12, wind->position.y + 22 + mod, 4, -1);
-				else if (loadedSamples[editor.selectedSample].modulationTypes[mod] == 1)
+				else if (loadedInstruments[editor.selectedSample].modulationTypes[mod] == 1)
 					DrawGUIText("AM", wind->position.x + 3, wind->position.x + 12, wind->position.y + 22 + mod, 4, -1);
-				else if (loadedSamples[editor.selectedSample].modulationTypes[mod] == 2)
+				else if (loadedInstruments[editor.selectedSample].modulationTypes[mod] == 2)
 					DrawGUIText("DELAY", wind->position.x + 3, wind->position.x + 12, wind->position.y + 22 + mod, 4, -1);
 				else
 				{
-					if (loadedSamples[editor.selectedSample].modulationTypes[mod] == 3)
+					if (loadedInstruments[editor.selectedSample].modulationTypes[mod] == 3)
 						DrawGUIText("LP-CUTOFF", wind->position.x + 3, wind->position.x + 12, wind->position.y + 22 + mod, 4, -1);
-					else if (loadedSamples[editor.selectedSample].modulationTypes[mod] == 4)
+					else if (loadedInstruments[editor.selectedSample].modulationTypes[mod] == 4)
 						DrawGUIText("LP-RESO.", wind->position.x + 3, wind->position.x + 12, wind->position.y + 22 + mod, 4, -1);
 					else
 						DrawGUIText("LP-BOTH", wind->position.x + 3, wind->position.x + 12, wind->position.y + 22 + mod, 4, -1);
-					if (loadedSamples[editor.selectedSample].modulationTypes[mod] < 5)
-						DrawHorizontalSlider(int(wind->position.x + 13), wind->position.y + 22 + mod, loadedSamples[editor.selectedSample].lPResonances[mod]);
+					if (loadedInstruments[editor.selectedSample].modulationTypes[mod] < 5)
+						DrawHorizontalSlider(int(wind->position.x + 13), wind->position.y + 22 + mod, loadedInstruments[editor.selectedSample].lPResonances[mod]);
 				}
 				gui.activeUI[int(wind->position.x + 12)][int(wind->position.y + 22 + mod)].sprite = { 6, 28 };
 			}
@@ -4239,7 +4331,7 @@ void DrawFloatingWindow(FloatingWindow* wind)
 			
 
 
-			DrawAlgorithm({ wind->position.x + 24, wind->position.y + 18 }, loadedSamples[editor.selectedSample].algorithmType, true);
+			DrawAlgorithm({ wind->position.x + 24, wind->position.y + 18 }, loadedInstruments[editor.selectedSample].algorithmType, true);
 
 			gui.activeUI[int(wind->position.x + 32)][int(wind->position.y + 18)].sprite = { 8, 8 };
 			gui.activeUI[int(wind->position.x + 32)][int(wind->position.y + 19)].sprite = { 9, 8 };
@@ -4253,6 +4345,8 @@ void DrawFloatingWindow(FloatingWindow* wind)
 				else
 					gui.activeUI[int(wind->position.x + 32)][int(wind->position.y + 18 + y)].textCol = 0;
 			}
+
+
 		}
 
 		gui.activeUI[int(wind->position.x + 22)][int(wind->position.y + 24)].sprite = { 5, 26 };
@@ -4523,35 +4617,35 @@ void DrawWaveTypeButton(int type, int xVal, int yVal)
 
 
 	
-	if (loadedSamples[editor.selectedSample].enabled)
+	if (loadedInstruments[editor.selectedSample].enabled)
 	{
 
 		if (type != 4) // Noise has neither property.
 		{
-			DrawGUIText("Duty:" + std::to_string(int(loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].dutyCycle * 100)), xVal - 2, xVal + 8, yVal + 1, 3, 0);
-			DrawHorizontalSlider(int(xVal + 6), int(yVal + 1), loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].dutyCycle);
+			DrawGUIText("Duty:" + std::to_string(int(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].dutyCycle * 100)), xVal - 2, xVal + 8, yVal + 1, 3, 0);
+			DrawHorizontalSlider(int(xVal + 6), int(yVal + 1), loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].dutyCycle);
 		}
 
 		if (type > 3) // Bell
 		{
-			DrawGUIText("Waves:" + std::to_string(int(loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].numOfSineWaves)), xVal - 2, xVal + 8, yVal + 2, 3, 0);
-			DrawHorizontalSlider(int(xVal + 6), int(yVal + 2), float(loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].numOfSineWaves) / 16.0f);
+			DrawGUIText("Waves:" + std::to_string(int(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].numOfSineWaves)), xVal - 2, xVal + 8, yVal + 2, 3, 0);
+			DrawHorizontalSlider(int(xVal + 6), int(yVal + 2), float(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].numOfSineWaves) / 16.0f);
 		}
 		else if (type > 0 && type != 2) // There is no smoothness effect for: sine, triangle, noise.
 		{
-			if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].generateFromSines)
+			if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].generateFromSines)
 			{
-				DrawGUIText("Waves:" + std::to_string(int(loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].numOfSineWaves)), xVal - 2, xVal + 8, yVal + 2, 3, 0);
+				DrawGUIText("Waves:" + std::to_string(int(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].numOfSineWaves)), xVal - 2, xVal + 8, yVal + 2, 3, 0);
 				DrawGUIText("FROM SINE", xVal, xVal + 9, yVal + 3, 4, -1);
 
-				DrawHorizontalSlider(int(xVal + 6), int(yVal + 2), float(loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].numOfSineWaves) / 16.0f);
+				DrawHorizontalSlider(int(xVal + 6), int(yVal + 2), float(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].numOfSineWaves) / 16.0f);
 			}
 			else
 			{
-				DrawGUIText("Soft:" + std::to_string(int(loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].smoothness * 100)), xVal - 2, xVal + 8, yVal + 2, 3, 0);
+				DrawGUIText("Soft:" + std::to_string(int(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].smoothness * 100)), xVal - 2, xVal + 8, yVal + 2, 3, 0);
 				DrawGUIText("EXACT", xVal, xVal + 9, yVal + 3, 4, -1);
 
-				DrawHorizontalSlider(int(xVal + 6), int(yVal + 2), loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].smoothness);
+				DrawHorizontalSlider(int(xVal + 6), int(yVal + 2), loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].smoothness);
 			}
 
 			gui.activeUI[int(xVal - 1)][int(yVal + 3)].sprite = { 5, 26 };
@@ -4569,7 +4663,14 @@ void DrawHorizontalSlider(int xVal, int yVal, float value)
 {
 	value *= 8;
 
-	for (int i = 0; i < 8; i++)
+	if (value > 0.5f)
+		gui.activeUI[xVal][yVal].sprite = { 15, 23 };
+	else if (value > 0.0f)
+		gui.activeUI[xVal][yVal].sprite = { 14, 23 };
+	else
+		gui.activeUI[xVal][yVal].sprite = { 13, 23 };
+
+	for (int i = 1; i < 8; i++)
 	{
 		if (i < value)
 		{
@@ -4584,10 +4685,10 @@ void DrawHorizontalSlider(int xVal, int yVal, float value)
 		}
 	}
 
-	//if (value > 7.0f)
-	//	gui.activeUI[xVal + 7][yVal].sprite = { 15, 21 };
-	//else
-	//	gui.activeUI[xVal + 7][yVal].sprite = { 14, 21 };
+	if (value > 7.0f)
+		gui.activeUI[xVal + 7][yVal].sprite = { 15, 21 };
+	else
+		gui.activeUI[xVal + 7][yVal].sprite = { 14, 21 };
 
 	return;
 }
@@ -4697,7 +4798,7 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 {
 	int operatorWaves[4];
 	for (int i = 0; i < 4; i++)
-		operatorWaves[i] = loadedSamples[editor.selectedSample].operatorWavesToUse[i];
+		operatorWaves[i] = loadedInstruments[editor.selectedSample].operatorWavesToUse[i];
 
 	for (int x = 0; x < 7; x++)
 	{
@@ -4773,7 +4874,6 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 		gui.activeUI[pos.x + 3][pos.y + 4].sprite = { 5, 7 };
 
 		gui.activeUI[pos.x + 2][pos.y + 2].sprite = { 1, 0 }; // Connectors
-		gui.activeUI[pos.x + 2][pos.y + 2].textCol = 4;
 		break;
 	}
 
@@ -4801,7 +4901,6 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 		gui.activeUI[pos.x + 4][pos.y + 4].sprite = { 8, 7 };
 
 		gui.activeUI[pos.x + 1][pos.y + 2].sprite = { 1, 0 }; // Connectors
-		gui.activeUI[pos.x + 1][pos.y + 2].textCol = 4;
 		break;
 	}
 
@@ -4816,9 +4915,7 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 		gui.activeUI[pos.x + 3][pos.y + 4].sprite = { 5, 7 };
 
 		gui.activeUI[pos.x + 1][pos.y + 2].sprite = { 1, 0 }; // Connectors
-		gui.activeUI[pos.x + 1][pos.y + 2].textCol = 4;
 		gui.activeUI[pos.x + 5][pos.y + 2].sprite = { 2, 0 }; // Connectors
-		gui.activeUI[pos.x + 5][pos.y + 2].textCol = 4;
 		break;
 	}
 
@@ -4832,9 +4929,7 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 		gui.activeUI[pos.x + 3][pos.y + 4].sprite = { 5, 7 };
 
 		gui.activeUI[pos.x + 2][pos.y + 2].sprite = { 1, 0 }; // Connectors
-		gui.activeUI[pos.x + 2][pos.y + 2].textCol = 4;
 		gui.activeUI[pos.x + 2][pos.y].sprite = { 2, 0 }; // Connectors
-		gui.activeUI[pos.x + 2][pos.y].textCol = 4;
 		break;
 	}
 
@@ -4851,9 +4946,7 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 		gui.activeUI[pos.x + 4][pos.y + 4].sprite = { 8, 7 };
 
 		gui.activeUI[pos.x + 1][pos.y + 2].sprite = { 1, 0 }; // Connectors
-		gui.activeUI[pos.x + 1][pos.y + 2].textCol = 4;
 		gui.activeUI[pos.x + 5][pos.y + 2].sprite = { 2, 0 }; // Connectors
-		gui.activeUI[pos.x + 5][pos.y + 2].textCol = 4;
 		break;
 	}
 
@@ -4869,11 +4962,8 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 		gui.activeUI[pos.x + 2][pos.y + 4].sprite = { 5, 7 };
 
 		gui.activeUI[pos.x + 1][pos.y + 2].sprite = { 1, 0 }; // Connectors
-		gui.activeUI[pos.x + 1][pos.y + 2].textCol = 4;
 		gui.activeUI[pos.x + 2][pos.y + 1].sprite = { 2, 0 };
-		gui.activeUI[pos.x + 2][pos.y + 1].textCol = 4;
 		gui.activeUI[pos.x + 3][pos.y].sprite = { 3, 0 };
-		gui.activeUI[pos.x + 3][pos.y].textCol = 4;
 		break;
 	}
 
@@ -4889,11 +4979,8 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 		gui.activeUI[pos.x + 3][pos.y + 4].sprite = { 5, 7 };
 
 		gui.activeUI[pos.x + 1][pos.y + 1].sprite = { 2, 0 }; // Connectors
-		gui.activeUI[pos.x + 1][pos.y + 1].textCol = 4;
 		gui.activeUI[pos.x + 5][pos.y + 1].sprite = { 3, 0 };
-		gui.activeUI[pos.x + 5][pos.y + 1].textCol = 4;
 		gui.activeUI[pos.x + 2][pos.y + 2].sprite = { 1, 0 };
-		gui.activeUI[pos.x + 2][pos.y + 2].textCol = 4;
 		break;
 	}
 
@@ -4909,11 +4996,9 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 		gui.activeUI[pos.x + 4][pos.y + 3].sprite = { 5, 8 };
 
 		gui.activeUI[pos.x + 1][pos.y + 1].sprite = { 3, 0 }; // Connectors
-		gui.activeUI[pos.x + 1][pos.y + 1].textCol = 4;
 		gui.activeUI[pos.x + 1][pos.y + 3].sprite = { 1, 0 };
-		gui.activeUI[pos.x + 1][pos.y + 3].textCol = 4;
 		gui.activeUI[pos.x + 5][pos.y + 3].sprite = { 2, 0 };
-		gui.activeUI[pos.x + 5][pos.y + 3].textCol = 4;
+
 		break;
 	}
 
@@ -4931,13 +5016,9 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 		gui.activeUI[pos.x + 3][pos.y + 4].sprite = { 5, 7 };
 
 		gui.activeUI[pos.x + 1][pos.y].sprite = { 3, 0 }; // Connectors
-		gui.activeUI[pos.x + 1][pos.y].textCol = 4;
 		gui.activeUI[pos.x + 5][pos.y].sprite = { 4, 0 };
-		gui.activeUI[pos.x + 5][pos.y].textCol = 4;
 		gui.activeUI[pos.x + 1][pos.y + 2].sprite = { 1, 0 };
-		gui.activeUI[pos.x + 1][pos.y + 2].textCol = 4;
 		gui.activeUI[pos.x + 5][pos.y + 2].sprite = { 2, 0 };
-		gui.activeUI[pos.x + 5][pos.y + 2].textCol = 4;
 		break;
 	}
 
@@ -4955,11 +5036,8 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 		gui.activeUI[int(pos.x + 4)][int(pos.y + 4)].sprite = { 8, 7 };
 
 		gui.activeUI[int(pos.x + 1)][int(pos.y + 2)].sprite = { 1, 0 }; // Connectors
-		gui.activeUI[int(pos.x + 1)][int(pos.y + 2)].textCol = 4;
 		gui.activeUI[int(pos.x + 2)][int(pos.y + 1)].sprite = { 3, 0 };
-		gui.activeUI[int(pos.x + 2)][int(pos.y + 1)].textCol = 4;
 		gui.activeUI[int(pos.x + 5)][int(pos.y + 2)].sprite = { 2, 0 };
-		gui.activeUI[int(pos.x + 5)][int(pos.y + 2)].textCol = 4;
 		break;
 	}
 
@@ -4976,9 +5054,7 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 		gui.activeUI[int(pos.x + 4)][int(pos.y + 4)].sprite = { 8, 7 };
 
 		gui.activeUI[int(pos.x + 1)][int(pos.y + 2)].sprite = { 1, 0 }; // Connectors
-		gui.activeUI[int(pos.x + 1)][int(pos.y + 2)].textCol = 4;
 		gui.activeUI[int(pos.x + 1)][int(pos.y + 0)].sprite = { 2, 0 };
-		gui.activeUI[int(pos.x + 1)][int(pos.y + 0)].textCol = 4;
 		break;
 	}
 
@@ -4996,11 +5072,8 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 		gui.activeUI[int(pos.x + 3)][int(pos.y + 4)].sprite = { 5, 7 };
 
 		gui.activeUI[int(pos.x + 2)][int(pos.y + 3)].sprite = { 2, 0 }; // Connectors
-		gui.activeUI[int(pos.x + 2)][int(pos.y + 3)].textCol = 4;
 		gui.activeUI[int(pos.x)][int(pos.y + 2)].sprite = { 1, 0 };
-		gui.activeUI[int(pos.x)][int(pos.y + 2)].textCol = 4;
 		gui.activeUI[int(pos.x + 6)][int(pos.y + 2)].sprite = { 3, 0 };
-		gui.activeUI[int(pos.x + 6)][int(pos.y + 2)].textCol = 4;
 		break;
 	}
 
@@ -5018,9 +5091,7 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 
 
 		gui.activeUI[int(pos.x + 1)][int(pos.y + 2)].sprite = { 1, 0 }; // Connectors
-		gui.activeUI[int(pos.x + 1)][int(pos.y + 2)].textCol = 4;
 		gui.activeUI[int(pos.x + 5)][int(pos.y + 2)].sprite = { 2, 0 };
-		gui.activeUI[int(pos.x + 5)][int(pos.y + 2)].textCol = 4;
 		break;
 	}
 
@@ -5043,11 +5114,8 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 		gui.activeUI[int(pos.x + 5)][int(pos.y + 4)].sprite = { 8, 7 };
 
 		gui.activeUI[int(pos.x + 2)][int(pos.y + 1)].sprite = { 2, 0 }; // Connectors
-		gui.activeUI[int(pos.x + 2)][int(pos.y + 1)].textCol = 4;
 		gui.activeUI[int(pos.x)][int(pos.y + 2)].sprite = { 1, 0 };
-		gui.activeUI[int(pos.x)][int(pos.y + 2)].textCol = 4;
 		gui.activeUI[int(pos.x + 6)][int(pos.y + 2)].sprite = { 3, 0 };
-		gui.activeUI[int(pos.x + 6)][int(pos.y + 2)].textCol = 4;
 		break;
 	}
 
@@ -5065,7 +5133,6 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 		gui.activeUI[int(pos.x + 5)][int(pos.y + 4)].sprite = { 8, 7 };
 
 		gui.activeUI[int(pos.x + 2)][int(pos.y + 2)].sprite = { 1, 0 }; // Connectors
-		gui.activeUI[int(pos.x + 2)][int(pos.y + 2)].textCol = 4;
 		break;
 	}
 
@@ -5083,9 +5150,7 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 		gui.activeUI[int(pos.x + 4)][int(pos.y + 4)].sprite = { 8, 7 };
 
 		gui.activeUI[int(pos.x)][int(pos.y + 2)].sprite = { 1, 0 }; // Connectors
-		gui.activeUI[int(pos.x)][int(pos.y + 2)].textCol = 4;
 		gui.activeUI[int(pos.x + 4)][int(pos.y + 2)].sprite = { 2, 0 };
-		gui.activeUI[int(pos.x + 4)][int(pos.y + 2)].textCol = 4;
 		break;
 	}
 
@@ -5108,6 +5173,29 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected)
 
 	default:
 		break;
+	}
+
+	if (gui.lightMode)
+	{
+		for (int x = 0; x < 7; x++)
+		{
+			for (int y = 0; y < 5; y++)
+			{
+				if (gui.activeUI[pos.x + x][pos.y + y].sprite.y == 0)
+					gui.activeUI[pos.x + x][pos.y + y].textCol = 2;
+			}
+		}
+	}
+	else
+	{
+		for (int x = 0; x < 7; x++)
+		{
+			for (int y = 0; y < 5; y++)
+			{
+				if (gui.activeUI[pos.x + x][pos.y + y].sprite.y == 0)
+					gui.activeUI[pos.x + x][pos.y + y].textCol = 4;
+			}
+		}
 	}
 
 	return;

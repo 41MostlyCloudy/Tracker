@@ -1,10 +1,116 @@
 
 
-// Fix reading is using selected operator instead of instrument one.
 
-// Save dark mode.
 
-// Save wave fine-tune to samples.
+
+// Fix save and keep frames crash.
+
+
+// Fix mouse click while exporting causes crash.
+
+
+// Fix playing line looks strange when playing.
+
+
+// Make sure notes are in tune.
+
+
+// Fix first theme not saving when selected.
+
+
+
+
+
+
+
+// posInPoint is increased.
+
+
+// If posInPoint is more than speechSpeed, increase phonemePos.
+// 
+//		posInPoint is reduced by speechSpeed.
+//
+// 
+//		If phonemePos is past the sample length (in points) - mix, set nextPhoneme to the next one.
+//		 
+//			-If nextPhoneme is 44, and the phoneme has the looping property, set it to currentPhoneme.
+//
+//			-If nextPhoneme is 45, set it to 44.
+//
+// 
+//		If phonemePos is past the sample length (in points), set currentPhoneme to the next and nextPhoneme to 44.
+//	
+//			-Reset phonemePos.
+//
+//			-Set phonemeInterpolation to 0.
+
+
+// If phonemePos is past the sample length (in points) - mix:
+//
+//	-Set phonemeInterpolation to (phonemePos + (posInPoint / speechSpeed)) / sample length.
+//
+// else:
+//
+//	-Set phonemeInterpolation to 0.
+
+
+// For each frequency:
+// 
+//	-Read the next frame
+// 
+//	-Increase the frequency framePos
+// 
+//	-Loop at end (or start)
+// 
+//
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Make a diagram of how reading phonemes will work.
+
+// Sample reading pos changes are applied for each frequency in their instances.
+
+
+// Every frame, increment the sample read pos and add the two voice samples.
+// It does this using the channel voice notes.
+// Set a default voice speed and blend (how quickly it goes from one phoneme to another).
+
+
+
+
+
+
+
+
+
+
+
+// The voice menu should include the sample display, since it uses the sample for the voice.
+// Improver selecting operator types.
 
 
 // Use Fourier transform to break voice samples into frequencies.
@@ -57,19 +163,24 @@
 /////////////////////////////////////
 
 
+
+
+
+// Fix problem with loading fine-tune.
+
+
+
+
+
 // Fix copying and pasting multiple channels.
 
-// Fix crash while setting loop type.
-
-
+// Make windowed mode movable.
 
 // Fix C command stopping the end of frame. (and clipping)
 
 // Fix sample glide not coming into effect until notes are played in the song.
 
 // Fix editing over a note with another sample causes crash.
-
-// Fix export crash. (On RockTest)
 
 
 
@@ -81,13 +192,6 @@
 // Fix file folders sometimes not appearing in file select.
 
 // Fix loading then playing a song from another song sometimes causes a crash.
-
-
-// Add options to the right of the Load File menu, with options depending on the file type.
-// For samples, there is an option to load as stereo.
-//		-If enabled, you can give the operator numbers that will be used for each of the 2 channels.
-//		-The selected operators will have their stereo property set to left and right.
-//		-It is then up to the user to set these operators as carriers as they want.
 
 
 // Add 2 bytes for the version number of a song to the start of its file. (Version byte1.byte2).
@@ -104,9 +208,6 @@
 
 
 
-// Fix end of line crash.
-
-// Fix crash while playing. (Most likely has to do with drawing or updating information of beat.) (Most likely has to do with synchronizing the audio reading with changes from updates or player input.)
 
 // Create synth presets.
 
@@ -119,7 +220,11 @@
 
 
 
-
+// Add options to the right of the Load File menu, with options depending on the file type.
+// For samples, there is an option to load as stereo.
+//		-If enabled, you can give the operator numbers that will be used for each of the 2 channels.
+//		-The selected operators will have their stereo property set to left and right.
+//		-It is then up to the user to set these operators as carriers as they want.
 
 
 // Add reverb effect. (Computer in mixed)

@@ -14,7 +14,7 @@
 #include "stb_image.h"
 #include "Draw.cpp"
 #include "FileHandling.cpp"
-#include "FrameHandling.cpp"
+#include "PatternHandling.cpp"
 #include "SongHandling.cpp"
 #include "PromptWindowPrompts.cpp"
 
@@ -63,14 +63,18 @@ void RunEngine()
     
 
     // Create a windowed mode window and its OpenGL context
+    //screen.screenSize.y = 912.0f;
+    //screen.screenSize.x = 1472.0f;
+    //mainWindow = glfwCreateWindow(screen.screenSize.x, screen.screenSize.y, "Dual Tracker", NULL, NULL);
+
     screen.screenSize.y = glfwGetVideoMode(glfwGetPrimaryMonitor())->height;
     screen.screenSize.x = glfwGetVideoMode(glfwGetPrimaryMonitor())->width;
 
     screen.windowRatio = (736.0f / 456.0f) * (screen.screenSize.y / screen.screenSize.x);
-
+    
 
     // Create the window
-    mainWindow = glfwCreateWindow(screen.screenSize.x, screen.screenSize.y, "SuperSound", glfwGetPrimaryMonitor(), nullptr);
+    mainWindow = glfwCreateWindow(screen.screenSize.x, screen.screenSize.y, "Dual Tracker", glfwGetPrimaryMonitor(), nullptr);
     glfwMakeContextCurrent(mainWindow);
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
     glViewport(0, 0, screen.screenSize.x, screen.screenSize.y);
@@ -134,14 +138,17 @@ void RunEngine()
     uiShaderProgram = glCreateProgram();
 
     unsigned int scrollBarShaderProgram;
-    scrollBarShaderProgram = glCreateProgram();;
+    scrollBarShaderProgram = glCreateProgram();
 
     glAttachShader(scrollBarShaderProgram, scrollBarVertexShader);
     glAttachShader(scrollBarShaderProgram, fragmentShader);
+    glDeleteShader(scrollBarVertexShader);
     glLinkProgram(scrollBarShaderProgram);
 
     glAttachShader(uiShaderProgram, uiVertexShader);
     glAttachShader(uiShaderProgram, fragmentShader);
+    glDeleteShader(uiVertexShader);
+    glDeleteShader(fragmentShader);
     glLinkProgram(uiShaderProgram);
     // Use the screen shader.
     glUseProgram(uiShaderProgram);
@@ -221,6 +228,8 @@ void RunEngine()
 
     glAttachShader(sampleShaderProgram, sampleVertexShader);
     glAttachShader(sampleShaderProgram, sampleFragmentShader);
+    glDeleteShader(sampleVertexShader);
+    glDeleteShader(sampleFragmentShader);
     glLinkProgram(sampleShaderProgram);
     // Use the screen shader.
     glUseProgram(sampleShaderProgram);
@@ -250,19 +259,19 @@ void RunEngine()
 
     // Create the initial song.
     //LoadSong("NewSong.wav");
-    Frame firstFrame;
+    Pattern firstFrame;
     firstFrame.channels.resize(loadedSong.numberOfChannels);
-    loadedSong.frames.emplace_back(firstFrame);
-    loadedSong.frameSequence.emplace_back(0);
+    loadedSong.patterns.emplace_back(firstFrame);
+    loadedSong.patternSequence.emplace_back(0);
 
 
-    loadedFrame = resizeUnrolledFrameRows(loadedFrame, 32);
+    loadedPattern = resizeUnrolledPatternRows(loadedPattern, 32);
 
     
 
-    saveCurrentFrame();
+    saveCurrentPattern();
 
-    loadCurrentFrame();
+    loadCurrentPattern();
 
     
     
@@ -286,6 +295,9 @@ void RunEngine()
     ChangeTheme(gui.uiColorTheme);
 
     fileNavigator.NavigateToSamplesFile();
+
+    // Load the voice sample file.
+    LoadVoiceFile();
 
     
     
@@ -341,6 +353,9 @@ void RunEngine()
 
         
         // Draw the screen
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
         if (gui.drawScreen)
         {
             glUseProgram(uiShaderProgram);
@@ -535,7 +550,7 @@ void RunEngine()
                 
                 if (sampleDisplay.visible && windowController.windows[i].name == "Instrument Editor")
                 {
-                    if (loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
+                    if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
                     {
                         glUseProgram(sampleShaderProgram);
 
@@ -656,7 +671,7 @@ void processInput(GLFWwindow* window)
     
 
     
-    if (screen.mouseDown && !editor.playingSong) // Select note (End selection)
+    if (screen.mouseDown) // Select note (End selection)
     {
         for (int wind = 0; wind < windowController.windows.size(); wind++) // Drag windows.
         {
@@ -708,7 +723,7 @@ void processInput(GLFWwindow* window)
 
                 if (bar == 0)
                 {
-                    gui.frameListScroll = (gui.scrollBars[bar].position / gui.scrollBars[bar].length) * loadedSong.frameSequence.size();
+                    gui.frameListScroll = (gui.scrollBars[bar].position / gui.scrollBars[bar].length) * loadedSong.patternSequence.size();
                     gui.drawUIThisFrame = true;
                 }
                 else if (bar == 1)
@@ -718,11 +733,14 @@ void processInput(GLFWwindow* window)
                 }
                 else if (bar == 2)
                 {
-                    if (loadedFrame.rows.size() > 39)
-                        gui.frameScroll.y = (gui.scrollBars[bar].position / gui.scrollBars[bar].length) * (loadedFrame.rows.size() - 39);
-                    else
-                        gui.frameScroll.y = 0;
-                    gui.drawFrameThisFrame = true;
+                    if (!editor.playingSong)
+                    {
+                        if (loadedPattern.rows.size() > 39)
+                            gui.frameScroll.y = (gui.scrollBars[bar].position / gui.scrollBars[bar].length) * (loadedPattern.rows.size() - 39);
+                        else
+                            gui.frameScroll.y = 0;
+                        gui.drawFrameThisFrame = true;
+                    }
                 }
                 else if (bar == 3)
                 {
@@ -767,33 +785,36 @@ void processInput(GLFWwindow* window)
         }
 
 
-        if (!usingScrollBar && gui.hoveredTile.y > 15 && gui.hoveredTile.y < 56 && gui.hoveredTile.x > 3 && gui.hoveredTile.x < 91 && !gui.clickingOnFloatingWind)
+        if (!editor.playingSong)
         {
-            int mouseTileX = gui.hoveredTile.x - 5 + gui.frameScroll.x;
-            int mouseTileY = gui.hoveredTile.y - 16 + gui.frameScroll.y;
+            if (!usingScrollBar && gui.hoveredTile.y > 15 && gui.hoveredTile.y < 56 && gui.hoveredTile.x > 3 && gui.hoveredTile.x < 91 && !gui.clickingOnFloatingWind)
+            {
+                int mouseTileX = gui.hoveredTile.x - 5 + gui.frameScroll.x;
+                int mouseTileY = gui.hoveredTile.y - 16 + gui.frameScroll.y;
 
-            if (mouseTileX <= editor.noteSelectionStart.x)
-                editor.noteSelectionStart.x = mouseTileX;
-            else if (mouseTileX >= editor.noteSelectionStart.x)
-                editor.noteSelectionEnd.x = mouseTileX;
+                if (mouseTileX <= editor.noteSelectionStart.x)
+                    editor.noteSelectionStart.x = mouseTileX;
+                else if (mouseTileX >= editor.noteSelectionStart.x)
+                    editor.noteSelectionEnd.x = mouseTileX;
 
-            if (mouseTileY <= editor.noteSelectionStart.y)
-                editor.noteSelectionStart.y = mouseTileY;
-            else if (mouseTileY >= editor.noteSelectionStart.y)
-                editor.noteSelectionEnd.y = mouseTileY;
+                if (mouseTileY <= editor.noteSelectionStart.y)
+                    editor.noteSelectionStart.y = mouseTileY;
+                else if (mouseTileY >= editor.noteSelectionStart.y)
+                    editor.noteSelectionEnd.y = mouseTileY;
 
-            loadedSong.currentNote = mouseTileY;
+                loadedSong.currentNote = mouseTileY;
 
-            gui.drawFrameThisFrame = true;
+                gui.drawFrameThisFrame = true;
+            }
+
+        
+            if (loadedSong.currentNote >= loadedPattern.rows.size()) // Snap the current selected note to the end of the frame.
+                loadedSong.currentNote = loadedPattern.rows.size() - 1;
+            if (editor.noteSelectionStart.y >= loadedPattern.rows.size())
+                editor.noteSelectionStart.y = loadedPattern.rows.size() - 1;
+            if (editor.noteSelectionEnd.y >= loadedPattern.rows.size())
+                editor.noteSelectionEnd.y = loadedPattern.rows.size() - 1;
         }
-
-
-        if (loadedSong.currentNote >= loadedFrame.rows.size()) // Snap the current selected note to the end of the frame.
-            loadedSong.currentNote = loadedFrame.rows.size() - 1;
-        if (editor.noteSelectionStart.y >= loadedFrame.rows.size())
-            editor.noteSelectionStart.y = loadedFrame.rows.size() - 1;
-        if (editor.noteSelectionEnd.y >= loadedFrame.rows.size())
-            editor.noteSelectionEnd.y = loadedFrame.rows.size() - 1;
     }
     else
     {
@@ -903,7 +924,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     {
         if (key == GLFW_KEY_KP_9)
         {
-            SaveInstrumentPreset(presetMenu.selectedSample, &loadedSamples[editor.selectedSample]);
+            SaveInstrumentPreset(presetMenu.selectedSample, &loadedInstruments[editor.selectedSample]);
         }
 
         if (key == GLFW_KEY_BACKSPACE)
@@ -955,15 +976,15 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             else if (editor.selectedButton == 8) // Delete text (Sample name)
             {
                 int selectedChar = gui.selectedTile.x - 72;
-                if (loadedSamples[editor.selectedSample].sampleName.length() > 0 && selectedChar > -1)
+                if (loadedInstruments[editor.selectedSample].sampleName.length() > 0 && selectedChar > -1)
                 {
-                    if (selectedChar == loadedSamples[editor.selectedSample].sampleName.length())
+                    if (selectedChar == loadedInstruments[editor.selectedSample].sampleName.length())
                     {
-                        loadedSamples[editor.selectedSample].sampleName = loadedSamples[editor.selectedSample].sampleName.substr(0, selectedChar);
+                        loadedInstruments[editor.selectedSample].sampleName = loadedInstruments[editor.selectedSample].sampleName.substr(0, selectedChar);
                     }
                     else
                     {
-                        loadedSamples[editor.selectedSample].sampleName = loadedSamples[editor.selectedSample].sampleName.substr(0, selectedChar) + loadedSamples[editor.selectedSample].sampleName.substr(selectedChar + 1, loadedSamples[editor.selectedSample].sampleName.length());
+                        loadedInstruments[editor.selectedSample].sampleName = loadedInstruments[editor.selectedSample].sampleName.substr(0, selectedChar) + loadedInstruments[editor.selectedSample].sampleName.substr(selectedChar + 1, loadedInstruments[editor.selectedSample].sampleName.length());
                     }
 
                     if (selectedChar > 0)
@@ -996,9 +1017,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         {
             if (!editor.playingSong)
             {
-                if (gui.frameScroll.y < loadedFrame.rows.size() - 40 && loadedSong.currentNote > 8)
+                if (gui.frameScroll.y < loadedPattern.rows.size() - 40 && loadedSong.currentNote > 8)
                     gui.frameScroll.y++;
-                if (loadedSong.currentNote < loadedFrame.rows.size() - 1)
+                if (loadedSong.currentNote < loadedPattern.rows.size() - 1)
                     loadedSong.currentNote++;
                 editor.noteSelectionStart.y = loadedSong.currentNote;
                 editor.noteSelectionEnd.y = loadedSong.currentNote;
@@ -1065,10 +1086,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
             if (selectedPart < 3) // Playing keys
             {
-                loadedFrame.rows[loadedSong.currentNote].note[selectedChannel] = 255;
+                loadedPattern.rows[loadedSong.currentNote].note[selectedChannel] = 255;
 
-                if (loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] < 0)
-                    loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = editor.selectedSample;
+                if (loadedPattern.rows[loadedSong.currentNote].instrument[selectedChannel] < 0)
+                    loadedPattern.rows[loadedSong.currentNote].instrument[selectedChannel] = editor.selectedSample;
             }
             loadedSong.unsavedChanges = true;
         }
@@ -1137,30 +1158,33 @@ void mouse_button_callback(GLFWwindow* window, int key, int action, int mods)
     {
         if (key == GLFW_MOUSE_BUTTON_LEFT && !editor.playingSong && !gui.clickingOnFloatingWind)
         {
-            if (gui.hoveredTile.y > 15 && gui.hoveredTile.y < 56 && gui.hoveredTile.x > 3 && gui.hoveredTile.x < 91) // Select note
+            if (!editor.playingSong)
             {
-                editor.noteSelectionStart = { gui.hoveredTile.x - 4 + gui.frameScroll.x, gui.hoveredTile.y - 16 + gui.frameScroll.y };
-                editor.noteSelectionEnd = { gui.hoveredTile.x - 4 + gui.frameScroll.x, gui.hoveredTile.y - 16 + gui.frameScroll.y };
-                loadedSong.currentNote = gui.hoveredTile.y - 16 + gui.frameScroll.y;
-
-
-                int selectedPart = editor.noteSelectionStart.x;
-                int selectedChannel = 0;
-                bool inChannel = false;
-                while (!inChannel)
+                if (gui.hoveredTile.y > 15 && gui.hoveredTile.y < 56 && gui.hoveredTile.x > 3 && gui.hoveredTile.x < 91) // Select note
                 {
-                    if (selectedPart >= 7 + channels[selectedChannel].effectCountPerRow * 4)
+                    editor.noteSelectionStart = { gui.hoveredTile.x - 4 + gui.frameScroll.x, gui.hoveredTile.y - 16 + gui.frameScroll.y };
+                    editor.noteSelectionEnd = { gui.hoveredTile.x - 4 + gui.frameScroll.x, gui.hoveredTile.y - 16 + gui.frameScroll.y };
+                    loadedSong.currentNote = gui.hoveredTile.y - 16 + gui.frameScroll.y;
+
+
+                    int selectedPart = editor.noteSelectionStart.x;
+                    int selectedChannel = 0;
+                    bool inChannel = false;
+                    while (!inChannel)
                     {
-                        selectedPart -= 7 + channels[selectedChannel].effectCountPerRow * 4;
-                        selectedChannel++;
-                        if (selectedChannel > channels.size() - 1)
+                        if (selectedPart >= 7 + channels[selectedChannel].effectCountPerRow * 4)
                         {
-                            break;
+                            selectedPart -= 7 + channels[selectedChannel].effectCountPerRow * 4;
+                            selectedChannel++;
+                            if (selectedChannel > channels.size() - 1)
+                            {
+                                break;
+                            }
                         }
-                    }
-                    else
-                    {
-                        inChannel = true;
+                        else
+                        {
+                            inChannel = true;
+                        }
                     }
                 }
             }
@@ -1262,19 +1286,19 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
         if (editor.selectedButton == 8) // Sample name
         {
             writing = true;
-            if (loadedSamples[editor.selectedSample].sampleName.length() < 20)
+            if (loadedInstruments[editor.selectedSample].sampleName.length() < 20)
             {
                 int selectedChar = gui.selectedTile.x - 72;
 
-                if (loadedSamples[editor.selectedSample].sampleName.length() == 0)
-                    loadedSamples[editor.selectedSample].sampleName = input;
-                else if (selectedChar >= loadedSamples[editor.selectedSample].sampleName.length() - 1)
+                if (loadedInstruments[editor.selectedSample].sampleName.length() == 0)
+                    loadedInstruments[editor.selectedSample].sampleName = input;
+                else if (selectedChar >= loadedInstruments[editor.selectedSample].sampleName.length() - 1)
                 {
-                    loadedSamples[editor.selectedSample].sampleName = loadedSamples[editor.selectedSample].sampleName + input;
+                    loadedInstruments[editor.selectedSample].sampleName = loadedInstruments[editor.selectedSample].sampleName + input;
                 }
                 else
                 {
-                    loadedSamples[editor.selectedSample].sampleName = loadedSamples[editor.selectedSample].sampleName.substr(0, selectedChar + 1) + input + loadedSamples[editor.selectedSample].sampleName.substr(selectedChar + 1, loadedSamples[editor.selectedSample].sampleName.length());
+                    loadedInstruments[editor.selectedSample].sampleName = loadedInstruments[editor.selectedSample].sampleName.substr(0, selectedChar + 1) + input + loadedInstruments[editor.selectedSample].sampleName.substr(selectedChar + 1, loadedInstruments[editor.selectedSample].sampleName.length());
                 }
 
                 gui.selectedTile.x++;
@@ -1319,19 +1343,19 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
         }
         else if (editor.selectedButton == 4) // ROW
         {
-            int leftSide = int(loadedFrame.rows.size() / float(pow(10, 3 - selectedChar))) * pow(10, 3 - selectedChar);
-            int rightSide = int(loadedFrame.rows.size()) % int(pow(10, 2 - selectedChar));
+            int leftSide = int(loadedPattern.rows.size() / float(pow(10, 3 - selectedChar))) * pow(10, 3 - selectedChar);
+            int rightSide = int(loadedPattern.rows.size()) % int(pow(10, 2 - selectedChar));
             int newSize = leftSide + newVal * pow(10, 2 - selectedChar) + rightSide;
             if (newSize < 1)
                 newSize = 1;
             if (newSize > 255)
                 newSize = 255;
 
-            if (newSize > loadedFrame.rows.size())
+            if (newSize > loadedPattern.rows.size())
             {
-                for (int row = 0; row < loadedFrame.rows.size() - newSize; row++)
+                for (int row = 0; row < loadedPattern.rows.size() - newSize; row++)
                 {
-                    FrameRow newRow;
+                    PatternRow newRow;
                     newRow.note.resize(loadedSong.numberOfChannels);
                     newRow.instrument.resize(loadedSong.numberOfChannels);
                     newRow.volume.resize(loadedSong.numberOfChannels);
@@ -1345,29 +1369,29 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                         for (int sample = 0; sample < 5; sample++)
                             newRow.voiceSamples[ch].sample[sample] = 44;
 
-                        for (int ef = 0; ef < loadedFrame.rows[0].effects[ch].cEffect.size(); ef++)
+                        for (int ef = 0; ef < loadedPattern.rows[0].effects[ch].cEffect.size(); ef++)
                         {
                             newRow.effects[ch].cEffect.emplace_back(-1);
                             newRow.effects[ch].cEffectValue.emplace_back(-1);
                         }
                     }
-                    loadedFrame.rows.emplace_back(newRow);
+                    loadedPattern.rows.emplace_back(newRow);
                 }
-                saveCurrentFrame();
+                saveCurrentPattern();
                 loadedSong.unsavedChanges = true;
             }
-            else if (newSize < loadedFrame.rows.size())
+            else if (newSize < loadedPattern.rows.size())
             {
-                loadedFrame.rows.resize(newSize);
-                saveCurrentFrame();
+                loadedPattern.rows.resize(newSize);
+                saveCurrentPattern();
                 loadedSong.unsavedChanges = true;
             }
         }
         else if (editor.selectedButton == 5) // BEAT
         {
-            int leftSide = int(loadedFrame.beatsPerMeasure / float(pow(10, 2 - selectedChar))) * pow(10, 2 - selectedChar);
-            int rightSide = int(loadedFrame.beatsPerMeasure) % int(pow(10, 1 - selectedChar));
-            loadedFrame.beatsPerMeasure = leftSide + newVal * pow(10, 1 - selectedChar) + rightSide;
+            int leftSide = int(loadedPattern.beatsPerMeasure / float(pow(10, 2 - selectedChar))) * pow(10, 2 - selectedChar);
+            int rightSide = int(loadedPattern.beatsPerMeasure) % int(pow(10, 1 - selectedChar));
+            loadedPattern.beatsPerMeasure = leftSide + newVal * pow(10, 1 - selectedChar) + rightSide;
             loadedSong.unsavedChanges = true;
             gui.drawFrameThisFrame = true;
         }
@@ -1439,12 +1463,12 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                     for (int wave = 0; wave < 4; wave++)
                         channels[selectedChannel].waveforms[wave].note = noteNum;
                 }
-                loadedFrame.rows[loadedSong.currentNote].note[selectedChannel] = noteNum;
-                loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = editor.selectedSample;
+                loadedPattern.rows[loadedSong.currentNote].note[selectedChannel] = noteNum;
+                loadedPattern.rows[loadedSong.currentNote].instrument[selectedChannel] = editor.selectedSample;
 
                 if (editor.playingSong)
                 {
-                    saveCurrentFrame();
+                    saveCurrentPattern();
                 }
 
                 loadedSong.unsavedChanges = true;
@@ -1461,21 +1485,21 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
             else
                 return;
 
-            if (loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] < 0)
-                loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = 0;
+            if (loadedPattern.rows[loadedSong.currentNote].instrument[selectedChannel] < 0)
+                loadedPattern.rows[loadedSong.currentNote].instrument[selectedChannel] = 0;
 
-            if (loadedFrame.rows[loadedSong.currentNote].note[selectedChannel] < 0)
-                loadedFrame.rows[loadedSong.currentNote].note[selectedChannel] = 48;
+            if (loadedPattern.rows[loadedSong.currentNote].note[selectedChannel] < 0)
+                loadedPattern.rows[loadedSong.currentNote].note[selectedChannel] = 48;
 
             if (selectedPart == 3)
             {
-                int d1 = loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] % 16;
-                loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = val * 16 + d1;
+                int d1 = loadedPattern.rows[loadedSong.currentNote].instrument[selectedChannel] % 16;
+                loadedPattern.rows[loadedSong.currentNote].instrument[selectedChannel] = val * 16 + d1;
             }
             else if (selectedPart == 4)
             {
-                int d2 = loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] - loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] % 16;
-                loadedFrame.rows[loadedSong.currentNote].instrument[selectedChannel] = d2 + val;
+                int d2 = loadedPattern.rows[loadedSong.currentNote].instrument[selectedChannel] - loadedPattern.rows[loadedSong.currentNote].instrument[selectedChannel] % 16;
+                loadedPattern.rows[loadedSong.currentNote].instrument[selectedChannel] = d2 + val;
             }
             loadedSong.unsavedChanges = true;
         }
@@ -1489,10 +1513,10 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
             else
                 return;
 
-            if (loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] < 0)
-                loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] = 0;
+            if (loadedPattern.rows[loadedSong.currentNote].volume[selectedChannel] < 0)
+                loadedPattern.rows[loadedSong.currentNote].volume[selectedChannel] = 0;
 
-            int effectValue = loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel];
+            int effectValue = loadedPattern.rows[loadedSong.currentNote].volume[selectedChannel];
 
 
             float val1 = effectValue % 16;
@@ -1500,11 +1524,11 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
 
             if (selectedPart == 5)
             {
-                loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] = inputNum * 16 + val1;
+                loadedPattern.rows[loadedSong.currentNote].volume[selectedChannel] = inputNum * 16 + val1;
             }
             else
             {
-                loadedFrame.rows[loadedSong.currentNote].volume[selectedChannel] = val10 + inputNum;
+                loadedPattern.rows[loadedSong.currentNote].volume[selectedChannel] = val10 + inputNum;
             }
             loadedSong.unsavedChanges = true;
             return;
@@ -1520,23 +1544,25 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                 selectedPart += 5;
 
                 int inputLetter = editor.findVoiceSamplePlayed(input);
+                if (inputLetter == -1)
+                    return;
                 editor.selectedVoiceSample = inputLetter;
 
-                loadedFrame.rows[loadedSong.currentNote].voiceSamples[selectedChannel].sample[selectedPart - 7] = inputLetter;
+                loadedPattern.rows[loadedSong.currentNote].voiceSamples[selectedChannel].sample[selectedPart - 7] = inputLetter;
                 loadedSong.unsavedChanges = true;
                 gui.drawFrameThisFrame = true;
-                saveCurrentFrame();
+                saveCurrentPattern();
 
                 return;
             }
             else
             {
                 int effectNum = (selectedPart - 7) / 4;
-                if (effectNum >= loadedFrame.rows[loadedSong.currentNote].effects[selectedChannel].cEffect.size())
+                if (effectNum >= loadedPattern.rows[loadedSong.currentNote].effects[selectedChannel].cEffect.size())
                     return;
                 int effectSelect = (selectedPart - 7) % 4;
-                int effectType = loadedFrame.rows[loadedSong.currentNote].effects[selectedChannel].cEffect[effectNum];
-                int effectValue = loadedFrame.rows[loadedSong.currentNote].effects[selectedChannel].cEffectValue[effectNum];
+                int effectType = loadedPattern.rows[loadedSong.currentNote].effects[selectedChannel].cEffect[effectNum];
+                int effectValue = loadedPattern.rows[loadedSong.currentNote].effects[selectedChannel].cEffectValue[effectNum];
 
 
                 if (effectSelect == 0)
@@ -1547,11 +1573,11 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
 
                     float val = float(int(effectType / 100.0f)) * 100.0f;
 
-                    if (loadedFrame.rows[loadedSong.currentNote].effects[selectedChannel].cEffect[effectNum] == -1)
-                        loadedFrame.rows[loadedSong.currentNote].effects[selectedChannel].cEffectValue[effectNum] = 0;
-                    loadedFrame.rows[loadedSong.currentNote].effects[selectedChannel].cEffect[effectNum] = val + inputLetter;
+                    if (loadedPattern.rows[loadedSong.currentNote].effects[selectedChannel].cEffect[effectNum] == -1)
+                        loadedPattern.rows[loadedSong.currentNote].effects[selectedChannel].cEffectValue[effectNum] = 0;
+                    loadedPattern.rows[loadedSong.currentNote].effects[selectedChannel].cEffect[effectNum] = val + inputLetter;
                     loadedSong.unsavedChanges = true;
-                    saveCurrentFrame();
+                    saveCurrentPattern();
                     return;
                 }
                 else if (effectSelect == 1) // Increase/decrease
@@ -1563,12 +1589,12 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                             float val = effectType % 100;
 
                             if (input == 100)
-                                loadedFrame.rows[loadedSong.currentNote].effects[selectedChannel].cEffect[effectNum] = val + 100;
+                                loadedPattern.rows[loadedSong.currentNote].effects[selectedChannel].cEffect[effectNum] = val + 100;
                             else
-                                loadedFrame.rows[loadedSong.currentNote].effects[selectedChannel].cEffect[effectNum] = val + 200;
+                                loadedPattern.rows[loadedSong.currentNote].effects[selectedChannel].cEffect[effectNum] = val + 200;
                             loadedSong.unsavedChanges = true;
                         }
-                        saveCurrentFrame();
+                        saveCurrentPattern();
                     }
                     return;
                 }
@@ -1587,14 +1613,14 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
 
                     if (effectSelect == 2)
                     {
-                        loadedFrame.rows[loadedSong.currentNote].effects[selectedChannel].cEffectValue[effectNum] = inputNum * 16 + val1;
+                        loadedPattern.rows[loadedSong.currentNote].effects[selectedChannel].cEffectValue[effectNum] = inputNum * 16 + val1;
                     }
                     else
                     {
-                        loadedFrame.rows[loadedSong.currentNote].effects[selectedChannel].cEffectValue[effectNum] = val10 + inputNum;
+                        loadedPattern.rows[loadedSong.currentNote].effects[selectedChannel].cEffectValue[effectNum] = val10 + inputNum;
                     }
                     loadedSong.unsavedChanges = true;
-                    saveCurrentFrame();
+                    saveCurrentPattern();
                     return;
                 }
             }
@@ -1610,21 +1636,17 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 
-    gui.frameScroll.x -= xoffset * 1.0f;
-    gui.frameScroll.y -= yoffset * 1.0f;
-
-    
-
-    if (loadedFrame.rows.size() > 40)
+    if (!editor.playingSong)
     {
-        if (gui.frameScroll.y > loadedFrame.rows.size() - 40)
-            gui.frameScroll.y = loadedFrame.rows.size() - 40;
+        gui.frameScroll.y -= yoffset * 1.0f;
 
-        if (gui.frameScroll.y < 0)
-            gui.frameScroll.y = 0;
+        gui.frameScroll.y = int(gui.frameScroll.y);
+
+        if (gui.frameScroll.y > loadedPattern.rows.size() - 40) gui.frameScroll.y = loadedPattern.rows.size() - 40;
+        if (gui.frameScroll.y < 0) gui.frameScroll.y = 0;
     }
-    else
-        gui.frameScroll.y = 0;
+
+    gui.frameScroll.x -= xoffset * 1.0f;
 
     if (gui.frameScroll.x < 0)
         gui.frameScroll.x = 0;
@@ -1641,7 +1663,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     }
 
     gui.frameScroll.x = int(gui.frameScroll.x);
-    gui.frameScroll.y = int(gui.frameScroll.y);
 
     
 
@@ -1740,9 +1761,41 @@ void pressButton(GLFWwindow* window)
 
     if (gui.hoveredTile.y == 0)
     {
-        if (gui.hoveredTile.x == 88 || gui.hoveredTile.x == 89) // Minimize program
+        if (gui.hoveredTile.x == 86 || gui.hoveredTile.x == 87) // Minimize program
         {
             glfwIconifyWindow(window);
+        }
+        else if (gui.hoveredTile.x == 88 || gui.hoveredTile.x == 89) // Window program
+        {
+            screen.windowed = !screen.windowed;
+            if (screen.windowed)
+            {
+                glfwSetWindowMonitor(window, NULL, (screen.screenSize.x - 1472.0f) * 0.5f, (screen.screenSize.y - 912.0f) * 0.5f, 1472.0f, 912.0f, 0);
+
+                glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);
+                glfwSetWindowAttrib(window, GLFW_RESIZABLE, GLFW_FALSE);
+                
+
+                screen.screenSize.y = 912.0f;
+                screen.screenSize.x = 1472.0f;
+
+                screen.windowRatio = (736.0f / 456.0f) * (screen.screenSize.y / screen.screenSize.x);
+
+                // Create the window
+                glViewport(0, 0, screen.screenSize.x, screen.screenSize.y);
+            }
+            else
+            {
+                screen.screenSize.y = glfwGetVideoMode(glfwGetPrimaryMonitor())->height;
+                screen.screenSize.x = glfwGetVideoMode(glfwGetPrimaryMonitor())->width;
+
+                screen.windowRatio = (736.0f / 456.0f) * (screen.screenSize.y / screen.screenSize.x);
+
+                glfwSetWindowMonitor(window, glfwGetPrimaryMonitor(), 0, 0, screen.screenSize.x, screen.screenSize.y, glfwGetVideoMode(glfwGetPrimaryMonitor())->refreshRate);
+
+                // Create the window
+                glViewport(0, 0, screen.screenSize.x, screen.screenSize.y);
+            }
         }
         else if (gui.hoveredTile.x == 90 || gui.hoveredTile.x == 91) // Close program
         {
@@ -1775,11 +1828,11 @@ void pressButton(GLFWwindow* window)
         {
             for (int wave = 0; wave < 4; wave++)
             {
-                if (loadedSamples[editor.selectedSample].waveforms[wave].pcmFrames.size() < 1)
+                if (loadedInstruments[editor.selectedSample].waveforms[wave].pcmFrames.size() < 1)
                 {
-                    loadedSamples[editor.selectedSample].waveforms[wave].pcmFrames.assign(480 * 2, 0.0f);
-                    loadedSamples[editor.selectedSample].waveforms[wave].loopStart = 0.0f;
-                    loadedSamples[editor.selectedSample].waveforms[wave].loopEnd = 480 * 2;
+                    loadedInstruments[editor.selectedSample].waveforms[wave].pcmFrames.assign(480 * 2, 0.0f);
+                    loadedInstruments[editor.selectedSample].waveforms[wave].loopStart = 0.0f;
+                    loadedInstruments[editor.selectedSample].waveforms[wave].loopEnd = 480 * 2;
                 }
             }
 
@@ -1921,7 +1974,7 @@ void pressButton(GLFWwindow* window)
                     if (channels[selectedChannel].effectCountPerRow < 8) // Max effects
                     {
                         channels[selectedChannel].effectCountPerRow++;
-                        loadedFrame = resizeSongFrameEffectColumns(loadedFrame);
+                        loadedPattern = resizeSongPatternEffectColumns(loadedPattern);
                         loadedSong.unsavedChanges = true;
                     }
                 }
@@ -1930,7 +1983,7 @@ void pressButton(GLFWwindow* window)
                     if (channels[selectedChannel].effectCountPerRow > 1) // Min effects
                     {
                         channels[selectedChannel].effectCountPerRow--;
-                        loadedFrame = resizeSongFrameEffectColumns(loadedFrame);
+                        loadedPattern = resizeSongPatternEffectColumns(loadedPattern);
                         loadedSong.unsavedChanges = true;
                     }
                 }
@@ -1992,17 +2045,22 @@ void pressButton(GLFWwindow* window)
     {
         if (gui.hoveredTile.x > 0 && gui.hoveredTile.x < 6)
         {
-            saveCurrentFrame();
-            loadedSong.currentFrame = gui.hoveredTile.y - 2 + gui.frameListScroll;
-            if (loadedSong.currentFrame >= loadedSong.frameSequence.size()) // Snap to end of song.
-                loadedSong.currentFrame = loadedSong.frameSequence.size() - 1;
-            loadCurrentFrame();
-        }
+            int moveToFrame = gui.hoveredTile.y - 2 + gui.frameListScroll;
+            if (moveToFrame >= loadedSong.patternSequence.size()) // Snap to end of song.
+                moveToFrame = loadedSong.patternSequence.size() - 1;
 
-        if (editor.playingSong) // Restart the frame if playing.
-        {
-            StartOrStopSong();
-            StartOrStopSong();
+            if (moveToFrame != loadedSong.currentPattern)
+            {
+                if (editor.playingSong) // Restart the frame if playing.
+                {
+                    StartOrStopSong();
+                    StartOrStopSong();
+                }
+
+                saveCurrentPattern();
+                loadedSong.currentPattern = moveToFrame;
+                loadCurrentPattern();
+            }
         }
     }
 
@@ -2026,17 +2084,17 @@ void pressButton(GLFWwindow* window)
             {
                 if (gui.hoveredTile.x == 90)
                 {
-                    if (!loadedSamples[editor.selectedSample].enabled) // Create sample.
+                    if (!loadedInstruments[editor.selectedSample].enabled) // Create sample.
                     {
                         //loadedSamples[editor.selectedSample] = new Sample;
-                        loadedSamples[editor.selectedSample].enabled = true;
+                        loadedInstruments[editor.selectedSample].enabled = true;
                         
                         for (int wave = 0; wave < 4; wave++)
                         {
-                            loadedSamples[editor.selectedSample].waveforms[wave].pcmFrames.clear();
-                            loadedSamples[editor.selectedSample].waveforms[wave].pcmFrames.assign(480 * 2, 0.0f);
-                            loadedSamples[editor.selectedSample].waveforms[wave].loopStart = 0.0f;
-                            loadedSamples[editor.selectedSample].waveforms[wave].loopEnd = 480 * 2;
+                            loadedInstruments[editor.selectedSample].waveforms[wave].pcmFrames.clear();
+                            loadedInstruments[editor.selectedSample].waveforms[wave].pcmFrames.assign(480 * 2, 0.0f);
+                            loadedInstruments[editor.selectedSample].waveforms[wave].loopStart = 0.0f;
+                            loadedInstruments[editor.selectedSample].waveforms[wave].loopEnd = 480 * 2;
                         }
                         sampleDisplay.drawing = false; // Stop sample drawing.
                         sampleDisplay.zoomed = false; // Reset zoom.
@@ -2046,16 +2104,16 @@ void pressButton(GLFWwindow* window)
                     {
                         //delete loadedSamples[editor.selectedSample];
                         //loadedSamples[editor.selectedSample] = nullptr;
-                        loadedSamples[editor.selectedSample].enabled = false;
+                        loadedInstruments[editor.selectedSample].enabled = false;
                     }
                 }
                 else if (gui.hoveredTile.x > 71) // Edit selected sample name.
                 {
-                    if (loadedSamples[editor.selectedSample].enabled)
+                    if (loadedInstruments[editor.selectedSample].enabled)
                     {
-                        if (gui.hoveredTile.x - 72 > loadedSamples[editor.selectedSample].sampleName.size())
+                        if (gui.hoveredTile.x - 72 > loadedInstruments[editor.selectedSample].sampleName.size())
                         {
-                            gui.hoveredTile.x = loadedSamples[editor.selectedSample].sampleName.size() + 71;
+                            gui.hoveredTile.x = loadedInstruments[editor.selectedSample].sampleName.size() + 71;
                             gui.selectedTile.x = gui.hoveredTile.x;
                         }
                         editor.selectedButton = 8;
@@ -2123,28 +2181,28 @@ void pressButton(GLFWwindow* window)
     {
         if (gui.hoveredTile.x == 7) // Change song frame.
         {
-            saveCurrentFrame();
-            loadedSong.frameSequence[loadedSong.currentFrame]++;
-            while (loadedSong.frameSequence[loadedSong.currentFrame] >= loadedSong.frames.size()) // Create a new frame when changed to one not yet used.
+            saveCurrentPattern();
+            loadedSong.patternSequence[loadedSong.currentPattern]++;
+            while (loadedSong.patternSequence[loadedSong.currentPattern] >= loadedSong.patterns.size()) // Create a new frame when changed to one not yet used.
             {
-                Frame newFrame;
+                Pattern newFrame;
                 newFrame.channels.resize(loadedSong.numberOfChannels);
-                newFrame.beatsPerMeasure = loadedFrame.beatsPerMeasure;
-                loadedSong.frames.emplace_back(newFrame);
+                newFrame.beatsPerMeasure = loadedPattern.beatsPerMeasure;
+                loadedSong.patterns.emplace_back(newFrame);
             }
-            loadCurrentFrame();
+            loadCurrentPattern();
             gui.activeUI[7][5].sprite = { 8, 4 };
             gui.activeUI[8][5].sprite = { 9, 4 };
-            saveCurrentFrame();
+            saveCurrentPattern();
             loadedSong.unsavedChanges = true;
         }
         else if (gui.hoveredTile.x == 9) // Change song frame.
         {
-            saveCurrentFrame();
-            loadedSong.frameSequence[loadedSong.currentFrame]--;
-            if (loadedSong.frameSequence[loadedSong.currentFrame] < 0)
-                loadedSong.frameSequence[loadedSong.currentFrame] = 0;
-            loadCurrentFrame();
+            saveCurrentPattern();
+            loadedSong.patternSequence[loadedSong.currentPattern]--;
+            if (loadedSong.patternSequence[loadedSong.currentPattern] < 0)
+                loadedSong.patternSequence[loadedSong.currentPattern] = 0;
+            loadCurrentPattern();
             gui.activeUI[9][5].sprite = { 10, 4 };
             gui.activeUI[8][5].sprite = { 9, 4 };
             loadedSong.unsavedChanges = true;
@@ -2198,27 +2256,27 @@ void pressButton(GLFWwindow* window)
         if (gui.hoveredTile.x == 7)
         {
             // Add a duplicate of the selected frame after it.
-            saveCurrentFrame();
-            loadedSong.frameSequence.emplace(loadedSong.frameSequence.begin() + loadedSong.currentFrame, loadedSong.frameSequence[loadedSong.currentFrame]);
+            saveCurrentPattern();
+            loadedSong.patternSequence.emplace(loadedSong.patternSequence.begin() + loadedSong.currentPattern, loadedSong.patternSequence[loadedSong.currentPattern]);
             gui.activeUI[7][8].sprite = { 8, 4 };
             gui.activeUI[8][8].sprite = { 9, 4 };
-            loadedSong.currentFrame++;
-            loadCurrentFrame();
+            loadedSong.currentPattern++;
+            loadCurrentPattern();
             loadedSong.unsavedChanges = true;
         }
         else if (gui.hoveredTile.x == 9)
         {
             // Delete the current frame if there is more than one in the song.
-            saveCurrentFrame();
-            if (loadedSong.frameSequence.size() > 1)
+            saveCurrentPattern();
+            if (loadedSong.patternSequence.size() > 1)
             {
-                loadedSong.frameSequence.erase(loadedSong.frameSequence.begin() + loadedSong.currentFrame);
-                gui.activeUI[4][2 + loadedSong.currentFrame].bgCol = 0;
-                gui.activeUI[5][2 + loadedSong.currentFrame].bgCol = 0;
-                loadedSong.frameSequence.shrink_to_fit();
-                if (loadedSong.currentFrame >= loadedSong.frameSequence.size())
-                    loadedSong.currentFrame--;
-                loadCurrentFrame();
+                loadedSong.patternSequence.erase(loadedSong.patternSequence.begin() + loadedSong.currentPattern);
+                gui.activeUI[4][2 + loadedSong.currentPattern].bgCol = 0;
+                gui.activeUI[5][2 + loadedSong.currentPattern].bgCol = 0;
+                loadedSong.patternSequence.shrink_to_fit();
+                if (loadedSong.currentPattern >= loadedSong.patternSequence.size())
+                    loadedSong.currentPattern--;
+                loadCurrentPattern();
                 loadedSong.unsavedChanges = true;
             }
         }
@@ -2227,9 +2285,9 @@ void pressButton(GLFWwindow* window)
     {
         if (gui.hoveredTile.x == 11) // Change frame row count.
         {
-            if (loadedFrame.rows.size() < 255) // Max frame size.
+            if (loadedPattern.rows.size() < 255) // Max frame size.
             {
-                FrameRow newRow;
+                PatternRow newRow;
                 newRow.note.resize(loadedSong.numberOfChannels);
                 newRow.instrument.resize(loadedSong.numberOfChannels);
                 newRow.volume.resize(loadedSong.numberOfChannels);
@@ -2244,14 +2302,14 @@ void pressButton(GLFWwindow* window)
                     for (int sample = 0; sample < 5; sample++)
                         newRow.voiceSamples[ch].sample[sample] = 44;
 
-                    for (int ef = 0; ef < loadedFrame.rows[0].effects[ch].cEffect.size(); ef++)
+                    for (int ef = 0; ef < loadedPattern.rows[0].effects[ch].cEffect.size(); ef++)
                     {
                         newRow.effects[ch].cEffect.emplace_back(-1);
                         newRow.effects[ch].cEffectValue.emplace_back(-1);
                     }
                 }
-                loadedFrame.rows.emplace_back(newRow);
-                saveCurrentFrame();
+                loadedPattern.rows.emplace_back(newRow);
+                saveCurrentPattern();
                 gui.activeUI[11][9].sprite = { 8, 4 };
                 gui.activeUI[12][9].sprite = { 9, 4 };
                 loadedSong.unsavedChanges = true;
@@ -2259,11 +2317,11 @@ void pressButton(GLFWwindow* window)
         }
         else if (gui.hoveredTile.x == 13) // Min frame size.
         {
-            if (loadedFrame.rows.size() > 1)
+            if (loadedPattern.rows.size() > 1)
             {
-                loadedFrame.rows.erase(loadedFrame.rows.begin() + loadedFrame.rows.size() - 1);
-                loadedFrame.rows.shrink_to_fit();
-                saveCurrentFrame();
+                loadedPattern.rows.erase(loadedPattern.rows.begin() + loadedPattern.rows.size() - 1);
+                loadedPattern.rows.shrink_to_fit();
+                saveCurrentPattern();
                 gui.activeUI[13][9].sprite = { 10, 4 };
                 gui.activeUI[12][9].sprite = { 9, 4 };
                 loadedSong.unsavedChanges = true;
@@ -2275,7 +2333,7 @@ void pressButton(GLFWwindow* window)
         if (gui.hoveredTile.x == 6) // Frame menu scroll down.
         {
             gui.activeUI[6][10].sprite = { 7, 4 };
-            if (loadedSong.frameSequence.size() - gui.frameListScroll > 1)
+            if (loadedSong.patternSequence.size() - gui.frameListScroll > 1)
                 gui.frameListScroll++;
         }
         else if (gui.hoveredTile.x == 91) // File menu scroll down.
@@ -2287,10 +2345,10 @@ void pressButton(GLFWwindow* window)
         // Change frame beats per measure.
         if (gui.hoveredTile.x == 11)
         {
-            if (loadedFrame.beatsPerMeasure < 99) // Max measure size.
+            if (loadedPattern.beatsPerMeasure < 99) // Max measure size.
             {
-                loadedFrame.beatsPerMeasure++;
-                saveCurrentFrame();
+                loadedPattern.beatsPerMeasure++;
+                saveCurrentPattern();
                 gui.activeUI[11][11].sprite = { 8, 4 };
                 gui.activeUI[12][11].sprite = { 9, 4 };
                 loadedSong.unsavedChanges = true;
@@ -2298,10 +2356,10 @@ void pressButton(GLFWwindow* window)
         }
         else if (gui.hoveredTile.x == 13) // Min measure size.
         {
-            if (loadedFrame.beatsPerMeasure > 0)
+            if (loadedPattern.beatsPerMeasure > 0)
             {
-                loadedFrame.beatsPerMeasure--;
-                saveCurrentFrame();
+                loadedPattern.beatsPerMeasure--;
+                saveCurrentPattern();
                 gui.activeUI[13][11].sprite = { 10, 4 };
                 gui.activeUI[12][11].sprite = { 9, 4 };
                 loadedSong.unsavedChanges = true;
@@ -2313,27 +2371,26 @@ void pressButton(GLFWwindow* window)
     {
         if (gui.hoveredTile.x == 91) // Frame scroll up.
         {
-            gui.frameScroll.y--;
-            if (gui.frameScroll.y < 0)
-                gui.frameScroll.y = 0;
-            gui.activeUI[91][16].sprite = { 7, 3 };
-            if (gui.frameScroll.y < 0)
-                gui.frameScroll.y = 0;
+            if (!editor.playingSong)
+            {
+                gui.frameScroll.y--;
+                if (gui.frameScroll.y < 0)
+                    gui.frameScroll.y = 0;
+                gui.activeUI[91][16].sprite = { 7, 3 };
+            }
         }
     }
     else if (gui.hoveredTile.y == 55)
     {
         if (gui.hoveredTile.x == 91) // Frame scroll down.
         {
-            gui.frameScroll.y++;
-            gui.activeUI[91][55].sprite = { 7, 4 };
-            if (loadedFrame.rows.size() > 40)
+            if (!editor.playingSong)
             {
-                if (gui.frameScroll.y > loadedFrame.rows.size() - 40)
-                    gui.frameScroll.y = loadedFrame.rows.size() - 40;
+                gui.frameScroll.y++;
+                gui.activeUI[91][55].sprite = { 7, 4 };
+                if (gui.frameScroll.y > loadedPattern.rows.size() - 40) gui.frameScroll.y = loadedPattern.rows.size() - 40;
+                if (gui.frameScroll.y < 0) gui.frameScroll.y = 0;
             }
-            else
-                gui.frameScroll.y = 0;
         }
     }
     else if (gui.hoveredTile.y == 56) // Frame scroll horizontally.
@@ -2547,27 +2604,27 @@ void pressAndHoldButton(GLFWwindow* window)
     {
         if (gui.hoveredTile.x == 7) // Change song frame.
         {
-            saveCurrentFrame();
-            loadedSong.frameSequence[loadedSong.currentFrame]++;
-            while (loadedSong.frameSequence[loadedSong.currentFrame] >= loadedSong.frames.size()) // Create a new frame when changed to one not yet used.
+            saveCurrentPattern();
+            loadedSong.patternSequence[loadedSong.currentPattern]++;
+            while (loadedSong.patternSequence[loadedSong.currentPattern] >= loadedSong.patterns.size()) // Create a new frame when changed to one not yet used.
             {
-                Frame newFrame;
+                Pattern newFrame;
                 newFrame.channels.resize(loadedSong.numberOfChannels);
-                newFrame.beatsPerMeasure = loadedFrame.beatsPerMeasure;
-                loadedSong.frames.emplace_back(newFrame);
+                newFrame.beatsPerMeasure = loadedPattern.beatsPerMeasure;
+                loadedSong.patterns.emplace_back(newFrame);
             }
-            loadCurrentFrame();
+            loadCurrentPattern();
             gui.activeUI[7][5].sprite = { 8, 4 };
             gui.activeUI[8][5].sprite = { 9, 4 };
             loadedSong.unsavedChanges = true;
         }
         else if (gui.hoveredTile.x == 9) // Change song frame.
         {
-            saveCurrentFrame();
-            loadedSong.frameSequence[loadedSong.currentFrame]--;
-            if (loadedSong.frameSequence[loadedSong.currentFrame] < 0)
-                loadedSong.frameSequence[loadedSong.currentFrame] = 0;
-            loadCurrentFrame();
+            saveCurrentPattern();
+            loadedSong.patternSequence[loadedSong.currentPattern]--;
+            if (loadedSong.patternSequence[loadedSong.currentPattern] < 0)
+                loadedSong.patternSequence[loadedSong.currentPattern] = 0;
+            loadCurrentPattern();
             gui.activeUI[9][5].sprite = { 10, 4 };
             gui.activeUI[8][5].sprite = { 9, 4 };
             loadedSong.unsavedChanges = true;
@@ -2620,9 +2677,9 @@ void pressAndHoldButton(GLFWwindow* window)
     {
         if (gui.hoveredTile.x == 11) // Change frame row count.
         {
-            if (loadedFrame.rows.size() < 255) // Max frame size.
+            if (loadedPattern.rows.size() < 255) // Max frame size.
             {
-                FrameRow newRow;
+                PatternRow newRow;
                 newRow.note.resize(loadedSong.numberOfChannels);
                 newRow.instrument.resize(loadedSong.numberOfChannels);
                 newRow.volume.resize(loadedSong.numberOfChannels);
@@ -2637,14 +2694,14 @@ void pressAndHoldButton(GLFWwindow* window)
                     for (int sample = 0; sample < 5; sample++)
                         newRow.voiceSamples[ch].sample[sample] = 44;
 
-                    for (int ef = 0; ef < loadedFrame.rows[0].effects[ch].cEffect.size(); ef++)
+                    for (int ef = 0; ef < loadedPattern.rows[0].effects[ch].cEffect.size(); ef++)
                     {
                         newRow.effects[ch].cEffect.emplace_back(-1);
                         newRow.effects[ch].cEffectValue.emplace_back(-1);
                     }
                 }
-                loadedFrame.rows.emplace_back(newRow);
-                saveCurrentFrame();
+                loadedPattern.rows.emplace_back(newRow);
+                saveCurrentPattern();
                 gui.activeUI[11][9].sprite = { 8, 4 };
                 gui.activeUI[12][9].sprite = { 9, 4 };
                 loadedSong.unsavedChanges = true;
@@ -2652,11 +2709,11 @@ void pressAndHoldButton(GLFWwindow* window)
         }
         else if (gui.hoveredTile.x == 13) // Min frame size.
         {
-            if (loadedFrame.rows.size() > 1)
+            if (loadedPattern.rows.size() > 1)
             {
-                loadedFrame.rows.erase(loadedFrame.rows.begin() + loadedFrame.rows.size() - 1);
-                loadedFrame.rows.shrink_to_fit();
-                saveCurrentFrame();
+                loadedPattern.rows.erase(loadedPattern.rows.begin() + loadedPattern.rows.size() - 1);
+                loadedPattern.rows.shrink_to_fit();
+                saveCurrentPattern();
                 gui.activeUI[13][9].sprite = { 10, 4 };
                 gui.activeUI[12][9].sprite = { 9, 4 };
                 loadedSong.unsavedChanges = true;
@@ -2668,7 +2725,7 @@ void pressAndHoldButton(GLFWwindow* window)
         if (gui.hoveredTile.x == 6) // Frame menu scroll down.
         {
             gui.activeUI[6][10].sprite = { 7, 4 };
-            if (loadedSong.frameSequence.size() - gui.frameListScroll > 1)
+            if (loadedSong.patternSequence.size() - gui.frameListScroll > 1)
                 gui.frameListScroll++;
         }
         else if (gui.hoveredTile.x == 91) // File menu scroll down.
@@ -2680,10 +2737,10 @@ void pressAndHoldButton(GLFWwindow* window)
         // Change frame beats per measure.
         if (gui.hoveredTile.x == 11)
         {
-            if (loadedFrame.beatsPerMeasure < 99) // Max measure size.
+            if (loadedPattern.beatsPerMeasure < 99) // Max measure size.
             {
-                loadedFrame.beatsPerMeasure++;
-                saveCurrentFrame();
+                loadedPattern.beatsPerMeasure++;
+                saveCurrentPattern();
                 gui.activeUI[11][11].sprite = { 8, 4 };
                 gui.activeUI[12][11].sprite = { 9, 4 };
                 loadedSong.unsavedChanges = true;
@@ -2691,10 +2748,10 @@ void pressAndHoldButton(GLFWwindow* window)
         }
         else if (gui.hoveredTile.x == 13) // Min measure size.
         {
-            if (loadedFrame.beatsPerMeasure > 0)
+            if (loadedPattern.beatsPerMeasure > 0)
             {
-                loadedFrame.beatsPerMeasure--;
-                saveCurrentFrame();
+                loadedPattern.beatsPerMeasure--;
+                saveCurrentPattern();
                 gui.activeUI[13][11].sprite = { 10, 4 };
                 gui.activeUI[12][11].sprite = { 9, 4 };
                 loadedSong.unsavedChanges = true;
@@ -2706,27 +2763,26 @@ void pressAndHoldButton(GLFWwindow* window)
     {
         if (gui.hoveredTile.x == 91) // Frame scroll up.
         {
-            gui.frameScroll.y--;
-            if (gui.frameScroll.y < 0)
-                gui.frameScroll.y = 0;
-            gui.activeUI[91][16].sprite = { 7, 3 };
-            if (gui.frameScroll.y < 0)
-                gui.frameScroll.y = 0;
+            if (!editor.playingSong)
+            {
+                gui.frameScroll.y--;
+                if (gui.frameScroll.y < 0)
+                    gui.frameScroll.y = 0;
+                gui.activeUI[91][16].sprite = { 7, 3 };
+            }
         }
     }
     else if (gui.hoveredTile.y == 55)
     {
         if (gui.hoveredTile.x == 91) // Frame scroll down.
         {
-            gui.frameScroll.y++;
-            gui.activeUI[91][55].sprite = { 7, 4 };
-            if (loadedFrame.rows.size() > 40)
+            if (!editor.playingSong)
             {
-                if (gui.frameScroll.y > loadedFrame.rows.size() - 40)
-                    gui.frameScroll.y = loadedFrame.rows.size() - 40;
+                gui.frameScroll.y++;
+                gui.activeUI[91][55].sprite = { 7, 4 };
+                if (gui.frameScroll.y > loadedPattern.rows.size() - 40) gui.frameScroll.y = loadedPattern.rows.size() - 40;
+                if (gui.frameScroll.y < 0) gui.frameScroll.y = 0;
             }
-            else
-                gui.frameScroll.y = 0;
         }
     }
     else if (gui.hoveredTile.y == 56) // Frame scroll horizontally.
@@ -2893,6 +2949,26 @@ void rightClickButton(GLFWwindow* window)
 
 void releaseButton()
 {
+    if (editor.toRecordSong)
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        editor.toRecordSong = false;
+        RecordSong();
+        for (int wind = 0; wind < windowController.windows.size(); wind++) // Stop dragging windows.
+        {
+            if (windowController.windows[wind].name == "Exporting...")
+            {
+                windowController.windows.erase(windowController.windows.begin() + wind);
+                windowController.windows.shrink_to_fit();
+                break;
+            }
+        }
+        SaveSong();
+        return;
+    }
+
+
+
     // Set to draw the interface.
     if (gui.hoveredTile.y < 16)
         gui.drawUIThisFrame = true;
@@ -2910,18 +2986,18 @@ void releaseButton()
         int ch1 = editor.channelBeingMoved;
         int ch2 = editor.channelMoveTo;
 
-        saveCurrentFrame();
+        saveCurrentPattern();
 
         Channel moveChannel = channels[editor.channelBeingMoved];
         channels.erase(channels.begin() + editor.channelBeingMoved);
         channels.emplace(channels.begin() + editor.channelMoveTo, moveChannel);
 
-        loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch1].notes.swap(loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch2].notes);
-        loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch1].volumes.swap(loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch2].volumes);
-        loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch1].effects.swap(loadedSong.frames[loadedSong.frameSequence[loadedSong.currentFrame]].channels[ch2].effects);
+        loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch1].notes.swap(loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch2].notes);
+        loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch1].volumes.swap(loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch2].volumes);
+        loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch1].effects.swap(loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch2].effects);
         
 
-        loadCurrentFrame();
+        loadCurrentPattern();
 
 
         gui.drawFrameThisFrame = true;

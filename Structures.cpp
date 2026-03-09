@@ -53,8 +53,7 @@ struct RGBColor
 };
 
 
-
-struct SampleWave
+struct InstrumentWave
 {
 	int operatorType = 0; // 0=Wave, 1=sample, 2=voice
 
@@ -96,18 +95,44 @@ struct SampleWave
 	bool sustainForever = true;
 	bool pitchToNote = true;
 	bool continueNote = true;
+
+
+
+	int getFineTuneLookupIndex()
+	{
+		int fineTuneApprox = int(fineTuneToC * 10000);
+
+		if (fineTuneApprox == 10002) return 1;
+		if (fineTuneApprox == 10012) return 2;
+		if (fineTuneApprox == 10033) return 3;
+
+		return 0;
+	}
+
+	void setFineTuneFromLookupValue(int val)
+	{
+		if (val == 1) fineTuneToC = 1.0002f;
+		else if (val == 2) fineTuneToC = 1.00124f;
+		else if (val == 3) fineTuneToC = 1.00333f;
+		else fineTuneToC = 1.0f;
+
+		return;
+	}
+
+
+	
 };
 
 
 
 // An audio sample
-struct Sample
+struct Instrument
 {
 	float volume = 1.0f;
 
 	bool enabled = false;
 
-	SampleWave waveforms[4];
+	InstrumentWave waveforms[4];
 	int operatorWavesToUse[4] = { 0, 1, 2, 3 }; // Which sample is mapped to each operator.
 
 	int modulationTypes[4] = { 0,0,0,0 };
@@ -126,17 +151,29 @@ struct Sample
 };
 
 
+struct voiceSamplePoint
+{
+	std::vector <float> frequencyVolumes = {};
+};
+
+
+
 struct voiceSample
 {
-	std::vector <float> pcmFrames;
+	std::vector <voiceSamplePoint> points = {};
 	bool loop = false;
+
 };
 
 
 struct VoiceSynth
 {
 	voiceSample phonemes[44];
+	int phonemePointSize = 480 * 10;
 
+	std::vector <float> phonemeFrequencies = { 1.0f/4.0f, 1.0f/3.0f, 1.0f/2.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f };
+
+	int lengthOfSilentPhomene = 4;
 
 	float findFrequencyInSample(std::vector <float> sample, float frequency)
 	{
@@ -165,6 +202,38 @@ struct VoiceSynth
 		volume = magnitude / (sampleSize / 2.0f);
 
 		return volume;
+	}
+
+
+	void createPhoneme(std::vector <float> sample, int phonemeIndex)
+	{
+		int points = sample.size() / phonemePointSize;
+		phonemes[phonemeIndex].points.clear();
+		phonemes[phonemeIndex].points.resize(points);
+
+		for (int sec = 0; sec < points; sec++)
+		{
+			std::vector <float> section = {};
+			for (int fr = 0; fr < phonemePointSize; fr++)
+			{
+				if (fr + sec * phonemePointSize < sample.size())
+					section.emplace_back(sample[fr + sec * phonemePointSize]);
+			}
+
+			
+			phonemes[phonemeIndex].points[sec].frequencyVolumes.clear();
+			phonemes[phonemeIndex].points[sec].frequencyVolumes.resize(phonemeFrequencies.size());
+
+
+			for (int freq = 0; freq < phonemeFrequencies.size(); freq++)
+			{
+				phonemes[phonemeIndex].points[sec].frequencyVolumes[freq] = findFrequencyInSample(section, phonemeFrequencies[freq] * 261.625f);
+			}
+		}
+
+		//std::cout << " Sections: " << sample.size() / phonemeSectionSize;
+
+		return;
 	}
 };
 
@@ -221,8 +290,8 @@ struct GUI
 	Vector2i frameScroll;
 
 
-	int songLength = 0; // Song length in seconds.
-	int songPos = 0; // Song position in seconds.
+	float songLength = 0; // Song length in seconds.
+	float songPos = 0; // Song position in seconds.
 
 
 	int uiColorTheme = 26;
@@ -326,6 +395,8 @@ struct Screen
 	bool keyDown = false;
 	bool shiftDown = false;
 	bool ctrDown = false;
+
+	bool windowed = false;
 };
 
 
@@ -335,6 +406,8 @@ struct Editor
 	bool recordingSong = false;
 	bool focusOnNotes = false; // Whether pressing keys will create notes.
 	bool channelFocus = false; // When enabled, only one channel will be uncompressed at a time.
+
+	bool toRecordSong = false;
 
 
 	// When a channel is being dragged to a new location.
@@ -545,9 +618,28 @@ struct Editor
 		else if (input == 57) return 41;
 		else if (input == 48) return 42;
 		else if (input == 45) return 43;
-		else if (input == 61) return 44;
-		else return 44;
+		else if (input == 61) return 45;
+		else return -1;
 	}
+};
+
+
+struct ChannelWaveVoice
+{
+	std::vector <float> frequencyVolumes = {};
+	std::vector <float> freqReadingPos = {};
+
+	int currentPhoneme = 44;
+	int nextPhoneme = 44;
+
+	float posInPoint = 0.0f;
+	float speechSpeed = 1.0f;
+
+	int phonemePos = 0;
+
+	int phonemeInRow = 0;
+
+	int mix = 2;
 };
 
 
@@ -570,6 +662,8 @@ struct ChannelWaveform
 
 	bool reverse = false;
 
+	// The object for voice sample reading.
+	ChannelWaveVoice voice;
 
 	// Low-pass filter.
 	float y1, y2, y3, y4;
@@ -606,6 +700,14 @@ struct ChannelWaveform
 
 		return y4;
 	}
+
+
+	float lostVols[2][8] = { { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f ,0.0f }, { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f ,0.0f } };
+	
+
+
+
+
 };
 
 
@@ -658,6 +760,8 @@ struct Channel
 
 	int instrument = 0;
 
+	int phonemes[5] = { 44, 44, 44, 44, 44 };
+
 
 	float averageVolL = 0.0f; // The volume of the channel averaging frames.
 	float averageVolR = 0.0f; // The volume of the channel averaging frames.
@@ -693,7 +797,7 @@ struct Channel
 
 
 // 1 channel of a frame.
-struct FrameChannel
+struct PatternChannel
 {
 	std::vector <int> notes;
 	std::vector <int> volumes;
@@ -706,11 +810,11 @@ struct FrameChannel
 
 
 // Song frame object
-struct Frame
+struct Pattern
 {
 	uint8_t rows = 32; // Length of the frame in beats.
 	int beatsPerMeasure = 4;
-	std::vector <FrameChannel> channels;
+	std::vector <PatternChannel> channels;
 };
 
 
@@ -730,7 +834,7 @@ struct UnrolledVoiceSamples
 
 
 // 1 row of an unrolled frame.
-struct FrameRow
+struct PatternRow
 {
 	std::vector <int> note = { };
 	std::vector <int> instrument = { };
@@ -743,10 +847,10 @@ struct FrameRow
 
 
 
-struct UnrolledFrame
+struct UnrolledPattern
 {
 	// Frame format
-	std::vector <FrameRow> rows;
+	std::vector <PatternRow> rows;
 	int beatsPerMeasure = 4;
 };
 
@@ -762,25 +866,27 @@ struct Song
 	float startingBPM = 120;
 	float bpm = 120;
 
-	std::vector <int> frameSequence;
+	std::vector <int> patternSequence;
 
-	std::vector <Frame> frames;
+	std::vector <Pattern> patterns;
 
 
 
-	int currentFrame = 0; // Current frame in frameSequence.
+	int currentPattern = 0; // Current frame in frameSequence.
 	int currentNote = 0;
-	float timeInNote = 0;
-	float timeInSong = 0;
+	float timeInNote = 0.0f;
+	float timeInSong = 0.0f;
 
 	int numberOfChannels = 1;
 
 	std::vector <float> toNextChannelNote = { };
 	std::vector <float> toNextChannelVolume = { };
+	std::vector <float> toNextChannelVoice = { };
 	std::vector <float> toNextChannelEffect = { };
 
 	std::vector <float> noteChannelIndex = { };
 	std::vector <float> volumeChannelIndex = { };
+	std::vector <float> voiceChannelIndex = { };
 	std::vector <float> effectChannelIndex = { };
 
 
@@ -842,11 +948,11 @@ struct SampleDisplay
 	std::vector <float> copyFrames = {};
 
 
-	Sample SwapOperators(Sample sample)
+	Instrument SwapOperators(Instrument sample)
 	{
 		drawing = false; // Stop sample drawing.
 		zoomed = false; // Reset zoom.
-		SampleWave swapWaves[4];
+		InstrumentWave swapWaves[4];
 
 		for (int wave = 0; wave < 4; wave++)
 			swapWaves[wave] = sample.waveforms[swapMenuOperators[wave]];
@@ -940,9 +1046,7 @@ struct FileNavigator
 
 
 
-	// Currently, samples are saved with absolute file paths, making transferring songs between computers difficult.
-
-
+	
 	void NavigateToFile()
 	{
 		std::string pathName = "C:/" + currentFilePath.std::filesystem::path::string();
