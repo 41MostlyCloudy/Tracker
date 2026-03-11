@@ -3,6 +3,7 @@
 
 
 #include <vector>
+#include <deque>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -151,91 +152,6 @@ struct Instrument
 };
 
 
-struct voiceSamplePoint
-{
-	std::vector <float> frequencyVolumes = {};
-};
-
-
-
-struct voiceSample
-{
-	std::vector <voiceSamplePoint> points = {};
-	bool loop = false;
-
-};
-
-
-struct VoiceSynth
-{
-	voiceSample phonemes[44];
-	int phonemePointSize = 480 * 10;
-
-	std::vector <float> phonemeFrequencies = { 1.0f/4.0f, 1.0f/3.0f, 1.0f/2.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f };
-
-	int lengthOfSilentPhomene = 4;
-
-	float findFrequencyInSample(std::vector <float> sample, float frequency)
-	{
-		// Finds the volume of a given frequency in a sample using the Goertzel Algorithm.
-		float volume = 0.0f;
-
-
-		int sampleSize = sample.size();
-		float freq = (frequency * float(sampleSize)) / 48000.0f;
-		float omega = 2.0f * 3.141593 * (freq / float(sampleSize));
-		float coeff = 2.0f * cos(omega);
-
-		float sPrev2 = 0.0f, sPrev1 = 0.0f, sCurr = 0.0f;
-
-		for (int n = 0; n < sampleSize; ++n)
-		{
-			sCurr = sample[n] + coeff * sPrev1 - sPrev2;
-			sPrev2 = sPrev1;
-			sPrev1 = sCurr;
-		}
-
-		float real = sPrev1 - sPrev2 * cos(omega);
-		float imag = sPrev2 * sin(omega);
-		float magnitude = sqrt(real * real + imag * imag);
-
-		volume = magnitude / (sampleSize / 2.0f);
-
-		return volume;
-	}
-
-
-	void createPhoneme(std::vector <float> sample, int phonemeIndex)
-	{
-		int points = sample.size() / phonemePointSize;
-		phonemes[phonemeIndex].points.clear();
-		phonemes[phonemeIndex].points.resize(points);
-
-		for (int sec = 0; sec < points; sec++)
-		{
-			std::vector <float> section = {};
-			for (int fr = 0; fr < phonemePointSize; fr++)
-			{
-				if (fr + sec * phonemePointSize < sample.size())
-					section.emplace_back(sample[fr + sec * phonemePointSize]);
-			}
-
-			
-			phonemes[phonemeIndex].points[sec].frequencyVolumes.clear();
-			phonemes[phonemeIndex].points[sec].frequencyVolumes.resize(phonemeFrequencies.size());
-
-
-			for (int freq = 0; freq < phonemeFrequencies.size(); freq++)
-			{
-				phonemes[phonemeIndex].points[sec].frequencyVolumes[freq] = findFrequencyInSample(section, phonemeFrequencies[freq] * 261.625f);
-			}
-		}
-
-		//std::cout << " Sections: " << sample.size() / phonemeSectionSize;
-
-		return;
-	}
-};
 
 
 
@@ -301,55 +217,6 @@ struct GUI
 	int uiDisplayMenuOption = 0; // 0 = Piano, 1 = Effects
 
 	unsigned int uiTexture;
-
-
-	std::string phonemes[44] =
-	{
-		"b",
-		"d",
-		"f",
-		"g",
-		"h",
-		"j",
-		"k",
-		"l",
-		"m",
-		"n",
-		"p",
-		"r",
-		"s",
-		"t",
-		"v",
-		"w",
-		"z",
-		"s (treasure)",
-		"ch",
-		"sh",
-		"th (three)",
-		"th (the)",
-		"ng (ring)",
-		"y (you)",
-		"a (cat)",
-		"a (say)",
-		"e (end)",
-		"e (be)",
-		"i (it)",
-		"i (sky)",
-		"aw (saw)",
-		"o (open)",
-		"o (look)",
-		"u (blood)",
-		"oo (who)",
-		"oi (join)",
-		"ow (how)",
-		"e (ladder)",
-		"air",
-		"a (also)",
-		"er (fern)",
-		"aw (saw)",
-		"ear",
-		"ur (sure)"
-	};
 
 
 	float uiColors[54] =
@@ -567,80 +434,8 @@ struct Editor
 
 		return(noteNum);
 	}
-
-
-	int findVoiceSamplePlayed(int input)
-	{
-		if (input == 122) return 0;
-		else if (input == 120) return 1;
-		else if (input == 99) return 2;
-		else if (input == 118) return 3;
-		else if (input == 98) return 4;
-		else if (input == 110) return 5;
-		else if (input == 109) return 6;
-		else if (input == 44) return 7;
-		else if (input == 46) return 8;
-		else if (input == 47) return 9;
-
-		else if (input == 97) return 10;
-		else if (input == 115) return 11;
-		else if (input == 100) return 12;
-		else if (input == 102) return 13;
-		else if (input == 103) return 14;
-		else if (input == 104) return 15;
-		else if (input == 106) return 16;
-		else if (input == 107) return 17;
-		else if (input == 108) return 18;
-		else if (input == 59) return 19;
-		else if (input == 39)  return 20;
-
-		else if (input == 113) return 21;
-		else if (input == 119) return 22;
-		else if (input == 101) return 23;
-		else if (input == 114) return 24;
-		else if (input == 116) return 25;
-		else if (input == 121) return 26;
-		else if (input == 117) return 27;
-		else if (input == 105) return 28;
-		else if (input == 111) return 29;
-		else if (input == 112) return 30;
-		else if (input == 91) return 31;
-		else if (input == 93) return 32;
-
-		else if (input == 49) return 33;
-		else if (input == 50) return 34;
-		else if (input == 51) return 35;
-		else if (input == 52) return 36;
-		else if (input == 53) return 37;
-		else if (input == 54) return 38;
-		else if (input == 55) return 39;
-		else if (input == 56) return 40;
-		else if (input == 57) return 41;
-		else if (input == 48) return 42;
-		else if (input == 45) return 43;
-		else if (input == 61) return 45;
-		else return -1;
-	}
 };
 
-
-struct ChannelWaveVoice
-{
-	std::vector <float> frequencyVolumes = {};
-	std::vector <float> freqReadingPos = {};
-
-	int currentPhoneme = 44;
-	int nextPhoneme = 44;
-
-	float posInPoint = 0.0f;
-	float speechSpeed = 1.0f;
-
-	int phonemePos = 0;
-
-	int phonemeInRow = 0;
-
-	int mix = 2;
-};
 
 
 struct ChannelWaveform
@@ -662,8 +457,6 @@ struct ChannelWaveform
 
 	bool reverse = false;
 
-	// The object for voice sample reading.
-	ChannelWaveVoice voice;
 
 	// Low-pass filter.
 	float y1, y2, y3, y4;
@@ -702,9 +495,6 @@ struct ChannelWaveform
 	}
 
 
-	float lostVols[2][8] = { { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f ,0.0f }, { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f ,0.0f } };
-	
-
 
 
 
@@ -724,8 +514,6 @@ struct Channel
 	bool toUninitialize = false;
 
 	bool noteStopped = false; // When true, skip sustain and go to release.
-
-	bool hasVoiceColumns = false; // If enables, the channel has columns for voice sounds.
 
 	
 	ChannelWaveform waveforms[4];
@@ -760,7 +548,7 @@ struct Channel
 
 	int instrument = 0;
 
-	int phonemes[5] = { 44, 44, 44, 44, 44 };
+
 
 
 	float averageVolL = 0.0f; // The volume of the channel averaging frames.
@@ -802,9 +590,6 @@ struct PatternChannel
 	std::vector <int> notes;
 	std::vector <int> volumes;
 	std::vector <int> effects;
-
-	// Optional voice samples.
-	std::vector <int> voiceSamples;
 };
 
 
@@ -840,9 +625,6 @@ struct PatternRow
 	std::vector <int> instrument = { };
 	std::vector <int> volume = { };
 	std::vector <UnrolledEffects> effects = { };
-	
-	// Optional voice samples.
-	std::vector <UnrolledVoiceSamples> voiceSamples = { };
 };
 
 
@@ -881,12 +663,10 @@ struct Song
 
 	std::vector <float> toNextChannelNote = { };
 	std::vector <float> toNextChannelVolume = { };
-	std::vector <float> toNextChannelVoice = { };
 	std::vector <float> toNextChannelEffect = { };
 
 	std::vector <float> noteChannelIndex = { };
 	std::vector <float> volumeChannelIndex = { };
-	std::vector <float> voiceChannelIndex = { };
 	std::vector <float> effectChannelIndex = { };
 
 

@@ -296,8 +296,6 @@ void RunEngine()
 
     fileNavigator.NavigateToSamplesFile();
 
-    // Load the voice sample file.
-    LoadVoiceFile();
 
     
     
@@ -1359,15 +1357,12 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                     newRow.note.resize(loadedSong.numberOfChannels);
                     newRow.instrument.resize(loadedSong.numberOfChannels);
                     newRow.volume.resize(loadedSong.numberOfChannels);
-                    newRow.voiceSamples.resize(loadedSong.numberOfChannels);
                     newRow.effects.resize(loadedSong.numberOfChannels);
                     for (int ch = 0; ch < loadedSong.numberOfChannels; ch++)
                     {
                         newRow.note[ch] = -1;
                         newRow.instrument[ch] = -1;
                         newRow.volume[ch] = -1;
-                        for (int sample = 0; sample < 5; sample++)
-                            newRow.voiceSamples[ch].sample[sample] = 44;
 
                         for (int ef = 0; ef < loadedPattern.rows[0].effects[ch].cEffect.size(); ef++)
                         {
@@ -1535,27 +1530,7 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
         }
         else // Effect value / Voice samples
         {
-            if (channels[selectedChannel].hasVoiceColumns)
-                selectedPart -= 5;
-            
-
-            if (selectedPart < 7) // Voice samples
-            {
-                selectedPart += 5;
-
-                int inputLetter = editor.findVoiceSamplePlayed(input);
-                if (inputLetter == -1)
-                    return;
-                editor.selectedVoiceSample = inputLetter;
-
-                loadedPattern.rows[loadedSong.currentNote].voiceSamples[selectedChannel].sample[selectedPart - 7] = inputLetter;
-                loadedSong.unsavedChanges = true;
-                gui.drawFrameThisFrame = true;
-                saveCurrentPattern();
-
-                return;
-            }
-            else
+            if (selectedPart >= 7) // Effect
             {
                 int effectNum = (selectedPart - 7) / 4;
                 if (effectNum >= loadedPattern.rows[loadedSong.currentNote].effects[selectedChannel].cEffect.size())
@@ -1882,8 +1857,6 @@ void pressButton(GLFWwindow* window)
             else
             {
                 selectedChannelSize = 7 + channels[selectedChannel].effectCountPerRow * 4;
-                if (channels[selectedChannel].hasVoiceColumns)
-                    selectedChannelSize += 5;
             }
 
 
@@ -2000,8 +1973,6 @@ void pressButton(GLFWwindow* window)
                 else
                 {
                     hoverPosAfterChannels -= 8 + channels[ch].effectCountPerRow * 4;
-                    if (channels[ch].hasVoiceColumns)
-                        hoverPosAfterChannels -= 5;
                 }
             }
             if (hoverPosAfterChannels == 5 || hoverPosAfterChannels == 6) // Add channel
@@ -2065,7 +2036,7 @@ void pressButton(GLFWwindow* window)
     }
 
 
-    if (gui.hoveredTile.y > 1 && gui.hoveredTile.y < 6) // Select GUI display.
+    if (gui.hoveredTile.y > 1 && gui.hoveredTile.y < 5) // Select GUI display.
     {
         if (gui.hoveredTile.x > 35 && gui.hoveredTile.x < 42)
         {
@@ -2291,16 +2262,12 @@ void pressButton(GLFWwindow* window)
                 newRow.note.resize(loadedSong.numberOfChannels);
                 newRow.instrument.resize(loadedSong.numberOfChannels);
                 newRow.volume.resize(loadedSong.numberOfChannels);
-                newRow.voiceSamples.resize(loadedSong.numberOfChannels);
                 newRow.effects.resize(loadedSong.numberOfChannels);
                 for (int ch = 0; ch < loadedSong.numberOfChannels; ch++)
                 {
                     newRow.note[ch] = -1;
                     newRow.instrument[ch] = -1;
                     newRow.volume[ch] = -1;
-
-                    for (int sample = 0; sample < 5; sample++)
-                        newRow.voiceSamples[ch].sample[sample] = 44;
 
                     for (int ef = 0; ef < loadedPattern.rows[0].effects[ch].cEffect.size(); ef++)
                     {
@@ -2683,16 +2650,12 @@ void pressAndHoldButton(GLFWwindow* window)
                 newRow.note.resize(loadedSong.numberOfChannels);
                 newRow.instrument.resize(loadedSong.numberOfChannels);
                 newRow.volume.resize(loadedSong.numberOfChannels);
-                newRow.voiceSamples.resize(loadedSong.numberOfChannels);
                 newRow.effects.resize(loadedSong.numberOfChannels);
                 for (int ch = 0; ch < loadedSong.numberOfChannels; ch++)
                 {
                     newRow.note[ch] = -1;
                     newRow.instrument[ch] = -1;
                     newRow.volume[ch] = -1;
-
-                    for (int sample = 0; sample < 5; sample++)
-                        newRow.voiceSamples[ch].sample[sample] = 44;
 
                     for (int ef = 0; ef < loadedPattern.rows[0].effects[ch].cEffect.size(); ef++)
                     {

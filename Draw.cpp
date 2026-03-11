@@ -7,7 +7,6 @@ void DrawEverything();
 void DrawTopUI();
 void DrawKeyBoard();
 void DrawEDOKeyboard();
-void DrawVoiceKeyboard();
 void DrawLogo();
 
 void DrawKey(int button, int key, Vector2i pos);
@@ -91,10 +90,6 @@ void DrawEverything()
 			else
 			{
 				xStart += 8 + channels[i].effectCountPerRow * 4;
-
-				// Voice samples (if enabled in channel).
-				if (channels[i].hasVoiceColumns)
-					xStart += 5;
 			}
 		}
 
@@ -299,7 +294,6 @@ void  DrawTopUI()
 	DrawGUIText("Song", 36, 42, 2, 3, 0);
 	DrawGUIText("Keys", 36, 42, 3, 3, 0);
 	DrawGUIText("Effect", 36, 42, 4, 3, 0);
-	DrawGUIText("Voice", 36, 42, 5, 3, 0);
 
 	if (gui.lightMode)
 	{
@@ -656,10 +650,6 @@ void  DrawTopUI()
 		gui.activeUI[68][1].sprite = { 3, 4 };
 		gui.activeUI[68][0].sprite = { 1, 3 };
 	}
-	else if (gui.uiDisplayMenuOption == 3) // Voice Sample GUI.
-	{
-		DrawVoiceKeyboard();
-	}
 	
 
 	return;
@@ -851,28 +841,6 @@ void DrawEDOKeyboard()
 }
 
 
-void DrawVoiceKeyboard()
-{
-	for (int x = 0; x < 10; x++)
-		DrawVoiceKey(x, { (x * 2) + 46, 10 });
-
-	for (int x = 0; x < 11; x++)
-		DrawVoiceKey(x + 10, { (x * 2) + 45, 9 });
-
-	for (int x = 0; x < 12; x++)
-		DrawVoiceKey(x + 21, { (x * 2) + 44, 8 });
-
-	for (int x = 0; x < 11; x++)
-		DrawVoiceKey(x + 33, { (x * 2) + 43, 7 });
-
-	if (editor.selectedVoiceSample > -1)
-		DrawGUIText("  " + gui.phonemes[editor.selectedVoiceSample], 46, 65, 5, 14, 12);
-	else
-		DrawGUIText("  ---", 46, 65, 5, 14, 12);
-
-	return;
-}
-
 
 
 void DrawMute()
@@ -946,8 +914,6 @@ int DrawChannelMuteGlass(int xPos, int i)
 	// Border
 	int muteBorderEnd = xPos + 7 + channels[i].effectCountPerRow * 4;
 
-	if (channels[i].hasVoiceColumns)
-		muteBorderEnd += 5;
 
 	for (int x = 0; x < 7 + muteBorderEnd - xPos; x++)
 	{
@@ -1043,49 +1009,7 @@ int DrawChannelMuteGlass(int xPos, int i)
 		DrawChannelNumber(i + 1, xPos);
 		xPos += 2;
 
-		if (channels[i].hasVoiceColumns)
-		{
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 6 + muteOffset, 12 }; gui.activeUI[xPos][14].sprite = { 6 + muteOffset, 13 };
-			}
-			xPos++;
-
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 5 + muteOffset, 12 }; gui.activeUI[xPos][14].sprite = { 5 + muteOffset, 13 };
-			}
-			xPos++;
-
-			///////////////// Voice sample icon
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 20, 7 }; gui.activeUI[xPos][14].sprite = { 20, 8 };
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 21, 7 }; gui.activeUI[xPos][14].sprite = { 21, 8 };
-			}
-			xPos++;
-			/////////////////
-
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 12 + muteOffset, 3 }; gui.activeUI[xPos][14].sprite = { 12 + muteOffset, 4 };
-			}
-			xPos++;
-		}
+		
 
 		if (xPos > 90) return xPos;
 
@@ -1865,10 +1789,6 @@ void DrawFrameBorder()
 		else
 		{
 			posX += 8 + channels[i].effectCountPerRow * 4;
-
-			// Voice samples (if enabled in channel).
-			if (channels[i].hasVoiceColumns)
-				posX += 5;
 		}
 	}
 	if (posX < 91)
@@ -2146,10 +2066,6 @@ void DrawVolumeBars()
 		else
 		{
 			posX += 8 + channels[i].effectCountPerRow * 4;
-
-			// Voice samples (if enabled in channel).
-			if (channels[i].hasVoiceColumns)
-				posX += 5;
 		}
 
 		if (posX > 4 && posX < 91)
@@ -2323,25 +2239,6 @@ void DrawChannelLine(int channelNum, int offsetX, int y)
 	xOffset++;
 
 
-	// Voice samples (if enabled in channel).
-	if (channels[channelNum].hasVoiceColumns)
-	{
-		for (int i = 0; i < 5; i++)
-		{
-			if (xOffset > 4 && xOffset < 91)
-			{
-				gui.activeUI[xOffset][y + 16].bgCol = bgColor;
-				gui.activeUI[xOffset][y + 16].textCol = textColor;
-				if (i == 4)
-					gui.activeUI[xOffset][y + 16].sprite = { 12, 0 };
-				else
-					gui.activeUI[xOffset][y + 16].sprite = { 16, 0 };
-				xOffset++;
-			}
-		}
-	}
-
-
 	for (int ef = 0; ef < channels[channelNum].effectCountPerRow; ef++)
 	{
 		for (int efNum = 0; efNum < 4; efNum++)
@@ -2459,34 +2356,7 @@ void DrawChannelLineValues(int channelNum, int offsetX, int y)
 		xOffset += 2;
 
 
-		float tempVar = 0;
-		// Voice samples (if enabled in channel).
-		if (channels[channelNum].hasVoiceColumns)
-		{
-			for (int i = 0; i < 5; i++)
-			{
-				if (xOffset > 4 && xOffset < 91)
-				{
-					int voiceNum = loadedPattern.rows[y + intScrollY].voiceSamples[channelNum].sample[i];
-					if (voiceNum < 44) // Note
-					{
-						if (voiceNum < 22)
-							gui.activeUI[xOffset][y + 16].sprite = { 4 + voiceNum, 17 };
-						else
-							gui.activeUI[xOffset][y + 16].sprite = { 4 + voiceNum - 22, 18 };
-
-						gui.activeUI[xOffset][y + 16].textCol = textColor + 9;
-					}
-					else if (voiceNum == 45) // Cut note
-					{
-						gui.activeUI[xOffset][y + 16].sprite = { 11, 0 };
-						gui.activeUI[xOffset][y + 16].textCol = textColor + 6;
-					}
-
-					xOffset++;
-				}
-			}
-		}
+		
 
 
 		for (int ef = 0; ef < channels[channelNum].effectCountPerRow; ef++)
@@ -3819,13 +3689,13 @@ void DrawFloatingWindow(FloatingWindow* wind)
 	}
 	else if (wind->name == "Settings")
 	{
-		std::string settingsText[4] = {
-			"THEMES", "CHANNEL FOCUS", "BACKGROUND", "PHONEMES"
+		std::string settingsText[3] = {
+			"THEMES", "CHANNEL FOCUS", "BACKGROUND"
 		};
 
 		
 
-		for (int i = 0; i < 4; i++)
+		for (int i = 0; i < 3; i++)
 		{
 			DrawGUIText(settingsText[i], wind->position.x + 2, wind->position.x + 15, wind->position.y + 2 + i * 2, 4, -1);
 
@@ -4503,59 +4373,9 @@ void DrawFloatingWindow(FloatingWindow* wind)
 			gui.activeUI[int(wind->position.x + 15)][int(wind->position.y + 2 + i * 2)].sprite = { 6, 26 };
 		}
 	}
-	else if (wind->name == "Phonemes")
-	{
-		for (int y = 0; y < 22; y++)
-		{
-			for (int x = 0; x < 16; x++)
-			{
-				gui.activeUI[int(wind->position.x + x)][int(wind->position.y + 2 + y)].bgCol = 0;
-				gui.activeUI[int(wind->position.x + x)][int(wind->position.y + 2 + y)].textCol = 13;
-			}
-
-			gui.activeUI[int(wind->position.x + 1)][int(wind->position.y + 2 + y)].sprite = { 4 + y, 17 };
-
-			if (voiceSynth.phonemes[y].loop)
-				gui.activeUI[int(wind->position.x + 2)][int(wind->position.y + 2 + y)].sprite = { 5, 22 };
-			else
-				gui.activeUI[int(wind->position.x + 2)][int(wind->position.y + 2 + y)].sprite = { 4, 22 };
-
-			gui.activeUI[int(wind->position.x + 3)][int(wind->position.y + 2 + y)].sprite = { 5, 26 };
-			DrawGUIText("SET", wind->position.x + 4, wind->position.x + 7, wind->position.y + 2 + y, 4, -1);
-			gui.activeUI[int(wind->position.x + 7)][int(wind->position.y + 2 + y)].sprite = { 6, 26 };
-
-			gui.activeUI[int(wind->position.x + 9)][int(wind->position.y + 2 + y)].sprite = { 5, 26 };
-			DrawGUIText("SET", wind->position.x + 10, wind->position.x + 13, wind->position.y + 2 + y, 4, -1);
-			gui.activeUI[int(wind->position.x + 13)][int(wind->position.y + 2 + y)].sprite = { 6, 26 };
-
-			if (voiceSynth.phonemes[y + 22].loop)
-				gui.activeUI[int(wind->position.x + 14)][int(wind->position.y + 2 + y)].sprite = { 5, 22 };
-			else
-				gui.activeUI[int(wind->position.x + 14)][int(wind->position.y + 2 + y)].sprite = { 4, 22 };
-
-			gui.activeUI[int(wind->position.x + 15)][int(wind->position.y + 2 + y)].sprite = { 4 + y, 18 };
-		}
-
-		gui.activeUI[int(wind->position.x + 1)][int(wind->position.y + 25)].sprite = { 5, 26 };
-		DrawGUIText("SAVE", wind->position.x + 2, wind->position.x + 6, wind->position.y + 25, 4, -1);
-		gui.activeUI[int(wind->position.x + 6)][int(wind->position.y + 25)].sprite = { 6, 26 };
-	}
 	else if (wind->name == "Channel")
 	{
-		std::string settingsText[1] = {
-			"VOICE",
-		};
-		for (int i = 0; i < 1; i++)
-		{
-			DrawGUIText(settingsText[i], wind->position.x + 2, wind->position.x + 15, wind->position.y + 2 + i * 2, 4, -1);
-			gui.activeUI[int(wind->position.x + 1)][int(wind->position.y + 2 + i * 2)].sprite = { 5, 26 };
-			gui.activeUI[int(wind->position.x + 15)][int(wind->position.y + 2 + i * 2)].sprite = { 6, 26 };
-		}
-
-		if (channels[editor.selectedChannel].hasVoiceColumns)
-			gui.activeUI[int(wind->position.x + 16)][int(wind->position.y + 2)].sprite = { 24, 6 };
-		else
-			gui.activeUI[int(wind->position.x + 16)][int(wind->position.y + 2)].sprite = { 23, 6 };
+		
 	}
 
 

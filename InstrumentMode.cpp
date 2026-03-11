@@ -3,166 +3,22 @@
 
 
 
+// Replace song theme with song program version number.
+
+
+// Fix playing line looks strange when playing.
+
+
 // Fix save and keep frames crash.
 
 
 // Fix mouse click while exporting causes crash.
 
 
-// Fix playing line looks strange when playing.
-
-
 // Make sure notes are in tune.
 
 
 // Fix first theme not saving when selected.
-
-
-
-
-
-
-
-// posInPoint is increased.
-
-
-// If posInPoint is more than speechSpeed, increase phonemePos.
-// 
-//		posInPoint is reduced by speechSpeed.
-//
-// 
-//		If phonemePos is past the sample length (in points) - mix, set nextPhoneme to the next one.
-//		 
-//			-If nextPhoneme is 44, and the phoneme has the looping property, set it to currentPhoneme.
-//
-//			-If nextPhoneme is 45, set it to 44.
-//
-// 
-//		If phonemePos is past the sample length (in points), set currentPhoneme to the next and nextPhoneme to 44.
-//	
-//			-Reset phonemePos.
-//
-//			-Set phonemeInterpolation to 0.
-
-
-// If phonemePos is past the sample length (in points) - mix:
-//
-//	-Set phonemeInterpolation to (phonemePos + (posInPoint / speechSpeed)) / sample length.
-//
-// else:
-//
-//	-Set phonemeInterpolation to 0.
-
-
-// For each frequency:
-// 
-//	-Read the next frame
-// 
-//	-Increase the frequency framePos
-// 
-//	-Loop at end (or start)
-// 
-//
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Make a diagram of how reading phonemes will work.
-
-// Sample reading pos changes are applied for each frequency in their instances.
-
-
-// Every frame, increment the sample read pos and add the two voice samples.
-// It does this using the channel voice notes.
-// Set a default voice speed and blend (how quickly it goes from one phoneme to another).
-
-
-
-
-
-
-
-
-
-
-
-// The voice menu should include the sample display, since it uses the sample for the voice.
-// Improver selecting operator types.
-
-
-// Use Fourier transform to break voice samples into frequencies.
-// Each sample is made up of a series of points, each containing volumes for all frequencies.
-// The points are interpolated between over time and the sine waves are played at the corresponding volumes.
-
-
-// Write a FourierTransform function that takes a sample point as input and outputs a vector of the transform.
-
-// Write a DeconstructSample function that takes a sample as input, breaks it into sample points, uses FourierTransform on them,
-//		then uses the output to find each point's frequency volumes, it outputs this as a 2D vector.
-
-// Start with { 1/8, 1/7, 1/6, 1/5, 1/4, 1/3, 1/2, 1, 2, 3, 4, 5, 6, 7, 8 } the the frequencies and 480*100 frames for the sample point size.
-
-// Use it when reading samples into the phonemes object.
-// First test the function with a spoken sentence.
-
-// When playing the voice samples, use a special set of sine wave samples in the voice samples object. They are added and read like a normal single wave operator.
-
-// First deconstruct voice samples.
-// 
-// -Apply the Fourier transform to the sample.
-// 
-// -Take the values of the output vector at the frequency points as the frequency volumes.
-// -Test to find a good set of frequencies and a good size of each sample point to test.
-// 
-// -When playing voice samples, all of the frequencies are played at their respective volumes and pitched up or down to match the note.
-// 
-// 
-// Then add playing voice samples.
-// Then add blending between voice samples.
-
-
-
-///////////////////////////////////// Voice synthesis
-// Record voice samples.
-//	-Edit the samples in Audacity.
-
-// Look into sub-types for objects so that all sample operators do not have voice variables.
-
-// Add voice variables
-//		-Voice speed (at attack)
-//		-Phoneme blend (at sustain)
-//		-Time stretch speed (at attack)
-//		-Time stretch length (at attack)
-
-// Add playing the voice samples in songs.
-
-// Use time-stretching to give higher and lower frequencies similar speeds.
-/////////////////////////////////////
-
-
 
 
 

@@ -58,7 +58,6 @@ Pattern rollPattern(UnrolledPattern pattern)
 	{
 		newPattern.channels[ch].notes.clear();
 		newPattern.channels[ch].volumes.clear();
-		newPattern.channels[ch].voiceSamples.clear();
 		newPattern.channels[ch].effects.clear();
 		int toNextNote = 0;
 		int toNextVolume = 0;
@@ -84,23 +83,7 @@ Pattern rollPattern(UnrolledPattern pattern)
 			else
 				toNextVolume++;
 
-			bool rowHasVoiceSample = false;
-			for (int vSample = 0; vSample < 5; vSample++)
-			{
-				if (pattern.rows[i].voiceSamples[ch].sample[vSample] != 44)
-					rowHasVoiceSample = true;
-			}
-			if (rowHasVoiceSample)
-			{
-				newPattern.channels[ch].voiceSamples.emplace_back(toNextVoiceSample);
-				for (int vSample = 0; vSample < 5; vSample++)
-				{
-					newPattern.channels[ch].voiceSamples.emplace_back(pattern.rows[i].voiceSamples[ch].sample[vSample]);
-				}
-				toNextVoiceSample = 0;
-			}
-			else
-				toNextVoiceSample++;
+
 			/*
 			if (frame.rows[i].effects[ch].cEffect[0] > -1)
 			{
@@ -139,8 +122,6 @@ Pattern rollPattern(UnrolledPattern pattern)
 					newPattern.channels[ch].notes.emplace_back(toNextNote);
 				if (newPattern.channels[ch].volumes.size() == 0)
 					newPattern.channels[ch].volumes.emplace_back(toNextVolume);
-				if (newPattern.channels[ch].voiceSamples.size() == 0)
-					newPattern.channels[ch].voiceSamples.emplace_back(toNextVoiceSample);
 				if (newPattern.channels[ch].effects.size() == 0)
 					newPattern.channels[ch].effects.emplace_back(toNextEffect);
 			}
@@ -229,34 +210,6 @@ UnrolledPattern unrollPattern(Pattern pattern)
 			{
 				int nextNote = pattern.channels[ch].volumes[i + 1];
 				newPattern.rows[unrolledNoteIndex].volume[ch] = nextNote;
-			}
-
-			unrolledNoteIndex++;
-		}
-
-
-		unrolledNoteIndex = 0;
-
-		for (int i = 0; i < pattern.channels[ch].voiceSamples.size(); i += 6)
-		{
-			int toNextNote = pattern.channels[ch].voiceSamples[i];
-
-			for (int j = unrolledNoteIndex; j < unrolledNoteIndex + toNextNote; j++)
-			{
-				newPattern.rows[j].voiceSamples[ch] = { 44, 44, 44, 44, 44 };
-			}
-
-			unrolledNoteIndex += toNextNote;
-
-
-
-			if (i + 5 < pattern.channels[ch].voiceSamples.size())
-			{
-				for (int vSample = 0; vSample < 5; vSample++)
-				{
-					int nextNote = pattern.channels[ch].voiceSamples[i + vSample + 1];
-					newPattern.rows[unrolledNoteIndex].voiceSamples[ch].sample[vSample] = nextNote;
-				}
 			}
 
 			unrolledNoteIndex++;
@@ -355,9 +308,6 @@ UnrolledPattern resizeUnrolledPatternRows(UnrolledPattern pattern, int newSize)
 				newRow.instrument.emplace_back(-1);
 				newRow.volume.emplace_back(-1);
 
-				UnrolledVoiceSamples vSamples;
-				for (int sample = 0; sample < 5; sample++)
-					newRow.voiceSamples.emplace_back(vSamples);
 
 				UnrolledEffects newEffects;
 				newRow.effects.emplace_back(newEffects);
@@ -421,7 +371,6 @@ void copyNotes()
 			patternSelection.rows[y].note[x] = -2;
 			patternSelection.rows[y].instrument[x] = -2;
 			patternSelection.rows[y].volume[x] = -2;
-			patternSelection.rows[y].voiceSamples[x] = { -2, -2, -2, -2, -2 };
 			patternSelection.rows[y].effects[x].cEffect.resize(channels[x].effectCountPerRow);
 			patternSelection.rows[y].effects[x].cEffectValue.resize(channels[x].effectCountPerRow);
 			for (int i = 0; i < channels[x].effectCountPerRow; i++)
@@ -460,18 +409,7 @@ void copyNotes()
 			{
 				selectedPart -= 7;
 
-				if (channels[selectedChannel].hasVoiceColumns)
-					selectedPart -= 5;
-
-				if (selectedPart < 0) // Voice sample
-				{
-					if (channels[selectedChannel].hasVoiceColumns)
-					{
-						for (int voiceNum = 0; voiceNum < 5; voiceNum++)
-							patternSelection.rows[y].voiceSamples[selectedChannel - leftMostChannel].sample[voiceNum] = loadedPattern.rows[y + editor.noteSelectionStart.y].voiceSamples[selectedChannel].sample[voiceNum];
-					}
-				}
-				else // Effect
+				if (selectedPart >= 0) // Effecct
 				{
 					int effectPart = (selectedPart) % 4;
 					int effectNum = (selectedPart) / 4;
@@ -514,14 +452,7 @@ void pasteNotes()
 					if (patternSelection.rows[y].volume[ch] > -2)
 						loadedPattern.rows[y + int(editor.noteSelectionStart.y)].volume[ch + leftMostChannel] = patternSelection.rows[y].volume[ch];
 
-					if (channels[ch].hasVoiceColumns)
-					{
-						if (patternSelection.rows[y].voiceSamples[ch].sample[0] != -2)
-						{
-							for (int voiceNum = 0; voiceNum < 5; voiceNum++)
-								loadedPattern.rows[y + int(editor.noteSelectionStart.y)].voiceSamples[ch + leftMostChannel] = patternSelection.rows[y].voiceSamples[ch];
-						}
-					}
+
 
 					for (int i = 0; i < channels[ch + leftMostChannel].effectCountPerRow; i++)
 					{
@@ -585,15 +516,7 @@ void deleteNotes()
 				{
 					selectedPart -= 7;
 
-					if (channels[selectedChannel].hasVoiceColumns)
-						selectedPart -= 5;
-
-					if (selectedPart < 0) // Voice sample
-					{
-						int voiceNum = (selectedPart + 5);
-						loadedPattern.rows[y].voiceSamples[selectedChannel].sample[voiceNum] = 44;
-					}
-					else // Effect
+					if (selectedPart >= 0) // Effect
 					{
 						int effectPart = (selectedPart) % 4;
 						int effectNum = (selectedPart) / 4;

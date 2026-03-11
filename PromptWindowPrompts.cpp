@@ -365,14 +365,6 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				gui.drawUIThisFrame = true;
 				gui.drawFrameThisFrame = true;
 			}
-			if (clickPos.y == 8)
-			{
-				windowController.windows.erase(windowController.windows.begin() + windowIndex);
-				windowController.windows.shrink_to_fit();
-				windowController.InitializeWindow("Phonemes", wind->position, { 16, 26 });
-				gui.drawUIThisFrame = true;
-				gui.drawFrameThisFrame = true;
-			}
 		}
 		else if (wind->name == "Selection")
 		{
@@ -1291,61 +1283,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 		}
 		else if (wind->name == "Channel")
 		{
-			if (clickPos.y == 2)
-			{
-				channels[editor.selectedChannel].hasVoiceColumns = !channels[editor.selectedChannel].hasVoiceColumns;
-				gui.drawUIThisFrame = true;
-				gui.drawFrameThisFrame = true;
-				loadedSong.unsavedChanges = true;
-			}
-		}
-		else if (wind->name == "Phonemes")
-		{
-			if (clickPos.y > 1 && clickPos.y < 24)
-			{
-				if (clickPos.x == 2)
-				{
-					voiceSynth.phonemes[int(clickPos.y - 2)].loop = !voiceSynth.phonemes[int(clickPos.y - 2)].loop;
-					gui.drawUIThisFrame = true;
-					gui.drawFrameThisFrame = true;
-					loadedSong.unsavedChanges = true;
-				}
-				else if (clickPos.x == 14)
-				{
-					voiceSynth.phonemes[int(clickPos.y - 2) + 22].loop = !voiceSynth.phonemes[int(clickPos.y - 2) + 22].loop;
-					gui.drawUIThisFrame = true;
-					gui.drawFrameThisFrame = true;
-					loadedSong.unsavedChanges = true;
-				}
-				else if (clickPos.x > 2 && clickPos.x < 8) // Create phoneme from selected sample.
-				{
-					/*
-					voiceSynth.phonemes[int(clickPos.y - 2)].pcmFrames.clear();
-					for (int fr = 0; fr < loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size(); fr++)
-					{
-						voiceSynth.phonemes[int(clickPos.y - 2)].pcmFrames.emplace_back(loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames[fr]);
-					}*/
-					voiceSynth.createPhoneme(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames, int(clickPos.y - 2));
-				}
-				else if (clickPos.x > 8 && clickPos.x < 14) // Create phoneme from selected sample.
-				{
-					/*
-					voiceSynth.phonemes[int(clickPos.y - 2) + 22].pcmFrames.clear();
-					for (int fr = 0; fr < loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size(); fr++)
-					{
-						voiceSynth.phonemes[int(clickPos.y - 2) + 22].pcmFrames.emplace_back(loadedSamples[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames[fr]);
-					}*/
-					voiceSynth.createPhoneme(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames, int(clickPos.y - 2) + 22);
-				}
-			}
-			else if (clickPos.y == 25 && clickPos.x > 0 && clickPos.x < 7)
-			{
-				SaveVoiceFile();
-				windowController.windows.erase(windowController.windows.begin() + windowIndex);
-				windowController.windows.shrink_to_fit();
-				loadedSong.unsavedChanges = true;
-				return;
-			}
+			
 		}
 	}
 

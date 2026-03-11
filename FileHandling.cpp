@@ -21,8 +21,6 @@ void LoadSong(std::string name); // Load the song file with the given name.
 
 void LoadGUIThemes();
 
-//void SwapLightDarkMode();
-
 void SaveSettings(); // Save the setting for the SuperSound program.
 
 void LoadSettings(); // Load the setting for the SuperSound program.
@@ -30,10 +28,6 @@ void LoadSettings(); // Load the setting for the SuperSound program.
 void SaveInstrumentPreset(int presetNum, Instrument* sample);
 
 void LoadInstrumentPreset(int presetNum, Instrument* sample);
-
-void SaveVoiceFile();
-
-void LoadVoiceFile();
 
 
 
@@ -585,11 +579,6 @@ void SaveSong() // Save the currently loaded song.
             if (channels[j].compressed)
                 compressed = 1;
             songFile.write((char*)&compressed, 1);
-
-            uint8_t voice = 0;
-            if (channels[j].hasVoiceColumns)
-                voice = 1;
-            songFile.write((char*)&voice, 1);
         }
         uint8_t bpm = int(loadedSong.startingBPM); // BPM
         songFile.write((char*)&bpm, 1);
@@ -635,14 +624,6 @@ void SaveSong() // Save the currently loaded song.
                 {
                     uint8_t volume = loadedSong.patterns[i].channels[ch].volumes[j];
                     songFile.write((char*)&volume, 1);
-                }
-
-                uint8_t voiceSampleSize = loadedSong.patterns[i].channels[ch].voiceSamples.size();
-                songFile.write((char*)&voiceSampleSize, 1);
-                for (int j = 0; j < voiceSampleSize; j++)
-                {
-                    uint8_t voice = loadedSong.patterns[i].channels[ch].voiceSamples[j];
-                    songFile.write((char*)&voice, 1);
                 }
 
                 uint8_t effectSize = loadedSong.patterns[i].channels[ch].effects.size();
@@ -948,11 +929,6 @@ void LoadSong(std::string name) // Load the song file with the given name.
             songFile.read((char*)&compressed, 1);
             if (compressed == 0) channels[ch].compressed = false;
             else channels[ch].compressed = true;
-
-            uint8_t voice;
-            songFile.read((char*)&voice, 1);
-            if (voice == 0) channels[ch].hasVoiceColumns = false;
-            else channels[ch].hasVoiceColumns = true;
         }
 
         uint8_t bpm;
@@ -1019,16 +995,6 @@ void LoadSong(std::string name) // Load the song file with the given name.
                     loadedSong.patterns[i].channels[ch].volumes[j] = volume;
                 }
 
-                uint8_t voiceSampleNum;
-                songFile.read((char*)&voiceSampleNum, 1);
-                loadedSong.patterns[i].channels[ch].voiceSamples.clear();
-                loadedSong.patterns[i].channels[ch].voiceSamples.resize(voiceSampleNum);
-                for (int j = 0; j < voiceSampleNum; j++)
-                {
-                    uint8_t voice;
-                    songFile.read((char*)&voice, 1);
-                    loadedSong.patterns[i].channels[ch].voiceSamples[j] = voice;
-                }
 
                 uint8_t effectNum;
                 songFile.read((char*)&effectNum, 1);
@@ -1293,20 +1259,9 @@ void LoadSong(std::string name) // Load the song file with the given name.
     {
         loadedSong.toNextChannelNote[i] = 0;
         loadedSong.toNextChannelVolume[i] = 0;
-        loadedSong.toNextChannelVoice[i] = 0;
         loadedSong.toNextChannelEffect[i] = 0;
     }
 
-
-    // Resize channel voice frequency volumes.
-    for (int ch = 0; ch < channels.size(); ch++)
-    {
-        for (int wave = 0; wave < 4; wave++)
-        {
-            channels[ch].waveforms->voice.frequencyVolumes.resize(voiceSynth.phonemeFrequencies.size());
-            channels[ch].waveforms->voice.freqReadingPos.resize(voiceSynth.phonemeFrequencies.size());
-        }
-    }
 
 
     loadCurrentPattern();
@@ -1419,86 +1374,6 @@ void LoadSettings()
         gui.lightMode = bool(light);
 
         settingsFile.close();
-    }
-
-    return;
-}
-
-
-
-void SaveVoiceFile()
-{
-    std::ofstream voiceFile("Voice Samples.bin", std::ios::binary | std::ios::out);
-
-    if (voiceFile.is_open())
-    {
-        for (int i = 0; i < 44; i++)
-        {
-            // Loop
-            uint8_t loop = voiceSynth.phonemes[i].loop;
-            voiceFile.write((char*)&loop, 1);
-
-            // Number of points
-            int pointCount = voiceSynth.phonemes[i].points.size();
-            voiceFile.write((char*)&pointCount, 4);
-
-            // Point frequencies
-            for (int point = 0; point < pointCount; point++)
-            {
-                for (int freq = 0; freq < voiceSynth.phonemeFrequencies.size(); freq++)
-                {
-                    int pointVal = int(voiceSynth.phonemes[i].points[point].frequencyVolumes[freq] * 1000.0f);
-                    voiceFile.write((char*)&pointVal, 4);
-                }
-            }
-        }
-
-        voiceFile.close();
-    }
-
-    return;
-}
-
-
-void LoadVoiceFile()
-{
-    std::ifstream voiceFile("Voice Samples.bin", std::ios::binary | std::ios::out);
-
-    if (voiceFile.is_open())
-    {
-        for (int i = 0; i < 44; i++)
-        {
-            // Loop
-            uint8_t looping;
-            voiceFile.read((char*)&looping, 1);
-            voiceSynth.phonemes[i].loop = looping;
-
-            // Size of sample
-            int pointCount;
-            voiceFile.read((char*)&pointCount, 4);
-
-            
-
-            // Point frequencies
-            voiceSynth.phonemes[i].points.clear();
-            voiceSynth.phonemes[i].points.resize(pointCount);
-
-            for (int point = 0; point < pointCount; point++)
-            {
-                voiceSynth.phonemes[i].points[point].frequencyVolumes.clear();
-                voiceSynth.phonemes[i].points[point].frequencyVolumes.resize(voiceSynth.phonemeFrequencies.size());
-
-                for (int freq = 0; freq < voiceSynth.phonemeFrequencies.size(); freq++)
-                {
-                    int pointVal;
-                    voiceFile.read((char*)&pointVal, 4);
-                    voiceSynth.phonemes[i].points[point].frequencyVolumes[freq] = float(voiceSynth.phonemes[i].points[point].frequencyVolumes[freq]) / 1000.0f;
-                }
-            }
-        }
-        
-
-        voiceFile.close();
     }
 
     return;

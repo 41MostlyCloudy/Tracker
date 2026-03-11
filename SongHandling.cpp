@@ -46,8 +46,6 @@ void DrawSamplePoint(Vector2 drawWavePos);
 
 void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int waveForm, float* mods[4]);
 
-void readVoice(float* pOutputF32, ma_uint64 frameCount, int channel, int waveForm, float* mods[4]);
-
 void applySubtractiveFilters(float* pOutputF32, ma_uint64 frameCount, int channel, float* input, ma_uint32 frameOffset);
 
 void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount);
@@ -98,14 +96,6 @@ ma_encoder encoder;
 void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op, float* mods[4])
 {
     int waveForm = loadedInstruments[channels[channel].instrument].operatorWavesToUse[op];
-
-
-    // Voice operator reading.
-    if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].operatorType == 2)
-    {
-        readVoice(pOutputF32, frameCount, channel, waveForm, mods);
-        return;
-    }
 
 
 
@@ -440,326 +430,6 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
     }
 
     channels[channel].waveforms[op].frameReadPos = resampleIndex;
-
-
-    return;
-}
-
-
-
-void readVoice(float* pOutputF32, ma_uint64 frameCount, int channel, int op, float* mods[4])
-{
-    int waveForm = loadedInstruments[channels[channel].instrument].operatorWavesToUse[op];
-
-
-
-    float notePitch = channels[channel].waveforms[op].pitch;
-
-    if (channels[channel].arpIndex > -1) // Arpeggiate note and find pitch.
-    {
-        float arpNote = ((channels[channel].arpP[channels[channel].arpIndex]) - 7.75f) * 4.0f;
-        arpNote /= loadedSong.edo;
-        arpNote = pow(2, arpNote);
-        notePitch *= arpNote;
-    }
-
-    int lfo = loadedInstruments[channels[channel].instrument].waveforms[waveForm].lfo;
-    float lfoMultiplier = pow(0.5f, lfo);
-
-    notePitch *= lfoMultiplier;
-
-    notePitch *= loadedInstruments[channels[channel].instrument].waveforms[waveForm].fineTuneToC;
-
-    if (notePitch > 12.0f) notePitch = 12.0f;
-    else if (notePitch < 0.00001f) notePitch = 0.00001f;
-
-
-    // Glide value.
-    float glide = (loadedInstruments[channels[channel].instrument].glide) * 20.0f;
-    if (glide > 0.0f)
-        glide = (1.0f / glide);
-    else
-        glide = 1.0f;
-    float interp = pow(0.99f, glide);
-
-
-
-    //float resampleIndex = channels[channel].waveforms[op].frameReadPos;
-
-    // Make sure that the frame reading position is inside the sample.
-    //if (resampleIndex < 0.0f)
-    //    resampleIndex = 0.0f;
-    //if (resampleIndex >= loadedSamples[channels[channel].instrument].waveforms[waveForm].pcmFrames.size() - 1)
-    //    resampleIndex = loadedSamples[channels[channel].instrument].waveforms[waveForm].pcmFrames.size() - 1;
-
-    for (int i = 0; i < frameCount; i++)
-    {
-        // Envelope
-        channels[channel].waveforms[op].envelopePos += 0.00004f;
-        float envPos = channels[channel].waveforms[op].envelopePos;
-        if (envPos < loadedInstruments[channels[channel].instrument].waveforms[waveForm].attack) // In attack section.
-        {
-            channels[channel].waveforms[op].envelopeVol = channels[channel].waveforms[op].envelopePos / loadedInstruments[channels[channel].instrument].waveforms[waveForm].attack;
-            channels[channel].waveforms[op].envelopeReleasePointVol = channels[channel].waveforms[op].envelopeVol;
-        }
-        else
-        {
-            // Sustain/decay.
-            envPos -= loadedInstruments[channels[channel].instrument].waveforms[waveForm].attack;
-            if ((loadedInstruments[channels[channel].instrument].waveforms[waveForm].sustainForever && !channels[channel].noteStopped) || envPos < loadedInstruments[channels[channel].instrument].waveforms[waveForm].sustain * 2.0f)
-            {
-                channels[channel].waveforms[op].envelopeVol -= loadedInstruments[channels[channel].instrument].waveforms[waveForm].decay * 0.00005f;
-                channels[channel].waveforms[op].envelopeReleasePointVol = channels[channel].waveforms[op].envelopeVol;
-            }
-            else // Release.
-            {
-                envPos -= loadedInstruments[channels[channel].instrument].waveforms[waveForm].sustain * 2.0f;
-                if (envPos < loadedInstruments[channels[channel].instrument].waveforms[waveForm].release)
-                {
-                    channels[channel].waveforms[op].envelopeVol = channels[channel].waveforms[op].envelopeReleasePointVol * (1.0f - (envPos / loadedInstruments[channels[channel].instrument].waveforms[waveForm].release));
-                }
-                else
-                    channels[channel].waveforms[op].envelopeVol = 0.0f;
-            }
-        }
-
-        if (channels[channel].waveforms[op].envelopeVol <= 0.0f)
-        {
-            channels[channel].waveforms[op].envelopeVol = 0.0f;
-        }
-
-
-        // Glide to pitch.
-        channels[channel].waveforms[op].pitch = channels[channel].waveforms[op].pitch * interp + channels[channel].waveforms[op].glideDest * (1.0f - interp);
-        channels[channel].waveforms[op].glideVolume = channels[channel].waveforms[op].glideVolume * interp + channels[channel].waveforms[op].envelopeVol * (1.0f - interp);
-
-
-        notePitch = channels[channel].waveforms[op].pitch;
-
-        if (channels[channel].arpIndex > -1) // Arpeggiate note and find pitch.
-        {
-            float arpNote = ((channels[channel].arpP[channels[channel].arpIndex]) - 7.75f) * 4.0f;
-            arpNote /= loadedSong.edo;
-            arpNote = pow(2, arpNote);
-            notePitch *= arpNote;
-        }
-
-        notePitch *= lfoMultiplier;
-
-        notePitch *= loadedInstruments[channels[channel].instrument].waveforms[waveForm].fineTuneToC;
-
-        if (notePitch > 12.0f) notePitch = 12.0f;
-        else if (notePitch < 0.00001f) notePitch = 0.00001f;
-
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////// Increment phonemes.
-
-        // Increment the position in the phoneme point.
-        channels[channel].waveforms[waveForm].voice.posInPoint += channels[channel].waveforms[waveForm].voice.speechSpeed;
-
-        float phonemeInterpolation = 0.0f;
-
-        // If past the length of 1 point.
-        if (channels[channel].waveforms[waveForm].voice.posInPoint > voiceSynth.phonemePointSize)
-        {
-            // Reset point position.
-            channels[channel].waveforms[waveForm].voice.posInPoint -= voiceSynth.phonemePointSize;
-            channels[channel].waveforms[waveForm].voice.phonemePos++;
-
-            // If the current phoneme is not a sound.
-            if (channels[channel].waveforms[waveForm].voice.currentPhoneme > 43)
-            {
-                // In between phonemes.
-                if (channels[channel].waveforms[waveForm].voice.phonemePos >= voiceSynth.lengthOfSilentPhomene - channels[channel].waveforms[waveForm].voice.mix)
-                {
-                    phonemeInterpolation = channels[channel].waveforms[waveForm].voice.phonemePos + (channels[channel].waveforms[waveForm].voice.posInPoint / channels[channel].waveforms[waveForm].voice.speechSpeed);
-                    phonemeInterpolation /= float(voiceSynth.lengthOfSilentPhomene);
-                }
-
-
-                // End of phoneme.
-                if (channels[channel].waveforms[waveForm].voice.phonemePos >= voiceSynth.lengthOfSilentPhomene)
-                {
-                    channels[channel].waveforms[waveForm].voice.phonemePos = 0;
-
-                    // Set the next phoneme.
-                    if (channels[channel].waveforms[waveForm].voice.phonemeInRow > 4) // Out pf phonemes in the row.
-                        channels[channel].waveforms[waveForm].voice.nextPhoneme = 44;
-                    else
-                        channels[channel].waveforms[waveForm].voice.nextPhoneme = channels[channel].phonemes[channels[channel].waveforms[waveForm].voice.phonemeInRow];
-
-                    // Set the current phoneme.
-                    if (channels[channel].waveforms[waveForm].voice.nextPhoneme == 45) // Stop sound.
-                        channels[channel].waveforms[waveForm].voice.currentPhoneme = 44;
-                    else if (channels[channel].waveforms[waveForm].voice.nextPhoneme != 44) // Next sound.
-                        channels[channel].waveforms[waveForm].voice.currentPhoneme = channels[channel].waveforms[waveForm].voice.nextPhoneme;
-                }
-            }
-            else // If the current phoneme is a sound.
-            {
-                // Reset point position.
-                channels[channel].waveforms[waveForm].voice.posInPoint -= voiceSynth.phonemePointSize;
-                channels[channel].waveforms[waveForm].voice.phonemePos++;
-
-                // In between phonemes.
-                if (channels[channel].waveforms[waveForm].voice.phonemePos >= voiceSynth.phonemes[channels[channel].waveforms[waveForm].voice.currentPhoneme].points.size() - channels[channel].waveforms[waveForm].voice.mix)
-                {
-                    phonemeInterpolation = channels[channel].waveforms[waveForm].voice.phonemePos + (channels[channel].waveforms[waveForm].voice.posInPoint / channels[channel].waveforms[waveForm].voice.speechSpeed);
-                    if (voiceSynth.phonemes[channels[channel].waveforms[waveForm].voice.currentPhoneme].points.size() > 0)
-                        phonemeInterpolation /= float(voiceSynth.phonemes[channels[channel].waveforms[waveForm].voice.currentPhoneme].points.size());
-                }
-
-
-
-                // End of phoneme.
-                if (channels[channel].waveforms[waveForm].voice.phonemePos >= voiceSynth.phonemes[channels[channel].waveforms[waveForm].voice.currentPhoneme].points.size())
-                {
-                    // Set the next phoneme.
-                    if (channels[channel].waveforms[waveForm].voice.phonemeInRow > 4) // Out pf phonemes in the row.
-                        channels[channel].waveforms[waveForm].voice.nextPhoneme = 44;
-                    else
-                        channels[channel].waveforms[waveForm].voice.nextPhoneme = channels[channel].phonemes[channels[channel].waveforms[waveForm].voice.phonemeInRow];
-
-
-                    if (voiceSynth.phonemes[channels[channel].waveforms[waveForm].voice.currentPhoneme].loop)
-                    {
-                        if (channels[channel].waveforms[waveForm].voice.nextPhoneme == 45) // Stop sound.
-                            channels[channel].waveforms[waveForm].voice.currentPhoneme = 44;
-                        
-                        else if (channels[channel].waveforms[waveForm].voice.nextPhoneme != 44) // Next sound.
-                            channels[channel].waveforms[waveForm].voice.currentPhoneme = channels[channel].waveforms[waveForm].voice.nextPhoneme;
-                    }
-                    else
-                    {
-                        if (channels[channel].waveforms[waveForm].voice.nextPhoneme == 45) // Stop sound.
-                            channels[channel].waveforms[waveForm].voice.currentPhoneme = 44;
-
-                        else if (channels[channel].waveforms[waveForm].voice.nextPhoneme == 44)
-                            channels[channel].waveforms[waveForm].voice.currentPhoneme = 44;  // Stop sound.
-
-                        else if (channels[channel].waveforms[waveForm].voice.nextPhoneme != 44) // Next sound.
-                            channels[channel].waveforms[waveForm].voice.currentPhoneme = channels[channel].waveforms[waveForm].voice.nextPhoneme;
-
-                        channels[channel].waveforms[waveForm].voice.phonemePos = 0;
-                    }
-                }
-            }           
-        }
-
-        
-
-        
-        //std::cout << "  " << voiceSynth.phonemes[channels[channel].waveforms[waveForm].voice.currentPhoneme].points.size();
-        
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////// Read frame data.
-
-        //std::cout << "  " << channels[channel].waveforms[waveForm].voice.currentPhoneme;
-
-        for (int freq = 0; freq < voiceSynth.phonemeFrequencies.size(); freq++)
-        {
-            float resampleIndex = channels[channel].waveforms[op].voice.freqReadingPos[freq];
-
-            // Make sure that the frame reading position is inside the sample.
-            if (resampleIndex < 0.0f)
-                resampleIndex = 0.0f;
-            if (resampleIndex >= loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames.size() - 1)
-                resampleIndex = loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames.size() - 1;
-
-
-            float sampleRateIndex = int(resampleIndex / channels[channel].sampleRate) * channels[channel].sampleRate;
-            int index1 = int(sampleRateIndex);
-            int index2 = int(sampleRateIndex) + 1;
-
-
-            float t = resampleIndex - index1;  // Fractional part
-
-
-            if (index2 >= loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames.size())
-                index2 = 0;
-
-            float frameVol = loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[index1] * (1.0f - t) + loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[index2] * t;
-
-            //frameVol *= 0.1f;
-
-            // Multiply the frame volume to get the volume of the specific frequency.
-            float currVol = 0.0f;
-            float nextVol = 0.0f;
-
-            if (channels[channel].waveforms[waveForm].voice.currentPhoneme < 44)
-                currVol = voiceSynth.phonemes[channels[channel].waveforms[waveForm].voice.currentPhoneme].points[channels[channel].waveforms[waveForm].voice.phonemePos].frequencyVolumes[freq];
-            if (channels[channel].waveforms[waveForm].voice.nextPhoneme < 44)
-                currVol = voiceSynth.phonemes[channels[channel].waveforms[waveForm].voice.nextPhoneme].points[channels[channel].waveforms[waveForm].voice.phonemePos].frequencyVolumes[freq];
-
-            float interpVol = currVol * (1.0f - phonemeInterpolation) + nextVol * phonemeInterpolation;
-            //interpVol *= 40.0f;
-
-            frameVol *= interpVol;
-            
-
-            float frameVolStereo[2] = { frameVol, frameVol };
-
-
-
-
-            for (int j = 0; j < 2; j++)
-            {
-                frameVolStereo[j] *= channels[channel].waveforms[op].volume;
-                frameVolStereo[j] *= channels[channel].waveforms[op].glideVolume;
-            }
-
-
-
-
-            if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].stereo == 0)
-            {
-                pOutputF32[i * 2] += frameVolStereo[0];
-                pOutputF32[i * 2 + 1] += frameVolStereo[1];
-            }
-            else if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].stereo == 1)
-                pOutputF32[i * 2] += frameVolStereo[0];
-            else
-                pOutputF32[i * 2 + 1] += frameVolStereo[1];
-
-
-            resampleIndex += notePitch * voiceSynth.phonemeFrequencies[freq];
-
-
-            /////////////////////////////////////////////// End of sample.
-            if (resampleIndex >= loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopEnd)
-            {
-                float loopLen = float(loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopEnd - loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopStart);
-                while (resampleIndex >= loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopEnd)
-                    resampleIndex -= loopLen;
-
-            }
-
-            channels[channel].waveforms[op].voice.freqReadingPos[freq] = resampleIndex;
-        }
-        
-        //////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-        
-        
-
-        // Wave Volume Slide
-        if (channels[channel].waveforms[op].volumeSlide != 0.0f)
-        {
-            channels[channel].waveforms[op].volume += channels[channel].waveforms[op].volumeSlide * 0.0001f * 120.0f;
-            if (channels[channel].waveforms[op].volume > 1.0f) channels[channel].waveforms[op].volume = 1.0f;
-            else if (channels[channel].waveforms[op].volume < 0.0f) channels[channel].waveforms[op].volume = 0.0f;
-        }
-
-        // Pitch Slide
-        if (channels[channel].pitchSlide != 0)
-        {
-            channels[channel].waveforms[op].glideDest += channels[channel].pitchSlide * 0.00001f * 120.0f;
-            if (channels[channel].waveforms[op].glideDest > 4)
-                channels[channel].waveforms[op].glideDest = 4;
-            else if (channels[channel].waveforms[op].glideDest < 0)
-                channels[channel].waveforms[op].glideDest = 0;
-        }
-    }
-
-    
 
 
     return;
@@ -1621,7 +1291,6 @@ void ResizeDecoders(int newSize) // When a new song is loaded, decoders need to 
         {
             loadedSong.patterns[i].channels[j].notes = { loadedSong.patterns[i].rows };
             loadedSong.patterns[i].channels[j].volumes = { loadedSong.patterns[i].rows };
-            loadedSong.patterns[i].channels[j].voiceSamples = { loadedSong.patterns[i].rows };
             loadedSong.patterns[i].channels[j].effects = { loadedSong.patterns[i].rows };
         }
     }
@@ -1630,7 +1299,6 @@ void ResizeDecoders(int newSize) // When a new song is loaded, decoders need to 
         loadedPattern.rows[i].note.resize(newSize);
         loadedPattern.rows[i].instrument.resize(newSize);
         loadedPattern.rows[i].volume.resize(newSize);
-        loadedPattern.rows[i].voiceSamples.resize(newSize);
         loadedPattern.rows[i].effects.resize(newSize);
 
         for (int j = loadedSong.numberOfChannels; j < newSize; j++)
@@ -1638,41 +1306,25 @@ void ResizeDecoders(int newSize) // When a new song is loaded, decoders need to 
             loadedPattern.rows[i].note[j] = -1;
             loadedPattern.rows[i].instrument[j] = -1;
             loadedPattern.rows[i].volume[j] = -1;
-            loadedPattern.rows[i].voiceSamples[j] = { 44, 44, 44, 44, 44 };
         }
     }
 
     // Resize song objects
     loadedSong.noteChannelIndex.resize(newSize);
     loadedSong.volumeChannelIndex.resize(newSize);
-    loadedSong.voiceChannelIndex.resize(newSize);
     loadedSong.effectChannelIndex.resize(newSize);
     loadedSong.toNextChannelNote.resize(newSize);
     loadedSong.toNextChannelVolume.resize(newSize);
-    loadedSong.toNextChannelVoice.resize(newSize);
     loadedSong.toNextChannelEffect.resize(newSize);
 
     for (int i = 0; i < newSize; i++)
     {
         loadedSong.noteChannelIndex[i] = 0;
         loadedSong.volumeChannelIndex[i] = 0;
-        loadedSong.voiceChannelIndex[i] = 0;
         loadedSong.effectChannelIndex[i] = 0;
         loadedSong.toNextChannelNote[i] = 0;
         loadedSong.toNextChannelVolume[i] = 0;
-        loadedSong.toNextChannelVoice[i] = 0;
         loadedSong.toNextChannelEffect[i] = 0;
-    }
-
-
-    for (int j = 0; j < loadedSong.numberOfChannels; j++)
-    {
-        // Resize channel voice frequency volumes.
-        for (int wave = 0; wave < 4; wave++)
-        {
-            channels[j].waveforms[wave].voice.frequencyVolumes.resize(voiceSynth.phonemeFrequencies.size());
-            channels[j].waveforms[wave].voice.freqReadingPos.resize(voiceSynth.phonemeFrequencies.size());
-        }
     }
 
 
@@ -1730,11 +1382,9 @@ void updateSongOnBeat()
         {
             loadedSong.noteChannelIndex[ch] = 0;
             loadedSong.volumeChannelIndex[ch] = 0;
-            loadedSong.voiceChannelIndex[ch] = 0;
             loadedSong.effectChannelIndex[ch] = 0;
             loadedSong.toNextChannelNote[ch] = 0;
             loadedSong.toNextChannelVolume[ch] = 0;
-            loadedSong.toNextChannelVoice[ch] = 0;
             loadedSong.toNextChannelEffect[ch] = 0;
         }
     }
@@ -1775,11 +1425,9 @@ void updateSongOnBeat()
         {
             loadedSong.noteChannelIndex[ch2] = 0;
             loadedSong.volumeChannelIndex[ch2] = 0;
-            loadedSong.voiceChannelIndex[ch2] = 0;
             loadedSong.effectChannelIndex[ch2] = 0;
             loadedSong.toNextChannelNote[ch2] = 0;
             loadedSong.toNextChannelVolume[ch2] = 0;
-            loadedSong.toNextChannelVoice[ch2] = 0;
             loadedSong.toNextChannelEffect[ch2] = 0;
         }
     }
@@ -1797,7 +1445,6 @@ int updateChannelOnBeat(int ch)
     // Find distance to first note, volume and effect.
     int noteIndex = loadedSong.noteChannelIndex[ch];
     int volumeIndex = loadedSong.volumeChannelIndex[ch];
-    int voiceIndex = loadedSong.voiceChannelIndex[ch];
     int effectIndex = loadedSong.effectChannelIndex[ch];
 
     if (loadedSong.noteChannelIndex[ch] == 0) // Initial "to next note" at the start of each frame.
@@ -1808,9 +1455,6 @@ int updateChannelOnBeat(int ch)
         loadedSong.toNextChannelVolume[ch] = loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch].volumes[0];
         loadedSong.volumeChannelIndex[ch]++;
         volumeIndex++;
-        loadedSong.toNextChannelVoice[ch] = loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch].voiceSamples[0];
-        loadedSong.voiceChannelIndex[ch]++;
-        voiceIndex++;
         loadedSong.toNextChannelEffect[ch] = loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch].effects[0];
         loadedSong.effectChannelIndex[ch]++;
         effectIndex++;
@@ -1820,7 +1464,6 @@ int updateChannelOnBeat(int ch)
 
     loadedSong.toNextChannelNote[ch]--;
     loadedSong.toNextChannelVolume[ch]--;
-    loadedSong.toNextChannelVoice[ch]--;
     loadedSong.toNextChannelEffect[ch]--;
 
 
@@ -1845,40 +1488,6 @@ int updateChannelOnBeat(int ch)
             }
             else
                 loadedSong.toNextChannelVolume[ch] = 255; // No more notes in this channel in the frame.
-        }
-    }
-
-    
-    if (loadedSong.toNextChannelVoice[ch] < 0) // Read next voice samples.
-    {
-        if (voiceIndex < loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch].voiceSamples.size())
-        {
-            for (int vSample = 0; vSample < 5; vSample++)
-            {
-                loadedSong.voiceChannelIndex[ch]++;
-
-                int voice = loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch].voiceSamples[voiceIndex];
-
-                voiceIndex++;
-
-                for (int phoneme = 0; phoneme < 5; phoneme++)
-                {
-                    channels[ch].phonemes[phoneme] = voice;
-                }
-
-                for (int wave = 0; wave < 4; wave++)
-                    channels[ch].waveforms[wave].voice.phonemeInRow = 0;
-            }
-            
-
-            // Set distance to next sample.
-            if (voiceIndex < loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch].voiceSamples.size())
-            {
-                loadedSong.toNextChannelVoice[ch] = loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch].voiceSamples[voiceIndex];
-                loadedSong.voiceChannelIndex[ch]++;
-            }
-            else
-                loadedSong.toNextChannelVoice[ch] = 255; // No more samples in this channel in the frame.
         }
     }
 
@@ -2169,11 +1778,9 @@ int updateChannelOnBeat(int ch)
     {
         loadedSong.noteChannelIndex[ch] = 0;
         loadedSong.volumeChannelIndex[ch] = 0;
-        loadedSong.voiceChannelIndex[ch] = 0;
         loadedSong.effectChannelIndex[ch] = 0;
         loadedSong.toNextChannelNote[ch] = 0;
         loadedSong.toNextChannelVolume[ch] = 0;
-        loadedSong.toNextChannelVoice[ch] = 0;
         loadedSong.toNextChannelEffect[ch] = 0;
 
         updateChannelOnBeat(ch);
@@ -2305,11 +1912,9 @@ void StartOrStopSong()
             StopSample(ch);
             loadedSong.noteChannelIndex[ch] = 0;
             loadedSong.volumeChannelIndex[ch] = 0;
-            loadedSong.voiceChannelIndex[ch] = 0;
             loadedSong.effectChannelIndex[ch] = 0;
             loadedSong.toNextChannelNote[ch] = 0;
             loadedSong.toNextChannelVolume[ch] = 0;
-            loadedSong.toNextChannelVoice[ch] = 0;
             loadedSong.toNextChannelEffect[ch] = 0;
 
 

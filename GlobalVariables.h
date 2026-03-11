@@ -38,10 +38,6 @@ FileNavigator fileNavigator;
 SampleDisplay sampleDisplay;
 PresetMenu presetMenu;
 
-VoiceSynth voiceSynth;
-
-
-
 
 
 
@@ -60,8 +56,6 @@ Vector2 findFrameTileByPosition(int pos) // Returns the channel and channel part
 		else
 		{
 			channelSize = 8 + loadedPattern.rows[0].effects[selectedChannel].cEffect.size() * 4;
-			if (channels[selectedChannel].hasVoiceColumns)
-				channelSize += 5;
 		}
 
 		if (selectedPart >= channelSize)
