@@ -38,6 +38,8 @@ FileNavigator fileNavigator;
 SampleDisplay sampleDisplay;
 PresetMenu presetMenu;
 
+int programVersionNumber = 0;
+
 
 
 
@@ -66,6 +68,10 @@ Vector2 findFrameTileByPosition(int pos) // Returns the channel and channel part
 			{
 				return { -1, -1 }; // Outside of the frame.
 			}
+		}
+		else if (selectedPart == channelSize - 1)
+		{
+			return { float(selectedChannel), -1 }; // Outside of the frame.
 		}
 		else
 		{

@@ -67,7 +67,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 		{
 			if (clickPos.y > 0 && clickPos.y < 33)
 			{
-				ChangeTheme((clickPos.y - 1));
+				ChangeTheme((int(clickPos.y) - 1));
 				SaveSettings();
 			}
 			else if (clickPos.y == 34)
@@ -79,7 +79,16 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				gui.drawUIThisFrame = true;
 				gui.drawFrameThisFrame = true;
 			}
-			
+		}
+		if (wind->name == "Background")
+		{
+			if (clickPos.y > 0 && clickPos.y < 8)
+			{
+				gui.background = int(clickPos.y) - 1;
+				SaveSettings();
+				gui.drawUIThisFrame = true;
+				gui.drawFrameThisFrame = true;
+			}
 		}
 		else if (wind->name == "Save and Exit")
 		{
@@ -97,7 +106,6 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 			{
 				SaveSong();
 				LoadSong(editor.fileToLoad);
-				ChangeTheme(gui.uiColorTheme);
 				windowController.windows.erase(windowController.windows.begin() + windowIndex);
 				windowController.windows.shrink_to_fit();
 				gui.drawUIThisFrame = true;
@@ -109,7 +117,6 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 			{
 				loadedSong.unsavedChanges = false;
 				LoadSong(editor.fileToLoad);
-				ChangeTheme(gui.uiColorTheme);
 				windowController.windows.erase(windowController.windows.begin() + windowIndex);
 				windowController.windows.shrink_to_fit();
 				gui.drawUIThisFrame = true;
@@ -134,15 +141,20 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				std::vector <Pattern> newFrames;
 				for (int i = 0; i < frameUsed.size(); i++)
 				{
-					if (frameUsed[i] == true)
-						newFrames.emplace_back(loadedSong.patterns[i]);
+					if (!frameUsed[i])
+					{
+						Pattern newPattern;
+						newPattern.channels.resize(loadedSong.numberOfChannels);
+						newPattern.beatsPerMeasure = loadedPattern.beatsPerMeasure;
+						loadedSong.patterns[i] = newPattern;
+					}
 				}
 
-				loadedSong.patterns = newFrames;
-
-				SaveSong();
 				windowController.windows.erase(windowController.windows.begin() + windowIndex);
 				windowController.windows.shrink_to_fit();
+
+
+				SaveSong();
 				gui.drawUIThisFrame = true;
 				gui.drawFrameThisFrame = true;
 				return;
@@ -197,7 +209,6 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 					std::string fileN = fileNavigator.fileNames[editor.selectedFile];
 					fileN.erase(0, 1);
 					LoadSong(fileN);
-					ChangeTheme(gui.uiColorTheme);
 				}
 				else if (fileNavigator.fileNames[editor.selectedFile].at(0) == '2') // Load Sample
 				{
@@ -227,8 +238,6 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.clear();
 					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.shrink_to_fit();
 					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType = 1;
-
-					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].fineTuneToC = 1.0f;
 
 					while (reading)
 					{
@@ -283,20 +292,20 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 			}
 			else if (clickPos.y > 0 && clickPos.x > 0 && clickPos.x < 39)
 			{
-				if (clickPos.y - 2 + gui.fileListScroll < fileNavigator.fileNames.size())
+				if (clickPos.y - 2 + fileNavigator.fileListScroll < fileNavigator.fileNames.size())
 				{
 					if (clickPos.x == 1)
 					{
-						if (fileNavigator.fileNames[clickPos.y - 2 + gui.fileListScroll].at(0) == '0')
+						if (fileNavigator.fileNames[clickPos.y - 2 + fileNavigator.fileListScroll].at(0) == '0')
 						{
-							std::string fileN = fileNavigator.fileNames[clickPos.y - 2 + gui.fileListScroll];
+							std::string fileN = fileNavigator.fileNames[clickPos.y - 2 + fileNavigator.fileListScroll];
 							fileN.erase(0, 1);
 							fileNavigator.EnterFile(fileN);
 						}
 					}
 					else
 					{
-						editor.selectedFile = clickPos.y - 2 + gui.fileListScroll;
+						editor.selectedFile = clickPos.y - 2 + fileNavigator.fileListScroll;
 					}
 				}
 			}
@@ -318,20 +327,20 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 			}
 			else if (clickPos.y > 0 && clickPos.x > 0 && clickPos.x < 39)
 			{
-				if (clickPos.y - 2 + gui.fileListScroll < fileNavigator.fileNames.size())
+				if (clickPos.y - 2 + fileNavigator.fileListScroll < fileNavigator.fileNames.size())
 				{
 					if (clickPos.x == 1)
 					{
-						if (fileNavigator.fileNames[clickPos.y - 2 + gui.fileListScroll].at(0) == '0')
+						if (fileNavigator.fileNames[clickPos.y - 2 + fileNavigator.fileListScroll].at(0) == '0')
 						{
-							std::string fileN = fileNavigator.fileNames[clickPos.y - 2 + gui.fileListScroll];
+							std::string fileN = fileNavigator.fileNames[clickPos.y - 2 + fileNavigator.fileListScroll];
 							fileN.erase(0, 1);
 							fileNavigator.EnterFile(fileN);
 						}
 					}
 					else
 					{
-						editor.selectedFile = clickPos.y - 2 + gui.fileListScroll;
+						editor.selectedFile = clickPos.y - 2 + fileNavigator.fileListScroll;
 					}
 				}
 			}
@@ -342,7 +351,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 			{
 				windowController.windows.erase(windowController.windows.begin() + windowIndex);
 				windowController.windows.shrink_to_fit();
-				windowController.InitializeWindow("Themes", wind->position, { 16, 36 });
+				windowController.InitializeWindow("Themes", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 16, 36 });
 				gui.drawUIThisFrame = true;
 				gui.drawFrameThisFrame = true;
 			}
@@ -360,8 +369,15 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 			}
 			if (clickPos.y == 6)
 			{
-				gui.background = !gui.background;
-				SaveSettings();
+				windowController.windows.erase(windowController.windows.begin() + windowIndex);
+				windowController.windows.shrink_to_fit();
+				windowController.InitializeWindow("Background", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 16, 36 });
+				gui.drawUIThisFrame = true;
+				gui.drawFrameThisFrame = true;
+			}
+			if (clickPos.y == 8)
+			{
+				windowController.InitializeWindow("Fishtank", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 16, 13 });
 				gui.drawUIThisFrame = true;
 				gui.drawFrameThisFrame = true;
 			}
@@ -399,7 +415,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				gui.drawUIThisFrame = true;
 				gui.drawFrameThisFrame = true;
 				editor.transposeValue = 0;
-				windowController.InitializeWindow("Transpose", wind->position, { 16, 10 });
+				windowController.InitializeWindow("Transpose", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 16, 10 });
 			}
 			else if (clickPos.y == 10)
 			{
@@ -463,7 +479,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 					indexName.erase(0, 1);
 					if (indexName == loadedSong.songName + ".wav")
 					{
-						windowController.InitializeWindow("Overwrite WAV", wind->position, { 20, 16 });
+						windowController.InitializeWindow("Overwrite WAV", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 20, 16 });
 						return;
 					}
 				}
@@ -476,20 +492,20 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 			}
 			else if (clickPos.y > 0 && clickPos.x > 0 && clickPos.x < 39)
 			{
-				if (clickPos.y - 2 + gui.fileListScroll < fileNavigator.fileNames.size())
+				if (clickPos.y - 2 + fileNavigator.fileListScroll < fileNavigator.fileNames.size())
 				{
 					if (clickPos.x == 1)
 					{
-						if (fileNavigator.fileNames[clickPos.y - 2 + gui.fileListScroll].at(0) == '0')
+						if (fileNavigator.fileNames[clickPos.y - 2 + fileNavigator.fileListScroll].at(0) == '0')
 						{
-							std::string fileN = fileNavigator.fileNames[clickPos.y - 2 + gui.fileListScroll];
+							std::string fileN = fileNavigator.fileNames[clickPos.y - 2 + fileNavigator.fileListScroll];
 							fileN.erase(0, 1);
 							fileNavigator.EnterFile(fileN);
 						}
 					}
 					else
 					{
-						editor.selectedFile = clickPos.y - 2 + gui.fileListScroll;
+						editor.selectedFile = clickPos.y - 2 + fileNavigator.fileListScroll;
 					}
 				}
 			}
@@ -520,13 +536,27 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 			// Synth UI.
 			if (clickPos.x > 1 && clickPos.x < 13)
 			{
-				if (clickPos.y == 2) // Toggle waveform or sample.
+				if (clickPos.y == 2) // Toggle waveform, sample or additive synth.
 				{
 					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType++;
 					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType > 2)
 						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType = 0;
-					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 0)
+					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 1)
 						GenerateAdditiveWave();
+
+					// Update additive operator frequencies.
+					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 2)
+					{
+						for (int wave = 0; wave < 4; wave++)
+						{
+							if (wave != sampleDisplay.selectedOperator && loadedInstruments[editor.selectedSample].waveforms[wave].operatorType == 2)
+							{
+								for (int freq = 0; freq < 11; freq++)
+									loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].frequencies[freq] = loadedInstruments[editor.selectedSample].waveforms[wave].frequencies[freq];
+							}
+						}
+					}
+
 					sampleDisplay.drawing = false; // Stop sample drawing.
 					sampleDisplay.zoomed = false; // Reset zoom.
 					loadedSong.unsavedChanges = true;
@@ -534,7 +564,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				}
 				if (clickPos.y == 4) // Change wave shape type
 				{
-					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 0)
+					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 1)
 					{
 						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].waveType++;
 						if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].waveType > 6)
@@ -553,20 +583,17 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				}
 				else if (clickPos.y == 9) // Set sample to loop
 				{
-					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
-					{
-						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopType++;
-						if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopType > 2)
-							loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopType = 0;
-						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopStart = 0;
+					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopType++;
+					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopType > 2)
+						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopType = 0;
+					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopStart = 0;
 
-						if (editor.playingSong)
-							StartOrStopSong();
+					if (editor.playingSong)
+						StartOrStopSong();
 
-						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopEnd = loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
-						DrawSampleDisplay();
-						loadedSong.unsavedChanges = true;
-					}
+					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopEnd = loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
+					DrawSampleDisplay();
+					loadedSong.unsavedChanges = true;
 					return;
 				}
 				else if (clickPos.y > 21 && clickPos.y < 26) // Toggle modulator input type
@@ -580,20 +607,23 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 			}
 
 
-
-			if (clickPos.y == 10) // Grid snap settings
+			if (int(clickPos.y) == 8) // Set number sample periods.
 			{
-				if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
-				{
-					if (clickPos.x == 8)
-						sampleDisplay.enableSnap = !sampleDisplay.enableSnap;
+				if (clickPos.x == 10)
+					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].useArp = !loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].useArp;
 
-					DrawSampleDisplay();
-				}
+				DrawSampleDisplay();
+			}
+			else if (clickPos.y == 10) // Grid snap settings
+			{
+				if (clickPos.x == 8)
+					sampleDisplay.enableSnap = !sampleDisplay.enableSnap;
+
+				DrawSampleDisplay();
 			}
 			else if (clickPos.y == 11) // Toggle reverse sample
 			{
-				if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 0)
+				if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 1)
 				{
 					if (clickPos.x == 9)
 					{
@@ -607,25 +637,19 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 			}
 			else if (clickPos.y == 13) // Toggle sustain forever
 			{
-				if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
-				{
-					if (clickPos.x == 8)
-						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustainForever = !loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustainForever;
+				if (clickPos.x == 8)
+					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustainForever = !loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustainForever;
 
-					DrawSampleDisplay();
-					loadedSong.unsavedChanges = true;
-				}
+				DrawSampleDisplay();
+				loadedSong.unsavedChanges = true;
 			}
 			else if (clickPos.y == 19) // Toggle pitch to note
 			{
-				if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
-				{
-					if (clickPos.x == 15)
-						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pitchToNote = !loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pitchToNote;
+				if (clickPos.x == 15)
+					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pitchToNote = !loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pitchToNote;
 
-					DrawSampleDisplay();
-					loadedSong.unsavedChanges = true;
-				}
+				DrawSampleDisplay();
+				loadedSong.unsavedChanges = true;
 			}
 			else if (clickPos.y == 18) // Toggle stereo type
 			{
@@ -639,26 +663,20 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 			}
 			else if (clickPos.y == 20) // Toggle lfo amount
 			{
-				if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
+				if (clickPos.x > 12 && clickPos.x < 17)
 				{
-					if (clickPos.x > 12 && clickPos.x < 17)
-					{
-						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].lfo++;
-						if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].lfo > 9)
-							loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].lfo = 0;
-						loadedSong.unsavedChanges = true;
-					}
+					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].lfo++;
+					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].lfo > 9)
+						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].lfo = 0;
+					loadedSong.unsavedChanges = true;
 				}
 			}
 			else if (clickPos.y == 21) // Toggle continue note
 			{
-				if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
+				if (clickPos.x == 15)
 				{
-					if (clickPos.x == 15)
-					{
-						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].continueNote = !loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].continueNote;
-						loadedSong.unsavedChanges = true;
-					}
+					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].continueNote = !loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].continueNote;
+					loadedSong.unsavedChanges = true;
 				}
 			}
 			
@@ -698,174 +716,171 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 					if (clickPos.y == 24) // Open algorithm menu.
 					{
 						sampleDisplay.operatorMenuSelectedOperator = loadedInstruments[editor.selectedSample].algorithmType;
-						windowController.InitializeWindow("Algorithms", wind->position, { 34, 33 });
+						windowController.InitializeWindow("Algorithms", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 34, 33 });
 						return;
 					}
 				}
 
-				if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
+				if (clickPos.y > 25 && clickPos.y < 38 && editor.selectedSample > -1) // Sample display
 				{
-					if (clickPos.y > 25 && clickPos.y < 38 && editor.selectedSample > -1) // Sample display
+					if (clickPos.y < 27) // Set jump points.
 					{
-						if (clickPos.y < 27) // Set jump points.
+						float posX = (gui.floatHoveredTile.x - windowController.windows[windowIndex].position.x - 1.0f) * 16.0f;
+
+						if (sampleDisplay.enableSnap)
 						{
-							float posX = (gui.floatHoveredTile.x - windowController.windows[windowIndex].position.x - 1.0f) * 16.0f;
-
-							if (sampleDisplay.enableSnap)
-							{
-								posX /= 528.0f;
-								posX *= sampleDisplay.snapSubdivisions;
-								posX += 0.5f;
-								posX = int(posX);
-								posX /= sampleDisplay.snapSubdivisions;
-								posX *= 528.0f;
-							}
-
-							int frameIndex = (posX / 528.0f) * loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
-
-							if (loadedInstruments[editor.selectedSample].jumpPoints.size() == 0)
-								loadedInstruments[editor.selectedSample].jumpPoints.emplace_back(frameIndex);
-							else
-							{
-								bool afterLastJump = false;
-								int addPos = 0;
-								while (!afterLastJump)
-								{
-									if (addPos >= loadedInstruments[editor.selectedSample].jumpPoints.size())
-										afterLastJump = true;
-									else if (loadedInstruments[editor.selectedSample].jumpPoints[addPos] <= frameIndex)
-									{
-										afterLastJump = true;
-									}
-									else
-									{
-										addPos++;
-									}
-								}
-
-								loadedInstruments[editor.selectedSample].jumpPoints.emplace(loadedInstruments[editor.selectedSample].jumpPoints.begin() + addPos, frameIndex);
-							}
-							loadedSong.unsavedChanges = true;
+							posX /= 528.0f;
+							posX *= sampleDisplay.snapSubdivisions;
+							posX += 0.5f;
+							posX = int(posX);
+							posX /= sampleDisplay.snapSubdivisions;
+							posX *= 528.0f;
 						}
-						else if (clickPos.y > 35) // Move loop points.
-						{
-							float posX = (gui.floatHoveredTile.x - windowController.windows[windowIndex].position.x) * 16.0f - 8.0f;
-							float lStartPos = float(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopStart) * (528.0f / float(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size()));
-							if (abs(lStartPos - posX) < 16)
-							{
-								sampleDisplay.dragLoopStart = true;
-								return;
-							}
-							else
-							{
-								float lEndPos = float(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopEnd) * (528.0f / float(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size()));
-								if (abs(lEndPos - posX) < 16)
-								{
-									sampleDisplay.dragLoopEnd = true;
-									return;
-								}
-							}
-							loadedSong.unsavedChanges = true;
-						}
+
+						int frameIndex = (posX / 528.0f) * loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
+
+						if (loadedInstruments[editor.selectedSample].jumpPoints.size() == 0)
+							loadedInstruments[editor.selectedSample].jumpPoints.emplace_back(frameIndex);
 						else
 						{
-							float posX = (gui.floatHoveredTile.x - windowController.windows[windowIndex].position.x - 0.5f) / 33.0f;
-
-							if (posX > 1.0f)
-								posX = 1.0f;
-							else if (posX < 0)
-								posX = 0;
-
-
-							if (sampleDisplay.enableSnap)
+							bool afterLastJump = false;
+							int addPos = 0;
+							while (!afterLastJump)
 							{
-								posX *= sampleDisplay.snapSubdivisions;
-								posX = int(posX);
-								posX /= sampleDisplay.snapSubdivisions;
-							}
-
-							int frameIndex = (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size()) * posX;
-
-							if (sampleDisplay.zoomed)
-							{
-								float zoomStart = sampleDisplay.zoomStart;
-								float zoomEnd = sampleDisplay.zoomEnd;
-								float zoomScale = (zoomEnd - zoomStart) / loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
-
-								frameIndex *= zoomScale;
-								frameIndex += zoomStart;
-							}
-
-							sampleDisplay.sampleStartPos = frameIndex;
-							sampleDisplay.sampleSelectionEnd = frameIndex;
-						}
-						DrawSampleDisplay();
-					}
-					else if (clickPos.y > 37)
-					{
-						if (clickPos.x == 1 || clickPos.x == 2) // Play sample
-						{
-							if (!editor.playingSong) // Play the note sound.
-							{
-								channels[0].volume = 64.0f;
-								StartSample(0, editor.selectedSample, 48, 0);
-								for (int wave = 0; wave < 4; wave++)
-									channels[0].waveforms[wave].note = 48;
-								sampleDisplay.playingSample = true;
-								for (int wave = 0; wave < 4; wave++)
-									channels[0].waveforms[wave].frameReadPos = sampleDisplay.sampleStartPos;
-							}
-						}
-						else if (clickPos.x == 3 || clickPos.x == 4) // Pause sample
-						{
-							channels[0].toUninitialize = true;
-							sampleDisplay.playingSample = false;
-							DrawSampleDisplay();
-						}
-						else if (clickPos.x == 26 || clickPos.x == 27) // Toggle draw sample
-						{
-							if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 1)
-							{
-								sampleDisplay.drawing = !sampleDisplay.drawing;
-								DrawSampleDisplay();
-								loadedSong.unsavedChanges = true;
-							}
-						}
-						else if (clickPos.x == 28 || clickPos.x == 29) // Toggle zoom sample
-						{
-							if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 1)
-							{
-								if (!sampleDisplay.zoomed && sampleDisplay.sampleStartPos == sampleDisplay.sampleSelectionEnd) // You cannot zoom if there is no selection.
-									return;
-
-								sampleDisplay.zoomed = !sampleDisplay.zoomed;
-
-								if (sampleDisplay.zoomed)
+								if (addPos >= loadedInstruments[editor.selectedSample].jumpPoints.size())
+									afterLastJump = true;
+								else if (loadedInstruments[editor.selectedSample].jumpPoints[addPos] <= frameIndex)
 								{
-									sampleDisplay.zoomStart = sampleDisplay.sampleStartPos;
-									sampleDisplay.zoomEnd = sampleDisplay.sampleSelectionEnd;
+									afterLastJump = true;
 								}
 								else
 								{
-									sampleDisplay.zoomStart = 0;
-									sampleDisplay.zoomEnd = loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size() - 1;
+									addPos++;
 								}
+							}
 
-								DrawSampleDisplay();
-								loadedSong.unsavedChanges = true;
+							loadedInstruments[editor.selectedSample].jumpPoints.emplace(loadedInstruments[editor.selectedSample].jumpPoints.begin() + addPos, frameIndex);
+						}
+						loadedSong.unsavedChanges = true;
+					}
+					else if (clickPos.y > 35) // Move loop points.
+					{
+						float posX = (gui.floatHoveredTile.x - windowController.windows[windowIndex].position.x) * 16.0f - 8.0f;
+						float lStartPos = float(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopStart) * (528.0f / float(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size()));
+						if (abs(lStartPos - posX) < 16)
+						{
+							sampleDisplay.dragLoopStart = true;
+							return;
+						}
+						else
+						{
+							float lEndPos = float(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopEnd) * (528.0f / float(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size()));
+							if (abs(lEndPos - posX) < 16)
+							{
+								sampleDisplay.dragLoopEnd = true;
+								return;
 							}
 						}
-						else if (clickPos.y == 38)
+						loadedSong.unsavedChanges = true;
+					}
+					else
+					{
+						float posX = (gui.floatHoveredTile.x - windowController.windows[windowIndex].position.x - 0.5f) / 33.0f;
+
+						if (posX > 1.0f)
+							posX = 1.0f;
+						else if (posX < 0)
+							posX = 0;
+
+
+						if (sampleDisplay.enableSnap)
 						{
-							if (clickPos.x > 5 && clickPos.x < 25) // Change sample length display units
+							posX *= sampleDisplay.snapSubdivisions;
+							posX = int(posX);
+							posX /= sampleDisplay.snapSubdivisions;
+						}
+
+						int frameIndex = (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size()) * posX;
+
+						if (sampleDisplay.zoomed)
+						{
+							float zoomStart = sampleDisplay.zoomStart;
+							float zoomEnd = sampleDisplay.zoomEnd;
+							float zoomScale = (zoomEnd - zoomStart) / loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
+
+							frameIndex *= zoomScale;
+							frameIndex += zoomStart;
+						}
+
+						sampleDisplay.sampleStartPos = frameIndex;
+						sampleDisplay.sampleSelectionEnd = frameIndex;
+					}
+					DrawSampleDisplay();
+				}
+				else if (clickPos.y > 37)
+				{
+					if (clickPos.x == 1 || clickPos.x == 2) // Play sample
+					{
+						if (!editor.playingSong) // Play the note sound.
+						{
+							channels[0].volume = 64.0f;
+							StartSample(0, editor.selectedSample, 48, 0);
+							for (int wave = 0; wave < 4; wave++)
+								channels[0].waveforms[wave].note = 48;
+							sampleDisplay.playingSample = true;
+							for (int wave = 0; wave < 4; wave++)
+								channels[0].waveforms[wave].frameReadPos = sampleDisplay.sampleStartPos;
+						}
+					}
+					else if (clickPos.x == 3 || clickPos.x == 4) // Pause sample
+					{
+						channels[0].toUninitialize = true;
+						sampleDisplay.playingSample = false;
+						DrawSampleDisplay();
+					}
+					else if (clickPos.x == 26 || clickPos.x == 27) // Toggle draw sample
+					{
+						if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 1)
+						{
+							sampleDisplay.drawing = !sampleDisplay.drawing;
+							DrawSampleDisplay();
+							loadedSong.unsavedChanges = true;
+						}
+					}
+					else if (clickPos.x == 28 || clickPos.x == 29) // Toggle zoom sample
+					{
+						if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 1)
+						{
+							if (!sampleDisplay.zoomed && sampleDisplay.sampleStartPos == sampleDisplay.sampleSelectionEnd) // You cannot zoom if there is no selection.
+								return;
+
+							sampleDisplay.zoomed = !sampleDisplay.zoomed;
+
+							if (sampleDisplay.zoomed)
 							{
-								sampleDisplay.measurementSystem++;
-								if (sampleDisplay.measurementSystem > 2)
-									sampleDisplay.measurementSystem = 0;
+								sampleDisplay.zoomStart = sampleDisplay.sampleStartPos;
+								sampleDisplay.zoomEnd = sampleDisplay.sampleSelectionEnd;
+							}
+							else
+							{
+								sampleDisplay.zoomStart = 0;
+								sampleDisplay.zoomEnd = loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size() - 1;
 							}
 
 							DrawSampleDisplay();
+							loadedSong.unsavedChanges = true;
 						}
+					}
+					else if (clickPos.y == 38)
+					{
+						if (clickPos.x > 5 && clickPos.x < 25) // Change sample length display units
+						{
+							sampleDisplay.measurementSystem++;
+							if (sampleDisplay.measurementSystem > 2)
+								sampleDisplay.measurementSystem = 0;
+						}
+
+						DrawSampleDisplay();
 					}
 				}
 			}
@@ -873,7 +888,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 			{
 				if (clickPos.y == 25) // Open preset menu.
 				{
-					windowController.InitializeWindow("Presets", wind->position, { 48, 18 });
+					windowController.InitializeWindow("Presets", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 48, 18 });
 					return;
 				}
 			}
@@ -917,7 +932,6 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 
 				sampleDisplay.sampleSelectionEnd = sampleDisplay.sampleStartPos;
 
-				loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].fineTuneToC = 1.0f;
 
 				DrawSampleDisplay();
 				windowController.windows.erase(windowController.windows.begin() + windowIndex);
@@ -936,7 +950,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				sampleDisplay.resampleNote = 48.0f - loadedSong.edo * 4;
 				sampleDisplay.resampleFineTune = 0.0f;
 				sampleDisplay.resampleMultiplier = 1.0f;
-				windowController.InitializeWindow("Resample Sample", wind->position, { 16, 12 });
+				windowController.InitializeWindow("Resample Sample", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 16, 12 });
 			}
 			else if (clickPos.y == 6) // Dtlete frames
 			{
@@ -945,7 +959,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				gui.drawUIThisFrame = true;
 				gui.drawFrameThisFrame = true;
 				editor.transposeValue = 0;
-				windowController.InitializeWindow("Sample Volume", wind->position, { 16, 6 });
+				windowController.InitializeWindow("Sample Volume", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 16, 6 });
 				sampleDisplay.volumeMultiplier = 1.0f;
 			}
 			else if (clickPos.y == 8) // Set loop
@@ -968,7 +982,6 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames[i] *= 1.0f - float(i - sampleDisplay.sampleStartPos) / float(sampleDisplay.sampleSelectionEnd - sampleDisplay.sampleStartPos);
 				}
 
-				loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].fineTuneToC = 1.0f;
 
 				windowController.windows.erase(windowController.windows.begin() + windowIndex);
 				windowController.windows.shrink_to_fit();
@@ -984,7 +997,6 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames[i] *= float(i - sampleDisplay.sampleStartPos) / float(sampleDisplay.sampleSelectionEnd - sampleDisplay.sampleStartPos);
 				}
 
-				loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].fineTuneToC = 1.0f;
 
 				windowController.windows.erase(windowController.windows.begin() + windowIndex);
 				windowController.windows.shrink_to_fit();
@@ -999,7 +1011,6 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				for (int i = sampleDisplay.sampleStartPos; i < sampleDisplay.sampleSelectionEnd; i++)
 					sampleDisplay.copyFrames.emplace_back(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames[i]);
 
-				loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].fineTuneToC = 1.0f;
 
 				windowController.windows.erase(windowController.windows.begin() + windowIndex);
 				windowController.windows.shrink_to_fit();
@@ -1013,7 +1024,6 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.emplace(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.begin() + sampleDisplay.sampleStartPos + i, sampleDisplay.copyFrames[i]);
 				}
 				
-				loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].fineTuneToC = 1.0f;
 
 				windowController.windows.erase(windowController.windows.begin() + windowIndex);
 				windowController.windows.shrink_to_fit();
@@ -1098,7 +1108,6 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.resize(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size());
 					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames = newPcmFrames;
 
-					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].fineTuneToC = 1.0f;
 
 					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopStart > sampleDisplay.sampleStartPos)
 					{
@@ -1256,7 +1265,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				windowController.windows.shrink_to_fit();
 
 				fileNavigator.NavigateToFile();
-				windowController.InitializeWindow("Save Song", wind->position, { 40, 20 });
+				windowController.InitializeWindow("Save Song", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 40, 20 });
 				gui.drawUIThisFrame = true;
 				gui.drawFrameThisFrame = true;
 			}
@@ -1266,7 +1275,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				windowController.windows.shrink_to_fit();
 
 				fileNavigator.NavigateToFile();
-				windowController.InitializeWindow("Load File", wind->position, { 40, 20 });
+				windowController.InitializeWindow("Load File", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 40, 20 });
 				gui.drawUIThisFrame = true;
 				gui.drawFrameThisFrame = true;
 			}
@@ -1276,7 +1285,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				windowController.windows.shrink_to_fit();
 
 				fileNavigator.NavigateToFile();
-				windowController.InitializeWindow("Export as .WAV", wind->position, { 40, 20 });
+				windowController.InitializeWindow("Export as .WAV", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 40, 20 });
 				gui.drawUIThisFrame = true;
 				gui.drawFrameThisFrame = true;
 			}
@@ -1319,34 +1328,31 @@ void RightClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 cli
 		{
 			if (loadedInstruments[editor.selectedSample].enabled)
 			{
-				if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
+				if (clickPos.y > 25 && clickPos.y < 38 && editor.selectedSample > -1)
 				{
-					if (clickPos.y > 25 && clickPos.y < 38 && editor.selectedSample > -1)
+					if (clickPos.y < 27) // Delete jump points.
 					{
-						if (clickPos.y < 27) // Delete jump points.
+						float posX = (gui.floatHoveredTile.x - windowController.windows[windowIndex].position.x) * 16.0f - 8.0f;
+						for (int i = 0; i < loadedInstruments[editor.selectedSample].jumpPoints.size(); i++)
 						{
-							float posX = (gui.floatHoveredTile.x - windowController.windows[windowIndex].position.x) * 16.0f - 8.0f;
-							for (int i = 0; i < loadedInstruments[editor.selectedSample].jumpPoints.size(); i++)
+							float iPos = float(loadedInstruments[editor.selectedSample].jumpPoints[i]) * (528.0f / float(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size()));
+							//int iPos = (loadedSamples[editor.selectedSample]->jumpPoints[i]) * (1.0f / loadedSamples[editor.selectedSample]->pcmFrames.size()) * 800.0f;
+							if (abs(iPos - posX) < 16)
 							{
-								float iPos = float(loadedInstruments[editor.selectedSample].jumpPoints[i]) * (528.0f / float(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size()));
-								//int iPos = (loadedSamples[editor.selectedSample]->jumpPoints[i]) * (1.0f / loadedSamples[editor.selectedSample]->pcmFrames.size()) * 800.0f;
-								if (abs(iPos - posX) < 16)
-								{
-									loadedInstruments[editor.selectedSample].jumpPoints.erase(loadedInstruments[editor.selectedSample].jumpPoints.begin() + i);
-									loadedInstruments[editor.selectedSample].jumpPoints.shrink_to_fit();
-									DrawSampleDisplay();
-									loadedSong.unsavedChanges = true;
-									return;
-								}
+								loadedInstruments[editor.selectedSample].jumpPoints.erase(loadedInstruments[editor.selectedSample].jumpPoints.begin() + i);
+								loadedInstruments[editor.selectedSample].jumpPoints.shrink_to_fit();
+								DrawSampleDisplay();
+								loadedSong.unsavedChanges = true;
+								return;
 							}
 						}
-						else // Open the selection menu.
-						{
-							if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 1)
-								windowController.InitializeWindow("Sample Selection", wind->position, { 16, 19 });
-						}
-						DrawSampleDisplay();
 					}
+					else // Open the selection menu.
+					{
+						if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 1)
+							windowController.InitializeWindow("Sample Selection", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 16, 19 });
+					}
+					DrawSampleDisplay();
 				}
 			}
 		}
@@ -1413,7 +1419,7 @@ void HoldClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clic
 			{
 				if (int(clickPos.y) == 5) // Edit duty cycle.
 				{
-					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 0)
+					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 1)
 					{
 						if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].waveType != 4) // Noise has no duty cycle.
 						{
@@ -1432,7 +1438,7 @@ void HoldClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clic
 				}
 				else if (int(clickPos.y) == 6) // Edit smoothness / # of sine waves to generate.
 				{
-					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 0)
+					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 1)
 					{
 						if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].generateFromSines || loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].waveType > 3)
 						{
@@ -1458,6 +1464,24 @@ void HoldClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clic
 					return;
 
 				}
+				/*
+				else if (int(clickPos.y) == 8) // Set number sample periods.
+				{
+					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 0)
+					{
+						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].periods = (int((clickPos.x - 9) * 2.0f));
+
+						if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].periods < 1)
+							loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].periods = 1;
+						else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].periods > 16)
+							loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].periods = 16;
+
+						loadedSong.unsavedChanges = true;
+						GenerateAdditiveWave();
+						DrawSampleDisplay();
+					}
+					return;
+				}*/
 				else if (int(clickPos.y) == 10) // Set sample display subdivisions.
 				{
 					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
@@ -1476,71 +1500,59 @@ void HoldClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clic
 				}
 				else if (int(clickPos.y) == 12) // Set sample attack.
 				{
-					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
-					{
-						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].attack = (float(int((clickPos.x - 9) * 2.0f)) / 16.0f);;
+					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].attack = (float(int((clickPos.x - 9) * 2.0f)) / 16.0f);;
 
-						if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].attack < 0)
-							loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].attack = 0;
-						else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].attack > 0.9375)
-							loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].attack = 0.9375;
+					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].attack < 0)
+						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].attack = 0;
+					else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].attack > 0.9375)
+						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].attack = 0.9375;
 
-						loadedSong.unsavedChanges = true;
-						DrawSampleDisplay();
-					}
+					loadedSong.unsavedChanges = true;
+					DrawSampleDisplay();
 					return;
 				}
 				else if (int(clickPos.y) == 13 && !loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustainForever) // Set sample sustain.
 				{
-					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
-					{
-						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustain = (float(int((clickPos.x - 9) * 2.0f)) / 16.0f);
+					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustain = (float(int((clickPos.x - 9) * 2.0f)) / 16.0f);
 
-						if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustain < 0)
-							loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustain = 0;
-						else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustain > 0.9375)
-							loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustain = 0.9375;
+					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustain < 0)
+						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustain = 0;
+					else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustain > 0.9375)
+						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].sustain = 0.9375;
 
-						loadedSong.unsavedChanges = true;
-						DrawSampleDisplay();
-					}
+					loadedSong.unsavedChanges = true;
+					DrawSampleDisplay();
 					return;
 				}
 				else if (int(clickPos.y) == 14) // Set sample decay.
 				{
-					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
-					{
-						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].decay = (float(int((clickPos.x - 9) * 2.0f)) / 16.0f);
+					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].decay = (float(int((clickPos.x - 9) * 2.0f)) / 16.0f);
 
-						if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].decay < 0)
-							loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].decay = 0;
-						else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].decay > 0.9375)
-							loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].decay = 0.9375;
+					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].decay < 0)
+						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].decay = 0;
+					else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].decay > 0.9375)
+						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].decay = 0.9375;
 
-						loadedSong.unsavedChanges = true;
-						DrawSampleDisplay();
-					}
+					loadedSong.unsavedChanges = true;
+					DrawSampleDisplay();
 					return;
 				}
 				else if (int(clickPos.y) == 15) // Set sample release.
 				{
-					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
-					{
-						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].release = (float(int((clickPos.x - 9) * 2.0f)) / 16.0f);
+					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].release = (float(int((clickPos.x - 9) * 2.0f)) / 16.0f);
 
-						if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].release < 0)
-							loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].release = 0;
-						else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].release > 0.9375)
-							loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].release = 0.9375;
+					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].release < 0)
+						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].release = 0;
+					else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].release > 0.9375)
+						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].release = 0.9375;
 
-						loadedSong.unsavedChanges = true;
-						DrawSampleDisplay();
-					}
+					loadedSong.unsavedChanges = true;
+					DrawSampleDisplay();
 					return;
 				}
 				else if (int(clickPos.y) == 16) // Set wave offset.
 				{
-					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 0)
+					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 1)
 					{
 						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].offset = (float(int((clickPos.x - 9) * 2.0f)) / 16.0f);
 
@@ -1629,7 +1641,7 @@ void HoldClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clic
 						loadedSong.unsavedChanges = true;
 					}
 				}
-				else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 0) // Change frequencies.
+				else if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 1) // Change frequencies.
 				{
 					if (int(clickPos.x) > 21)
 					{
@@ -1639,113 +1651,141 @@ void HoldClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clic
 						if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].frequencies[int(clickPos.x) - 18 - 4] != newFreqVal)
 						{
 							loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].frequencies[int(clickPos.x) - 18 - 4] = newFreqVal;
-							GenerateAdditiveWave();
+
+							// Update additive operator frequencies.
+							if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType == 2)
+							{
+								for (int ch = 0; ch < channels.size(); ch++)
+								{
+									if (channels[ch].instrument == editor.selectedSample)
+									{
+										for (int freq = 0; freq < 11; freq++)
+										{
+											channels[ch].additiveSynth.freqStartingVolumes[freq] = loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].frequencies[freq];
+											channels[ch].additiveSynth.freqVolumes[freq] = channels[ch].additiveSynth.freqStartingVolumes[freq];
+										}
+									}
+								}
+								
+
+								for (int wave = 0; wave < 4; wave++)
+								{
+									if (wave != sampleDisplay.selectedOperator &&  loadedInstruments[editor.selectedSample].waveforms[wave].operatorType == 2)
+									{
+										for (int freq = 0; freq < 11; freq++)
+											loadedInstruments[editor.selectedSample].waveforms[wave].frequencies[freq] = loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].frequencies[freq];
+									}
+								}
+							}
+							else
+							{
+								GenerateAdditiveWave();
+							}
+							
+
 							loadedSong.unsavedChanges = true;
 						}
 					}
 				}
 			}
 
-			if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
+			// Drag loop points.
+			if (loadedInstruments[editor.selectedSample].enabled)
 			{
-				// Drag loop points.
-				if (loadedInstruments[editor.selectedSample].enabled)
+				float posX = ((gui.floatHoveredTile.x - windowController.windows[windowIndex].position.x) * 16.0f - 8.0f) * (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size() / 528.0f);
+
+				if (sampleDisplay.enableSnap)
 				{
-					float posX = ((gui.floatHoveredTile.x - windowController.windows[windowIndex].position.x) * 16.0f - 8.0f) * (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size() / 528.0f);
-
-					if (sampleDisplay.enableSnap)
-					{
-						posX /= float(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size());
-						posX *= sampleDisplay.snapSubdivisions;
-						posX += 0.5f;
-						posX = int(posX);
-						posX /= sampleDisplay.snapSubdivisions;
-						posX *= (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size());
-					}
+					posX /= float(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size());
+					posX *= sampleDisplay.snapSubdivisions;
+					posX += 0.5f;
+					posX = int(posX);
+					posX /= sampleDisplay.snapSubdivisions;
+					posX *= (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size());
+				}
 
 
-					if (posX > loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size())
-						posX = loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
+				if (posX > loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size())
+					posX = loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
+				else if (posX < 0)
+					posX = 0;
+
+				if (sampleDisplay.dragLoopStart)
+				{
+					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopStart = posX;
+					DrawSampleDisplay();
+					loadedSong.unsavedChanges = true;
+				}
+				else if (sampleDisplay.dragLoopEnd)
+				{
+					loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopEnd = posX;
+					DrawSampleDisplay();
+					loadedSong.unsavedChanges = true;
+				}
+				if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopStart > loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopEnd)
+				{
+					std::swap(sampleDisplay.dragLoopStart, sampleDisplay.dragLoopEnd);
+					std::swap(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopStart, loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopEnd);
+				}
+
+				if (clickPos.y > 26 && clickPos.y < 38) // Move sample selection / draw.
+				{
+					/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+					float posX = (gui.floatHoveredTile.x - windowController.windows[windowIndex].position.x - 0.5f) / 33.0f;
+
+					if (posX > 1.0f)
+						posX = 1.0f;
 					else if (posX < 0)
 						posX = 0;
 
-					if (sampleDisplay.dragLoopStart)
+					//////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+					if (sampleDisplay.drawing)
 					{
-						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopStart = posX;
-						DrawSampleDisplay();
-						loadedSong.unsavedChanges = true;
-					}
-					else if (sampleDisplay.dragLoopEnd)
-					{
-						loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopEnd = posX;
-						DrawSampleDisplay();
-						loadedSong.unsavedChanges = true;
-					}
-					if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopStart > loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopEnd)
-					{
-						std::swap(sampleDisplay.dragLoopStart, sampleDisplay.dragLoopEnd);
-						std::swap(loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopStart, loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].loopEnd);
-					}
+						float posY = -(gui.floatHoveredTile.y - windowController.windows[windowIndex].position.y - 32.0f) / 6.0f;
 
-					if (clickPos.y > 26 && clickPos.y < 38) // Move sample selection / draw.
-					{
-						/////////////////////////////////////////////////////////////////////////////////////////////////////////
+						int frameIndex = (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size()) * posX;
 
-						float posX = (gui.floatHoveredTile.x - windowController.windows[windowIndex].position.x - 0.5f) / 33.0f;
-
-						if (posX > 1.0f)
-							posX = 1.0f;
-						else if (posX < 0)
-							posX = 0;
-
-						//////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-						if (sampleDisplay.drawing)
+						if (sampleDisplay.zoomed)
 						{
-							float posY = -(gui.floatHoveredTile.y - windowController.windows[windowIndex].position.y - 32.0f) / 6.0f;
+							float zoomStart = sampleDisplay.zoomStart;
+							float zoomEnd = sampleDisplay.zoomEnd;
+							float zoomScale = (zoomEnd - zoomStart) / loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
 
-							int frameIndex = (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size()) * posX;
-
-							if (sampleDisplay.zoomed)
-							{
-								float zoomStart = sampleDisplay.zoomStart;
-								float zoomEnd = sampleDisplay.zoomEnd;
-								float zoomScale = (zoomEnd - zoomStart) / loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
-
-								frameIndex *= zoomScale;
-								frameIndex += zoomStart;
-							}
-
-							sampleDisplay.drawWavePos = { float(frameIndex), posY };
-							DrawSamplePoint(sampleDisplay.drawWavePos);
+							frameIndex *= zoomScale;
+							frameIndex += zoomStart;
 						}
-						else
-						{
-							if (sampleDisplay.enableSnap)
-							{
-								posX *= sampleDisplay.snapSubdivisions;
-								posX = int(posX);
-								posX /= sampleDisplay.snapSubdivisions;
-							}
 
-							int frameIndex = (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size()) * posX;
-
-							if (sampleDisplay.zoomed)
-							{
-								float zoomStart = sampleDisplay.zoomStart;
-								float zoomEnd = sampleDisplay.zoomEnd;
-								float zoomScale = (zoomEnd - zoomStart) / loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
-
-								frameIndex *= zoomScale;
-								frameIndex += zoomStart;
-							}
-
-							sampleDisplay.sampleSelectionEnd = frameIndex;
-							DrawSampleDisplay();
-						}
-						loadedSong.unsavedChanges = true;
+						sampleDisplay.drawWavePos = { float(frameIndex), posY };
+						DrawSamplePoint(sampleDisplay.drawWavePos);
 					}
+					else
+					{
+						if (sampleDisplay.enableSnap)
+						{
+							posX *= sampleDisplay.snapSubdivisions;
+							posX = int(posX);
+							posX /= sampleDisplay.snapSubdivisions;
+						}
+
+						int frameIndex = (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size()) * posX;
+
+						if (sampleDisplay.zoomed)
+						{
+							float zoomStart = sampleDisplay.zoomStart;
+							float zoomEnd = sampleDisplay.zoomEnd;
+							float zoomScale = (zoomEnd - zoomStart) / loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
+
+							frameIndex *= zoomScale;
+							frameIndex += zoomStart;
+						}
+
+						sampleDisplay.sampleSelectionEnd = frameIndex;
+						DrawSampleDisplay();
+					}
+					loadedSong.unsavedChanges = true;
 				}
 			}
 		}
@@ -1779,6 +1819,8 @@ void RightHoldFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clic
 
 void ChangeTheme(int theme)
 {
+	gui.uiColorTheme = theme;
+
 	int sizeX, sizeY, comps;
 	glBindTexture(GL_TEXTURE_2D, gui.uiTexture);
 	unsigned char* data;
@@ -1903,7 +1945,7 @@ void ChangeTheme(int theme)
 	gui.uiColors[52] = gui.themes[theme].uiColors[8].g / 255.0f;
 	gui.uiColors[53] = gui.themes[theme].uiColors[8].b / 255.0f;
 
-	gui.uiColorTheme = theme;
+	
 
 	if (sampleDisplay.visible)
 	{

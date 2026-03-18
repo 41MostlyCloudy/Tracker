@@ -386,6 +386,11 @@ void copyNotes()
 			int selectedChannel = selection.x;
 			int selectedPart = selection.y;
 
+			if (selectedPart < 0)
+				continue;
+
+
+
 			if (selectedPart == -2) // Entire channel selected.
 			{
 				patternSelection.rows[y].note[selectedChannel - leftMostChannel] = loadedPattern.rows[y + editor.noteSelectionStart.y].note[selectedChannel];
@@ -409,7 +414,7 @@ void copyNotes()
 			{
 				selectedPart -= 7;
 
-				if (selectedPart >= 0) // Effecct
+				if (selectedPart >= 0) // Effect
 				{
 					int effectPart = (selectedPart) % 4;
 					int effectNum = (selectedPart) / 4;
@@ -488,6 +493,9 @@ void deleteNotes()
 		{
 			Vector2 selection = findFrameTileByPosition(x);
 
+			if (selection.y < 0)
+				continue;
+
 			if (selection.x != -1)
 			{
 				int selectedChannel = selection.x;
@@ -521,8 +529,15 @@ void deleteNotes()
 						int effectPart = (selectedPart) % 4;
 						int effectNum = (selectedPart) / 4;
 
-						loadedPattern.rows[y].effects[selectedChannel].cEffect[effectNum] = -1;
-						loadedPattern.rows[y].effects[selectedChannel].cEffectValue[effectNum] = -1;
+						if (effectPart == 1) // Remove increase/decrease property.
+						{
+							loadedPattern.rows[y].effects[selectedChannel].cEffect[effectNum] = int(loadedPattern.rows[y].effects[selectedChannel].cEffect[effectNum]) % 100;
+						}
+						else
+						{
+							loadedPattern.rows[y].effects[selectedChannel].cEffect[effectNum] = -1;
+							loadedPattern.rows[y].effects[selectedChannel].cEffectValue[effectNum] = -1;
+						}
 					}
 				}
 			}
@@ -543,6 +558,9 @@ void transposeNotes()
 		{
 			Vector2 selection = findFrameTileByPosition(x);
 
+			if (selection.y < 0)
+				continue;
+
 			if (selection.x != -1)
 			{
 				int selectedChannel = selection.x;
@@ -552,6 +570,12 @@ void transposeNotes()
 				{
 					if (loadedPattern.rows[y].note[selectedChannel] != -1)
 						loadedPattern.rows[y].note[selectedChannel] += editor.transposeValue;
+				}
+
+				while (selectedPart < 5) // Make sure that the same note isn't transposed twice.
+				{
+					selectedPart++;
+					x++;
 				}
 			}
 		}
@@ -570,6 +594,9 @@ void setNoteSamples()
 		for (int x = editor.noteSelectionStart.x; x < editor.noteSelectionEnd.x; x++)
 		{
 			Vector2 selection = findFrameTileByPosition(x);
+
+			if (selection.y < 0)
+				continue;
 
 			if (selection.x != -1)
 			{

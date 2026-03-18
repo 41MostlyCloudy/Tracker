@@ -203,7 +203,7 @@ void SaveInstrumentPreset(int presetNum, Instrument* sample)
             else if (sample->waveforms[wave].stereo == 2)
                 stereo2 = true;
 
-            writeVar = (int)stereo1 * 64.0f + (int)stereo2 * 32.0f + (int)sample->waveforms[wave].generateFromSines * 16.0f + (int)sample->waveforms[wave].reverseFrames * 8.0f + (int)sample->waveforms[wave].sustainForever * 4.0f + (int)sample->waveforms[wave].pitchToNote * 2.0f + (int)sample->waveforms[wave].continueNote;
+            writeVar = (int)sample->waveforms[wave].useArp * 128.0f + (int)stereo1 * 64.0f + (int)stereo2 * 32.0f + (int)sample->waveforms[wave].generateFromSines * 16.0f + (int)sample->waveforms[wave].reverseFrames * 8.0f + (int)sample->waveforms[wave].sustainForever * 4.0f + (int)sample->waveforms[wave].pitchToNote * 2.0f + (int)sample->waveforms[wave].continueNote;
             presetFile.write((char*)&writeVar, 1);
 
             for (int i = 0; i < 11; i++)
@@ -346,13 +346,15 @@ void LoadInstrumentPreset(int presetNum, Instrument* sample)
             sample->waveforms[wave].release = var2 / 16.0f;
             presetFile.read((char*)&readVar, 1);
 
-            float stereo1 = int(readVar / 64.0f);
-            float stereo2 = int(readVar / 32.0f) - (stereo1 * 64.0f);
-            float varE = int(readVar / 16.0f) - (stereo1 * 64.0f + stereo2 * 32.0f);
-            float varD = int(readVar / 8.0f) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f);
-            float varC = int(readVar / 4.0f) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f);
-            float varB = int(readVar / 2.0f) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f + varC * 4.0f);
-            float varA = int(readVar) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f + varC * 4.0f + varB * 2.0f);
+            int varF = int(readVar / 128.0f);
+            int stereo1 = int(readVar - (varF * 128.0f)) / 64.0f;
+            int stereo2 = int(readVar - (varF * 128.0f + stereo1 * 64.0f)) / 32.0f;
+            int varE = int(readVar - (varF * 128.0f + stereo1 * 64.0f + stereo2 * 32.0f)) / 16.0f;
+            int varD = int(readVar - (varF * 128.0f + stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f)) / 8.0f;
+            int varC = int(readVar - (varF * 128.0f + stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f)) / 4.0f;
+            int varB = int(readVar - (varF * 128.0f + stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f + varC * 4.0f)) / 2.0f;
+            int varA = int(readVar - (varF * 128.0f + stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f + varC * 4.0f + varB * 2.0f));
+            sample->waveforms[wave].useArp = (bool)varF;
             sample->waveforms[wave].generateFromSines = (bool)varE;
             sample->waveforms[wave].reverseFrames = (bool)varD;
             sample->waveforms[wave].sustainForever = (bool)varC;
@@ -384,7 +386,6 @@ void LoadInstrumentPreset(int presetNum, Instrument* sample)
             for (int i = 0; i < 11; i++)
             {
                 presetFile.read((char*)&readVar, 1);
-                sample->waveforms[wave].frequencies[i] = readVar;
             }
         }
         
@@ -424,7 +425,13 @@ void SaveSong() // Save the currently loaded song.
         for (int i = 0; i < frameUsed.size(); i++)
         {
             if (frameUsed[i] == false)
-                loadedSong.unusedFrames = true;
+            {
+                for (int ch = 0; ch < channels.size(); ch++)
+                {
+                    if (loadedSong.patterns[i].channels[ch].notes.size() > 0 || loadedSong.patterns[i].channels[ch].volumes.size() > 0 || loadedSong.patterns[i].channels[ch].effects.size() > 0)
+                        loadedSong.unusedFrames = true;
+                }
+            }
         }
 
         if (loadedSong.unusedFrames)
@@ -468,6 +475,7 @@ void SaveSong() // Save the currently loaded song.
     // Song file format.
 
     // Song Body:
+    //      1 byte: Version number.
     //      1 byte: Length of artist name.
     //      For each character:
     //          1 byte value.
@@ -478,7 +486,6 @@ void SaveSong() // Save the currently loaded song.
     //          1 byte: voice samples enables.
     //      1 byte: BPM
     //      1 byte: EDO
-    //      1 byte: Theme
     //      1 byte: # Of frames in frame sequence.
     //      For each index in the frame sequence:
     //          1 byte: Frame index number.
@@ -558,7 +565,11 @@ void SaveSong() // Save the currently loaded song.
     if (songFile.is_open())
     {
         ////////////////////// SONG
-        // 
+        
+
+        uint8_t version = int(programVersionNumber); // Version
+        songFile.write((char*)&version, 1);
+
         // Artist Name
         std::string artistName = loadedSong.artistName;
 
@@ -584,8 +595,6 @@ void SaveSong() // Save the currently loaded song.
         songFile.write((char*)&bpm, 1);
         uint8_t edo = int(loadedSong.edo); // EDO
         songFile.write((char*)&edo, 1);
-        uint8_t theme = int(gui.uiColorTheme); // Theme
-        songFile.write((char*)&theme, 1);
 
 
         uint8_t seqSize = loadedSong.patternSequence.size();
@@ -720,13 +729,13 @@ void SaveSong() // Save the currently loaded song.
                         }
 
                         uint8_t isWaveform = 0;
-                        int fineTune = loadedInstruments[i].waveforms[j].getFineTuneLookupIndex();
-                        isWaveform = fineTune * 16.0f + loadedInstruments[i].waveforms[j].operatorType;
+                        int periods = loadedInstruments[i].waveforms[j].periods;
+                        isWaveform = periods * 16.0f + loadedInstruments[i].waveforms[j].operatorType;
                         songFile.write((char*)&isWaveform, 1);
 
                         uint8_t waveVar = 0;
 
-                        if (loadedInstruments[i].waveforms[j].operatorType == 0) // Waveform-specific data.
+                        if (loadedInstruments[i].waveforms[j].operatorType != 1) // Waveform-specific data.
                         {
                             waveVar = int(loadedInstruments[i].waveforms[j].dutyCycle * 16.0f);
                             songFile.write((char*)&waveVar, 1);
@@ -762,8 +771,11 @@ void SaveSong() // Save the currently loaded song.
                         else if (loadedInstruments[i].waveforms[j].stereo == 2)
                             stereo2 = true;
 
-                        waveVar = (int)stereo1 * 64.0f + (int)stereo2 * 32.0f + (int)loadedInstruments[i].waveforms[j].generateFromSines * 16.0f + (int)loadedInstruments[i].waveforms[j].reverseFrames * 8.0f + (int)loadedInstruments[i].waveforms[j].sustainForever * 4.0f + (int)loadedInstruments[i].waveforms[j].pitchToNote * 2.0f + (int)loadedInstruments[i].waveforms[j].continueNote;
+                        
+                        waveVar = (int)loadedInstruments[i].waveforms[j].useArp * 128.0f + (int)stereo1 * 64.0f + (int)stereo2 * 32.0f + (int)loadedInstruments[i].waveforms[j].generateFromSines * 16.0f + (int)loadedInstruments[i].waveforms[j].reverseFrames * 8.0f + (int)loadedInstruments[i].waveforms[j].sustainForever * 4.0f + (int)loadedInstruments[i].waveforms[j].pitchToNote * 2.0f + (int)loadedInstruments[i].waveforms[j].continueNote;
                         songFile.write((char*)&waveVar, 1);
+
+                        //std::cout << " Write: " << int(waveVar);
 
                         int loopStart = loadedInstruments[i].waveforms[j].loopStart;
                         songFile.write((char*)&loopStart, 4);
@@ -812,13 +824,13 @@ void LoadSong(std::string name) // Load the song file with the given name.
     std::ifstream songFile("C:/" + fileNavigator.currentFilePath.std::filesystem::path::string() + "/" + name, std::ios::binary | std::ios::in);
 
     name.erase(name.length() - 5, 6);
-    loadedSong.songName = name;
 
     if (songFile.is_open())
     {
     // Song file format.
 
     // Song Body:
+    //      1 byte: Version number.
     //      1 byte: Length of artist name.
     //      For each character:
     //          1 byte value.
@@ -829,7 +841,6 @@ void LoadSong(std::string name) // Load the song file with the given name.
     //          1 byte: voice samples enables.
     //      1 byte: BPM
     //      1 byte: EDO
-    //      1 byte: Theme
     //      1 byte: # Of frames in frame sequence.
     //      For each index in the frame sequence:
     //          1 byte: Frame index number.
@@ -905,6 +916,21 @@ void LoadSong(std::string name) // Load the song file with the given name.
 
         ////////////////////// SONG
 
+        uint8_t version;
+        songFile.read((char*)&version, 1);
+
+        // Song uses incompatible program version.
+        if (version > programVersionNumber)
+        {
+            windowController.InitializeWindow("Newer Format", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 20, 16 });
+            songFile.close();
+            return;
+        }
+
+
+
+        loadedSong.songName = name;
+
         uint8_t artistNameNum;
         songFile.read((char*)&artistNameNum, 1);
 
@@ -938,9 +964,7 @@ void LoadSong(std::string name) // Load the song file with the given name.
         uint8_t edo;
         songFile.read((char*)&edo, 1);
         loadedSong.edo = edo;
-        uint8_t theme;
-        songFile.read((char*)&theme, 1);
-        gui.uiColorTheme = theme;
+        
 
         // Frame sequence
         uint8_t frameSeqNum;
@@ -1133,13 +1157,13 @@ void LoadSong(std::string name) // Load the song file with the given name.
                         songFile.read((char*)&waveform, 1);
                         var1 = int(waveform / 16.0f);
                         var2 = waveform - var1 * 16.0f;
-                        loadedInstruments[i].waveforms[j].setFineTuneFromLookupValue(int(var1));
+                        loadedInstruments[i].waveforms[j].periods = int(var1);
                         loadedInstruments[i].waveforms[j].operatorType = var2;
 
 
                         uint8_t waveVar = 0;
 
-                        if (loadedInstruments[i].waveforms[j].operatorType == 0) // Waveform-specific data.
+                        if (loadedInstruments[i].waveforms[j].operatorType != 1) // Waveform-specific data.
                         {
                             songFile.read((char*)&waveVar, 1);
                             loadedInstruments[i].waveforms[j].dutyCycle = float(waveVar) / 16.0f;
@@ -1171,22 +1195,27 @@ void LoadSong(std::string name) // Load the song file with the given name.
                         loadedInstruments[i].waveforms[j].decay = float(var1) / 16.0f;
                         loadedInstruments[i].waveforms[j].release = float(var2) / 16.0f;
 
-
+                        
                         
                         // Boolean flags
                         songFile.read((char*)&readVar, 1);
-                        float stereo1 = int(readVar / 64.0f);
-                        float stereo2 = int(readVar / 32.0f) - (stereo1 * 64.0f);
-                        float varE = int(readVar / 16.0f) - (stereo1 * 64.0f + stereo2 * 32.0f);
-                        float varD = int(readVar / 8.0f) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f);
-                        float varC = int(readVar / 4.0f) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f);
-                        float varB = int(readVar / 2.0f) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f + varC * 4.0f);
-                        float varA = int(readVar) - (stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f + varC * 4.0f + varB * 2.0f);
+                        int varF = int(readVar / 128.0f);
+                        int stereo1 = int(readVar - (varF * 128.0f)) / 64.0f;
+                        int stereo2 = int(readVar - (varF * 128.0f + stereo1 * 64.0f)) / 32.0f;
+                        int varE = int(readVar - (varF * 128.0f + stereo1 * 64.0f + stereo2 * 32.0f)) / 16.0f;
+                        int varD = int(readVar - (varF * 128.0f + stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f)) / 8.0f;
+                        int varC = int(readVar - (varF * 128.0f + stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f)) / 4.0f;
+                        int varB = int(readVar - (varF * 128.0f + stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f + varC * 4.0f)) / 2.0f;
+                        int varA = int(readVar - (varF * 128.0f + stereo1 * 64.0f + stereo2 * 32.0f + varE * 16.0f + varD * 8.0f + varC * 4.0f + varB * 2.0f));
+                        loadedInstruments[i].waveforms[j].useArp = (bool)varF;
                         loadedInstruments[i].waveforms[j].generateFromSines = (bool)varE;
                         loadedInstruments[i].waveforms[j].reverseFrames = (bool)varD;
                         loadedInstruments[i].waveforms[j].sustainForever = (bool)varC;
                         loadedInstruments[i].waveforms[j].pitchToNote = (bool)varB;
                         loadedInstruments[i].waveforms[j].continueNote = (bool)varA;
+
+
+                        
 
                         if (stereo2 == 1)
                             loadedInstruments[i].waveforms[j].stereo = 2;
@@ -1297,14 +1326,9 @@ void LoadGUIThemes()
             for (int x = 0; x < sizeX; x++)
             {
                 unsigned char* pixelOffset = data + ((9 * y) + x) * 3;
-                //if (gui.uiBrightMode)
-                //    newTheme.uiColors[8 - x] = { pixelOffset[0], pixelOffset[1], pixelOffset[2] };
-                //else
                 newTheme.uiColors[x] = { pixelOffset[0], pixelOffset[1], pixelOffset[2] };
             }
             
-            
-
             gui.themes.emplace_back(newTheme);
         }
     }
@@ -1314,15 +1338,7 @@ void LoadGUIThemes()
     return;
 }
 
-/*
-void SwapLightDarkMode()
-{
-    gui.uiBrightMode = !gui.uiBrightMode;
-    LoadGUIThemes();
-    SaveSettings();
 
-    return;
-}*/
 
 
 void SaveSettings()
@@ -1332,7 +1348,7 @@ void SaveSettings()
     if (settingsFile.is_open())
     {
         // Samples
-        uint8_t themeNum = gui.uiColorTheme;
+        uint8_t themeNum = uint8_t(gui.uiColorTheme);
         settingsFile.write((char*)&themeNum, 1); // Theme number.
 
         uint8_t chFoc = editor.channelFocus;
@@ -1343,9 +1359,9 @@ void SaveSettings()
 
         uint8_t light = gui.lightMode;
         settingsFile.write((char*)&light, 1); // Light mode.
-
-        settingsFile.close();
     }
+
+    settingsFile.close();
 
     return;
 }
@@ -1367,14 +1383,14 @@ void LoadSettings()
 
         uint8_t background;
         settingsFile.read((char*)&background, 1); // Background.
-        gui.background = bool(background);
+        gui.background = background;
 
         uint8_t light;
         settingsFile.read((char*)&light, 1); // Light mode.
         gui.lightMode = bool(light);
-
-        settingsFile.close();
     }
+
+    settingsFile.close();
 
     return;
 }

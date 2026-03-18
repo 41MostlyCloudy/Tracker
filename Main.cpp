@@ -315,7 +315,23 @@ void RunEngine()
             //stepSongOutCallback(delta);
             //stepSong();
 
+        if (editor.toRecordSong)
+        {
+            std::lock_guard<std::mutex> lock(mtx);
+            editor.toRecordSong = false;
+            RecordSong();
+            for (int wind = 0; wind < windowController.windows.size(); wind++) // Stop dragging windows.
+            {
+                if (windowController.windows[wind].name == "Exporting...")
+                {
+                    windowController.windows.erase(windowController.windows.begin() + wind);
+                    windowController.windows.shrink_to_fit();
+                    break;
+                }
+            }
 
+            continue;
+        }
         
 
         gui.drawScreen = false;
@@ -548,28 +564,25 @@ void RunEngine()
                 
                 if (sampleDisplay.visible && windowController.windows[i].name == "Instrument Editor")
                 {
-                    if (loadedInstruments[editor.selectedSample].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
-                    {
-                        glUseProgram(sampleShaderProgram);
+                    glUseProgram(sampleShaderProgram);
 
-                        glBindTexture(GL_TEXTURE_2D, sampleTex);
-                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 528, 192, 0, GL_RGB, GL_UNSIGNED_BYTE, sampleDisplay.pixelData);
-                        glBindVertexArray(sampleVAO);
+                    glBindTexture(GL_TEXTURE_2D, sampleTex);
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 528, 192, 0, GL_RGB, GL_UNSIGNED_BYTE, sampleDisplay.pixelData);
+                    glBindVertexArray(sampleVAO);
 
-                        GLint ratioInUIShader3 = glGetUniformLocation(sampleShaderProgram, "windowRatio");
-                        glUniform1f(ratioInUIShader3, screen.windowRatio);
+                    GLint ratioInUIShader3 = glGetUniformLocation(sampleShaderProgram, "windowRatio");
+                    glUniform1f(ratioInUIShader3, screen.windowRatio);
 
 
-                        GLint posInShader3 = glGetUniformLocation(sampleShaderProgram, "offset");
-                        glUniform2f(posInShader3, sampleDisplay.position.x, sampleDisplay.position.y + 0.5f);
+                    GLint posInShader3 = glGetUniformLocation(sampleShaderProgram, "offset");
+                    glUniform2f(posInShader3, sampleDisplay.position.x, sampleDisplay.position.y + 0.5f);
 
-                        glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 1); // Draw the sprites.
+                    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 1); // Draw the sprites.
 
 
-                        glUseProgram(uiShaderProgram);
-                        glBindTexture(GL_TEXTURE_2D, gui.uiTexture);
-                        glBindVertexArray(sVAO);
-                    }
+                    glUseProgram(uiShaderProgram);
+                    glBindTexture(GL_TEXTURE_2D, gui.uiTexture);
+                    glBindVertexArray(sVAO);
                 }
 
                 if (i == 0) // Draw scrollbars.
@@ -751,7 +764,7 @@ void processInput(GLFWwindow* window)
                 }
                 else if (bar == 4)
                 {
-                    gui.fileListScroll = (gui.scrollBars[bar].position / gui.scrollBars[bar].length) * fileNavigator.fileNames.size();
+                    fileNavigator.fileListScroll = (gui.scrollBars[bar].position / gui.scrollBars[bar].length) * fileNavigator.fileNames.size();
                     gui.drawFrameThisFrame = true;
                 }
             }
@@ -1436,7 +1449,8 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
         int selectedPart = notePos.y;
         int selectedChannel = notePos.x;
         
-
+        if (selectedPart < 0)
+            return;
 
         if (selectedPart < 3 && selectedPart != -2) // Playing keys
         {
@@ -1471,6 +1485,9 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
         }
         else if (selectedPart == 3 || selectedPart == 4) // Instrument
         {
+            if (loadedPattern.rows[loadedSong.currentNote].note[selectedChannel] < 0)
+                return;
+
             int val = 0;
 
             if (input > 47 && input < 58)
@@ -1482,9 +1499,6 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
 
             if (loadedPattern.rows[loadedSong.currentNote].instrument[selectedChannel] < 0)
                 loadedPattern.rows[loadedSong.currentNote].instrument[selectedChannel] = 0;
-
-            if (loadedPattern.rows[loadedSong.currentNote].note[selectedChannel] < 0)
-                loadedPattern.rows[loadedSong.currentNote].note[selectedChannel] = 48;
 
             if (selectedPart == 3)
             {
@@ -1528,7 +1542,7 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
             loadedSong.unsavedChanges = true;
             return;
         }
-        else // Effect value / Voice samples
+        else // Effect value
         {
             if (selectedPart >= 7) // Effect
             {
@@ -1546,6 +1560,11 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                     if (inputLetter < 0 || inputLetter > 26)
                         return;
 
+                    if (inputLetter == 2) //Clear effects effect does not have a value.
+                    {
+                        loadedPattern.rows[loadedSong.currentNote].effects[selectedChannel].cEffectValue[effectNum] = 0;
+                    }
+
                     float val = float(int(effectType / 100.0f)) * 100.0f;
 
                     if (loadedPattern.rows[loadedSong.currentNote].effects[selectedChannel].cEffect[effectNum] == -1)
@@ -1559,6 +1578,8 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                 {
                     if (effectType > -1) // Return if there is no effect on the line.
                     {
+                        if (effectType == 2) // Clear effects effect does not increase/decrease.
+                            return;
                         if (input == 100 || input == 105)
                         {
                             float val = effectType % 100;
@@ -1575,6 +1596,9 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                 }
                 else
                 {
+                    if (effectType == 2) // Clear effects effect does not have a value.
+                        return;
+
                     int inputNum;
                     if (input > 47 && input < 58)
                         inputNum = input - 48;
@@ -2912,24 +2936,6 @@ void rightClickButton(GLFWwindow* window)
 
 void releaseButton()
 {
-    if (editor.toRecordSong)
-    {
-        std::lock_guard<std::mutex> lock(mtx);
-        editor.toRecordSong = false;
-        RecordSong();
-        for (int wind = 0; wind < windowController.windows.size(); wind++) // Stop dragging windows.
-        {
-            if (windowController.windows[wind].name == "Exporting...")
-            {
-                windowController.windows.erase(windowController.windows.begin() + wind);
-                windowController.windows.shrink_to_fit();
-                break;
-            }
-        }
-        SaveSong();
-        return;
-    }
-
 
 
     // Set to draw the interface.

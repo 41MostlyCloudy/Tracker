@@ -54,9 +54,16 @@ struct RGBColor
 };
 
 
+/*
+struct AdditiveSynth
+{
+	
+};*/
+
+
 struct InstrumentWave
 {
-	int operatorType = 0; // 0=Wave, 1=sample, 2=voice
+	int operatorType = 0; // 0=Wave, 1=sample, 2=vadditive synth
 
 	// Wave types: Sine, Square, Triangle, Saw, Noise, Bell thing
 	int waveType = 0; // -1: Constantly open (so that the modulator can be used as a standalone wave.)
@@ -65,14 +72,15 @@ struct InstrumentWave
 	int loopStart = 0;
 	int loopEnd = 0;
 
+	int periods = 1;
+
 	std::vector <float> pcmFrames;
-	float fineTuneToC = 1.0f; // Since samples have an integer length, this value is used to scale their pitch to be in-tune.
 
 	// The duty cycle.
 	float dutyCycle = 1.0f;
 	float smoothness = 0.0f; // Smoothness (not for sine wave).
 	int numOfSineWaves = 15;
-	float offset = 0.0f; // Offsets the wave volume from the center.
+	float offset = 0.5f; // Offsets the wave volume from center = 0.5f.
 	
 	// Envelope
 	float attack = 0.0f;
@@ -96,32 +104,8 @@ struct InstrumentWave
 	bool sustainForever = true;
 	bool pitchToNote = true;
 	bool continueNote = true;
+	bool useArp = false;
 
-
-
-	int getFineTuneLookupIndex()
-	{
-		int fineTuneApprox = int(fineTuneToC * 10000);
-
-		if (fineTuneApprox == 10002) return 1;
-		if (fineTuneApprox == 10012) return 2;
-		if (fineTuneApprox == 10033) return 3;
-
-		return 0;
-	}
-
-	void setFineTuneFromLookupValue(int val)
-	{
-		if (val == 1) fineTuneToC = 1.0002f;
-		else if (val == 2) fineTuneToC = 1.00124f;
-		else if (val == 3) fineTuneToC = 1.00333f;
-		else fineTuneToC = 1.0f;
-
-		return;
-	}
-
-
-	
 };
 
 
@@ -201,7 +185,6 @@ struct GUI
 	Vector2 selectedWindowTile;
 
 	int frameListScroll = 0;
-	int fileListScroll = 0;
 	int sampleListScroll = 0;
 	Vector2i frameScroll;
 
@@ -212,7 +195,7 @@ struct GUI
 
 	int uiColorTheme = 26;
 	std::vector <GUITheme> themes = {};
-	bool background = false;
+	int background = 0;
 	bool lightMode = false;
 	int uiDisplayMenuOption = 0; // 0 = Piano, 1 = Effects
 
@@ -438,9 +421,30 @@ struct Editor
 
 
 
+struct ChannelWaveAdditiveSynth
+{
+	float freqReadPos[11] = { 0,0,0,0,0,0,0,0,0,0,0 };
+};
+
+
+struct ChannelAdditiveSynth
+{
+	// Frequencies (1 = fundamental frequency)
+	// (1/4) (1/3) (1/2) (1) (2) (3) (4) (5) (6) (7) (8)
+	float freqStartingVolumes[11] = { 0,0,0,0,0,0,0,0,0,0,0 };
+	float freqVolumes[11] = { 0,0,0,0,0,0,0,0,0,0,0 };
+	float freqSlides[11] = { 0,0,0,0,0,0,0,0,0,0,0 };
+
+	ChannelWaveAdditiveSynth waves[4];
+};
+
+
+
 struct ChannelWaveform
 {
 	float frameReadPos = 0.0f;
+
+	float chorusReadPos = 0.0f;
 
 	float pitch = 0.0f;
 	float volume = 1.0f;
@@ -493,11 +497,6 @@ struct ChannelWaveform
 
 		return y4;
 	}
-
-
-
-
-
 };
 
 
@@ -517,6 +516,8 @@ struct Channel
 
 	
 	ChannelWaveform waveforms[4];
+
+	ChannelAdditiveSynth additiveSynth;
 
 
 	float panValue = 0.0f;
@@ -547,6 +548,8 @@ struct Channel
 	float jumpPoint = 0;
 
 	int instrument = 0;
+
+	int retriggerTimer = 0;
 
 
 
@@ -580,6 +583,55 @@ struct Channel
 	float pastVolsL[128] = {0.0f};
 	float pastVolsR[128] = {0.0f};
 	*/
+
+
+	void resetChannelEffects()
+	{
+		for (int wave = 0; wave < 4; wave++)
+		{
+			waveforms[wave].volumeSlide = 0.0f;
+		}
+
+		panValue = 0.0f;
+		panSlide = 0.0f;
+
+		pitchSlide = 0.0f;
+
+		volume = 1.0f;
+		volumeSlide = 0.0f;
+
+		highPass = 0.0f;
+		highPassSlide = 0.0f;
+
+		float cutoffFreq = highPass * 2000.0f;
+		if (cutoffFreq <= 0)
+			cutoffFreq = 1.0f;
+		float RC = 1.0f / (2.0f * 3.14159265f * cutoffFreq);
+		alphaHigh = RC / (RC + (1.0f / 48000.0f));
+
+		frameOffset = 0;
+
+		lowPass = 0.0f;
+		lowPassSlide = 0.0f;
+
+		retrigger = 0.0f;
+		retriggerSlide = 0.0f;
+
+		jumpPoint = -1.0f;
+		jumpSlide = 0.0f;
+
+		fuzzLevel = 1.0f;
+		fuzzSlide = 0.0f;
+
+		sampleRate = 1.0f;
+		sampleRateSlide = 0.0f;
+
+		for (int i = 0; i < 11; i++)
+		{
+			additiveSynth.freqVolumes[i] = additiveSynth.freqStartingVolumes[i];
+			additiveSynth.freqSlides[i] = 0.0f;
+		}
+	}
 };
 
 
@@ -642,7 +694,7 @@ struct Song
 {
 	std::string songName = "NewSong1";
 	std::string artistName = "Me";
-	std::string notes = "";
+
 
 	int edo = 12; // Equal divisions of an octave. (Number of tones)
 	float startingBPM = 120;
@@ -824,6 +876,8 @@ struct FileNavigator
 
 	std::vector <std::string> fileNames = {};
 
+	int fileListScroll = 0;
+
 
 
 	
@@ -849,11 +903,7 @@ struct FileNavigator
 			fileNames.emplace_back(sampleName);
 		}
 
-		
-
-
-
-		
+		fileListScroll = 0;
 
 		return;
 	}
