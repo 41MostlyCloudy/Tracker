@@ -1,5 +1,37 @@
 
 
+
+
+
+// Computer Volume
+
+// Fix EDO transpose.
+
+
+
+// Make presets.
+
+
+// Fix the playing crash.
+
+
+
+
+// Keyboard Song
+
+// Stepping on Snow
+
+// Lunar Memories
+
+// Fatal Error
+
+
+
+
+
+
+
+
 // Create a demo song using keyboard samples and samples around the house.
 
 // Create a demo song using a different EDO.
@@ -8,14 +40,10 @@
 
 // Create a demo song with high use of additive synth instruments.
 
-// Create a demo song with drum breaks.
+// Create a demo song with drum breaks, dynamic synths and samples.
 
 
 
-
-
-
-// There is a crash in playing AddTest.
 
 
 
@@ -24,11 +52,10 @@
 
 // Fix set LFO crash?
 
-// Fix setting harmonic crash?
-
 // Is there a crash in the regular program loop?
 
 // Is the crash caused by starting and stopping the song?
+
 
 
 // Create 10 3 minute demo songs.
@@ -49,6 +76,25 @@
 
 
 // Release version 1.0. ////////////////////////////////////////////////////////////////////
+
+
+
+// Only save sample frames if using.
+
+// Delete additive synth completely.
+
+
+
+// What is causing the file reading problem?
+//	-It only happens when multiple operators are set to additive waves, regardless of whether they are read. The wave corresponding to the operator is removed.
+//	-Check all references to additive wave frequencies in relation to regular sample frequencies.
+
+// Is the additive crash in the onBeat reading or in modulator reading?
+
+
+// Does delay cause the crash?
+
+////////////////////////////
 
 
 // Rework the envelope system.

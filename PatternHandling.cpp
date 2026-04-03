@@ -285,7 +285,7 @@ void saveCurrentPattern()
 void loadCurrentPattern()
 {
 	loadedPattern = unrollPattern(loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]]);
-	gui.frameScroll.y = 0.0f;
+	gui.patternScroll.y = 0;
 
 	// The interface has changed, and must be redrawn.
 	gui.drawUIThisFrame = true;
@@ -606,7 +606,7 @@ void setNoteSamples()
 				if (selectedPart < 5)
 				{
 					if (loadedPattern.rows[y].instrument[selectedChannel] != -1)
-						loadedPattern.rows[y].instrument[selectedChannel] = editor.selectedSample;
+						loadedPattern.rows[y].instrument[selectedChannel] = editor.selectedInstrument;
 				}
 			}
 		}

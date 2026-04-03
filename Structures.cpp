@@ -72,7 +72,7 @@ struct InstrumentWave
 	int loopStart = 0;
 	int loopEnd = 0;
 
-	int periods = 1;
+	
 
 	std::vector <float> pcmFrames;
 
@@ -87,6 +87,8 @@ struct InstrumentWave
 	float sustain = 0.0f;
 	float decay = 0.0f;
 	float release = 0.0f;
+
+	float fuzz = 0.0f;
 
 	int lfo = 0; // 0=1, 1=0.1, 2=0.01, 3=0.001
 
@@ -127,7 +129,7 @@ struct Instrument
 	float arpSpeed = 0.5f; // Arpeggiation speed in subdivisions of a beat.
 	float arpLength = 0.0f;
 
-	std::string sampleName = "NewSample";
+	std::string name = "NewSample";
 	std::vector <int> jumpPoints = {};
 
 	float glide = 0.0f;
@@ -147,28 +149,13 @@ struct GUITheme
 
 struct ScrollBar
 {
-	Vector2i topLeft;
 	float position = 0.0f;
-	float length = 10.0f;
-	bool horizontal = false;
 	bool drag = false;
 };
 
 
 struct GUI
 {
-	// Scrollbars
-	std::vector <ScrollBar> scrollBars =
-	{
-	{ { 6, 3 }, 0.0f, 8, false, false }, // frameMenuScroll
-	{ { 91, 3 }, 0.0f, 8, false, false }, // sampleMenuScroll
-	{ { 91, 17 }, 0.0f, 38, false, false }, // NoteScroll
-	{ { 6, 56 }, 0.0f, 84, true, false }, // NoteScrollHorizontal
-	{ { -1, -1 }, 0.0f, 17, false, false }, // fileScroll
-	//{ { -1, -1 }, 0.0f, 49, true, false }, // sampleEditorScroll
-	};
-
-
 	bool clickingOnFloatingWind = false;
 
 	bool drawScreen = false;
@@ -184,9 +171,18 @@ struct GUI
 	Vector2 selectedTile;
 	Vector2 selectedWindowTile;
 
-	int frameListScroll = 0;
-	int sampleListScroll = 0;
-	Vector2i frameScroll;
+	int patternListScroll = 0;
+	ScrollBar patternListScrollBar;
+	int instrumentListScroll = 0;
+	ScrollBar instrumentListScrollBar;
+	Vector2i patternScroll;
+	ScrollBar patternVerticalScrollBar;
+	ScrollBar patternHorizontalScrollBar;
+
+	int mixScroll = 0;
+	ScrollBar mixScrollBar;
+
+	bool draggingScrollBar = false;
 
 
 	float songLength = 0; // Song length in seconds.
@@ -202,7 +198,7 @@ struct GUI
 	unsigned int uiTexture;
 
 
-	float uiColors[54] =
+	float uiColors[55] =
 	{
 		0.0f, 0.0f, 0.0f, // Blue/Gray\n"
 		30.0f / 255.0f, 30.0f / 255.0f, 60.0f / 255.0f,
@@ -226,6 +222,7 @@ struct GUI
 		63.0f / 255.0f, 100.0f / 255.0f, 100.0f / 255.0f, // Accent colors
 		127.0f / 255.0f, 190.0f / 255.0f, 0.0f,
 		1.0f, 1.0f, 0.0f,
+
 	};
 
 
@@ -269,11 +266,10 @@ struct Editor
 	// Selectable Buttons:
 	// 0 = Song name, 1 = BPM, 2 = TPB, 3 = OCT, 4 = ROW, 5 = BEAT, 6 = Artist name, 7 = notes window, 8 = sample name, 9-27 = None, 28 = Resample Size
 	int selectedButton = -1;
-	int selectedSample = 0;
+	int selectedInstrument = 0;
 	int selectedKey = -1;
 	int selectedFile = 0;
 	int selectedChannel = 0;
-	int selectedVoiceSample = 0;
 
 	Vector2 noteSelectionStart;
 	Vector2 noteSelectionEnd;
@@ -435,6 +431,9 @@ struct ChannelAdditiveSynth
 	float freqVolumes[11] = { 0,0,0,0,0,0,0,0,0,0,0 };
 	float freqSlides[11] = { 0,0,0,0,0,0,0,0,0,0,0 };
 
+	int shapeWaveToOp = -1;
+	float waveShapeSlide = 0.0f;
+
 	ChannelWaveAdditiveSynth waves[4];
 };
 
@@ -442,9 +441,8 @@ struct ChannelAdditiveSynth
 
 struct ChannelWaveform
 {
-	float frameReadPos = 0.0f;
+	float patternReadPos = 0.0f;
 
-	float chorusReadPos = 0.0f;
 
 	float pitch = 0.0f;
 	float volume = 1.0f;
@@ -503,7 +501,7 @@ struct ChannelWaveform
 // Audio channel
 struct Channel
 {
-	int frameOffset = 0; // If set more than 0, decrement.
+	int patternOffset = 0; // If set more than 0, decrement.
 	int offsetNote = 0;
 	int offsetInstrument = 0;
 	int offsetPos = 0;
@@ -523,6 +521,7 @@ struct Channel
 	float panValue = 0.0f;
 	float panSlide = 0.0f;
 
+	float mixVolume = 1.0f;
 	float volume = 1.0f;
 	float volumeSlide = 0.0f;
 
@@ -530,9 +529,6 @@ struct Channel
 
 	float retrigger = 0.0f;
 	float retriggerSlide = 0.0f;
-
-	float fuzzLevel = 1.0f; // Larger values add more fuzz.
-	float fuzzSlide = 0.0f;
 
 	float sampleRate = 1.0f;
 	float sampleRateSlide = 0.0f;
@@ -585,7 +581,7 @@ struct Channel
 	*/
 
 
-	void resetChannelEffects()
+	void resetChannelEffects(bool resetVolume)
 	{
 		for (int wave = 0; wave < 4; wave++)
 		{
@@ -597,7 +593,8 @@ struct Channel
 
 		pitchSlide = 0.0f;
 
-		volume = 1.0f;
+		if (resetVolume)
+			volume = 1.0f;
 		volumeSlide = 0.0f;
 
 		highPass = 0.0f;
@@ -609,7 +606,7 @@ struct Channel
 		float RC = 1.0f / (2.0f * 3.14159265f * cutoffFreq);
 		alphaHigh = RC / (RC + (1.0f / 48000.0f));
 
-		frameOffset = 0;
+		patternOffset = 0;
 
 		lowPass = 0.0f;
 		lowPassSlide = 0.0f;
@@ -619,9 +616,6 @@ struct Channel
 
 		jumpPoint = -1.0f;
 		jumpSlide = 0.0f;
-
-		fuzzLevel = 1.0f;
-		fuzzSlide = 0.0f;
 
 		sampleRate = 1.0f;
 		sampleRateSlide = 0.0f;
@@ -742,7 +736,7 @@ struct SampleDisplay
 
 	//float zoomFactor = 1.0f; // Increase to zoom in on the sample.
 
-	bool playingSample = false;
+	bool playingInstrument = false;
 
 	bool drawing = false;
 	Vector2 drawWavePos; // { pos in frames, volume }
@@ -877,7 +871,7 @@ struct FileNavigator
 	std::vector <std::string> fileNames = {};
 
 	int fileListScroll = 0;
-
+	ScrollBar fileScrollBar;
 
 
 	
@@ -897,8 +891,10 @@ struct FileNavigator
 				sampleName = "1" + dir_entry.path().std::filesystem::path::filename().generic_string();
 			else if (dir_entry.path().std::filesystem::path::extension() == ".wav")
 				sampleName = "2" + dir_entry.path().std::filesystem::path::filename().generic_string();
-			else
+			else if (dir_entry.path().std::filesystem::path::extension() == ".inst")
 				sampleName = "3" + dir_entry.path().std::filesystem::path::filename().generic_string();
+			else
+				sampleName = "4" + dir_entry.path().std::filesystem::path::filename().generic_string();
 
 			fileNames.emplace_back(sampleName);
 		}
@@ -941,28 +937,46 @@ struct FileNavigator
 
 struct PresetMenu
 {
+	std::filesystem::path currentFilePath;
+
+	std::vector <std::string> fileNames = {};
+
+
 	// 32 * 6 = 192
 	int instrumentType = 0;
+	std::string categories[6] = { "Leads", "Pads", "Bass", "Keys", "Percussion", "SFX" };
 
 	int selectedSample = 0;
 
-	std::string presetNames[192] = {
-		"(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)",
-		"(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)",
 
-		"(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)",
-		"(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)",
+	void NavigateToFile()
+	{
+		std::string pathName = "C:/" + currentFilePath.std::filesystem::path::string();
 
-		"(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)",
-		"(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)",
+		fileNames.clear();
+		for (auto const& dir_entry : std::filesystem::directory_iterator(pathName))
+		{
+			std::string sampleName;
+			if (dir_entry.path().std::filesystem::path::extension() == ".inst")
+			{
+				sampleName = dir_entry.path().std::filesystem::path::filename().generic_string();
+				sampleName.erase(sampleName.length() - 5, 6);
+				fileNames.emplace_back(sampleName);
+			}
+		}
 
-		"(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)",
-		"(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)",
+		return;
+	}
 
-		"(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)",
-		"(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)",
+	void NavigateToInstrumentType(std::string category)
+	{
+		currentFilePath = std::filesystem::relative("Presets", "C:/");
+		currentFilePath = currentFilePath.std::filesystem::path::append(category);
+		NavigateToFile();
+		return;
+	}
 
-		"(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)",
-		"(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)","(...)",
-	};
+
+
+
 };
