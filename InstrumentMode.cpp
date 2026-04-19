@@ -3,65 +3,11 @@
 
 
 
-// Computer Volume
-
-// Fix EDO transpose.
-
-
-
-// Make presets.
-
-
-// Fix the playing crash.
-
-
-
-
-// Keyboard Song
-
-// Stepping on Snow
-
-// Lunar Memories
-
-// Fatal Error
-
-
-
-
-
-
-
-
-// Create a demo song using keyboard samples and samples around the house.
-
-// Create a demo song using a different EDO.
-
-// Create a demo song around saw waves and a lot of effects.
-
-// Create a demo song with high use of additive synth instruments.
-
-// Create a demo song with drum breaks, dynamic synths and samples.
-
-
-
-
-
-
-
-
-
-// Fix set LFO crash?
-
-// Is there a crash in the regular program loop?
-
-// Is the crash caused by starting and stopping the song?
-
-
-
-// Create 10 3 minute demo songs.
-
-
-// Create synth presets.
+// Crash while playing and trying to adjust frequencies.
+// Crash while playing and trying to adjust attack. (Could the crash be in the sliders?).
+// Crash while pressing key to add note while stopping song.
+// Crash while playing song Test3. (Possible problem with playing mod?)
+// Crash while stopping song.
 
 
 // Rework help page.
@@ -72,39 +18,52 @@
 //	-Effects
 
 
-// Create names for light themes.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // Release version 1.0. ////////////////////////////////////////////////////////////////////
 
+// Add pattern channel split.
 
+// Fix different instruments cause clipping in interpolation.
 
-// Only save sample frames if using.
+// Add 16 bit samples.
 
-// Delete additive synth completely.
-
-
-
-// What is causing the file reading problem?
-//	-It only happens when multiple operators are set to additive waves, regardless of whether they are read. The wave corresponding to the operator is removed.
-//	-Check all references to additive wave frequencies in relation to regular sample frequencies.
-
-// Is the additive crash in the onBeat reading or in modulator reading?
-
-
-// Does delay cause the crash?
-
-////////////////////////////
-
-
-// Rework the envelope system.
-
+// Add loading sterio.
 
 // Fix wave A and B subharmonics.
 
+// Find a better way to add and delete channels.
 
-// Fix retrigger effect only working with looping samples and not stopping at stop note.
+// Only save sample frames if using.
 
+// Rework the envelope system.
 
 // Re-implement and fix C effect.
 // Fix C command stopping the end of frame. (and clipping)
@@ -151,8 +110,6 @@
 // Add compress as a sample waveform edit.
 // Add an undo button for the sample editor.
 
-
-// Add voice to compressed channel effect drawing with another horizontal tile. It looks like a long oval.
 
 
 // Add starting partway through a frame by reading until that point is reached.

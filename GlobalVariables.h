@@ -38,6 +38,7 @@ FileNavigator fileNavigator;
 SampleDisplay sampleDisplay;
 PresetMenu presetMenu;
 
+
 int programVersionNumber = 0;
 
 

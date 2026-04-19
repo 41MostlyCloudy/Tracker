@@ -121,7 +121,7 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
 
 
 
-    float resampleIndex = channels[channel].waveforms[op].patternReadPos;
+    float resampleIndex = channels[channel].waveforms[op].sampleReadPos;
 
     // Make sure that the frame reading position is inside the sample.
     if (resampleIndex < 0.0f)
@@ -130,30 +130,8 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
         resampleIndex = loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames.size() - 1;
 
 
-    // Make sure additive waves are in range.
-    /*
-    if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].operatorType == 2)
-    {
-        //return;
-        for (int freq = 0; freq < 11; freq++)
-        {
-            if (channels[channel].additiveSynth.waves[op].freqReadPos[freq] >= loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames.size() - 1)
-                channels[channel].additiveSynth.waves[op].freqReadPos[freq] = loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames.size() - 1;
-            else if (channels[channel].additiveSynth.waves[op].freqReadPos[freq] < 0)
-                channels[channel].additiveSynth.waves[op].freqReadPos[freq] = 0;
-        }
-    }
 
-
-    // Set initial additive harmonics.
-    float initialAdditiveVols[11];
-    if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].operatorType == 2)
-    {
-        for (int freq = 0; freq < 11; freq++)
-        {
-            initialAdditiveVols[freq] = channels[channel].additiveSynth.freqVolumes[freq];
-        }
-    }*/
+    
 
 
     for (int i = 0; i < frameCount; i++)
@@ -239,54 +217,51 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
         float frameVol = loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[index1] * (1.0f - t) + loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[index2] * t;
 
 
-
-
         float frameVolStereo[2] = { frameVol, frameVol };
         
-
         resampleIndex += notePitch;
 
-        // Increment additive wave.
-        /*
-        if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].operatorType == 2)
+        /////////////////////////////////////// Read interpolation volume.
+        if (channels[channel].waveforms[op].interpTimer > 0.0f)
         {
-            int sampleLen = loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames.size();
-            frameVol = 0.0f;
+            // Interpolation frame reading position.
+            float interpolateIndex = channels[channel].waveforms[op].interpLastReadPos;
 
-            for (int freq = 0; freq < 11; freq++)
-            {
-                int fIndex1 = int(channels[channel].additiveSynth.waves[op].freqReadPos[freq]);
-                int fIndex2 = int(channels[channel].additiveSynth.waves[op].freqReadPos[freq]) + 1;
+            int lastInstrument = channels[channel].interpLastInstrument;
 
-
-                float fT = channels[channel].additiveSynth.waves[op].freqReadPos[freq] - fIndex1;  // Fractional part
-
-                if (fIndex2 >= loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames.size())
-                    fIndex2 = 0;
-
-                float freqVol = loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[fIndex1] * (1.0f - fT) + loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[fIndex2] * fT;
-                float vol = channels[channel].additiveSynth.freqVolumes[freq];
-                if (vol < 0.0f) vol = 0.0f;
-                else if (vol > 8.0f) vol = 8.0f;
-                frameVol += freqVol * vol;
+            // Make sure that the frame reading position is inside the sample.
+            if (interpolateIndex < 0.0f)
+                interpolateIndex = 0.0f;
+            if (interpolateIndex >= loadedInstruments[lastInstrument].waveforms[waveForm].pcmFrames.size() - 1)
+                interpolateIndex = loadedInstruments[lastInstrument].waveforms[waveForm].pcmFrames.size() - 1;
 
 
 
+            float iTime = channels[channel].waveforms[op].interpTimer;
 
-                float freqScale = float(freq - 2);
-                if (freq < 3)
-                    freqScale = 1.0f / float(4 - freq);
 
-                channels[channel].additiveSynth.waves[op].freqReadPos[freq] += notePitch * freqScale;
+            float interpSampleRateIndex = int(interpolateIndex / channels[channel].sampleRate) * channels[channel].sampleRate;
+            int interpIndex1 = int(interpSampleRateIndex);
+            int interpIndex2 = int(interpSampleRateIndex) + 1;
 
-                // End of sample.
-                while (channels[channel].additiveSynth.waves[op].freqReadPos[freq] >= sampleLen) channels[channel].additiveSynth.waves[op].freqReadPos[freq] -= sampleLen;
-                while (channels[channel].additiveSynth.waves[op].freqReadPos[freq] < 0) channels[channel].additiveSynth.waves[op].freqReadPos[freq] += sampleLen;
-            }
 
-            frameVolStereo[0] = frameVol;
-            frameVolStereo[1] = frameVol;
-        }*/
+            float interpT = interpolateIndex - interpIndex1;  // Fractional part
+
+
+            if (interpIndex2 >= loadedInstruments[lastInstrument].waveforms[waveForm].pcmFrames.size())
+                interpIndex2 = 0;
+
+            float interpFrameVol = loadedInstruments[lastInstrument].waveforms[waveForm].pcmFrames[interpIndex1] * (1.0f - interpT) + loadedInstruments[lastInstrument].waveforms[waveForm].pcmFrames[interpIndex2] * interpT;
+
+
+            frameVolStereo[0] = interpFrameVol * iTime + frameVolStereo[0] * (1.0f - iTime);
+            frameVolStereo[1] = interpFrameVol * iTime + frameVolStereo[1] * (1.0f - iTime);
+
+            channels[channel].waveforms[op].interpLastReadPos += notePitch;
+            channels[channel].waveforms[op].interpTimer -= 0.01f;
+        }
+
+
 
         //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -314,67 +289,40 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
                     {
                         int sampleLen = loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames.size();
 
-                        if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].operatorType == 2)
-                        {
-                            for (int freq = 0; freq < 11; freq++)
-                            {
-                                float freqScale = float(freq - 2);
-                                if (freq < 3)
-                                    freqScale = 1.0f / float(4 - freq);
+                        float delayIndex = resampleIndex + mods[modNum][i * 2 + stereoOffset] * 100.0f;
+                        while (delayIndex >= sampleLen) delayIndex -= sampleLen;
+                        while (delayIndex < 0) delayIndex += sampleLen;
 
-                                float delayIndex = channels[channel].additiveSynth.waves[op].freqReadPos[freq] + (mods[modNum][i * 2 + stereoOffset] * 100.0f) * freqScale;
-                                while (delayIndex >= sampleLen) delayIndex -= sampleLen;
-                                while (delayIndex < 0) delayIndex += sampleLen;
+                        ma_uint32 dIndex1 = delayIndex;
+                        ma_uint32 dIndex2 = delayIndex + 1;
 
-                                ma_uint32 dIndex1 = delayIndex;
-                                ma_uint32 dIndex2 = delayIndex + 1;
+                        float t2 = delayIndex - dIndex1;  // Fractional part
+                        if (dIndex2 >= sampleLen)
+                            dIndex2 = 0;
 
-                                float t2 = delayIndex - dIndex1;  // Fractional part
-                                if (dIndex2 >= sampleLen)
-                                    dIndex2 = 0;
-
-                                float freqVol = loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[dIndex1] * (1.0f - t2) + loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[dIndex2] * t2;
-                                float vol = channels[channel].additiveSynth.freqVolumes[freq];
-                                if (vol < 0.0f) vol = 0.0f;
-                                else if (vol > 8.0f) vol = 8.0f;
-                                frameVol += freqVol * vol;
-                            }
-                        }
-                        else
-                        {
-                            float delayIndex = resampleIndex + mods[modNum][i * 2 + stereoOffset] * 100.0f;
-                            while (delayIndex >= sampleLen) delayIndex -= sampleLen;
-                            while (delayIndex < 0) delayIndex += sampleLen;
-
-                            ma_uint32 dIndex1 = delayIndex;
-                            ma_uint32 dIndex2 = delayIndex + 1;
-
-                            float t2 = delayIndex - dIndex1;  // Fractional part
-                            if (dIndex2 >= sampleLen)
-                                dIndex2 = 0;
-
-                            frameVolStereo[stereoOffset] += loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[dIndex1] * (1.0f - t2) + loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[dIndex2] * t2;
-                        }
+                        frameVolStereo[stereoOffset] += loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[dIndex1] * (1.0f - t2) + loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[dIndex2] * t2;
                     }
                     else if (loadedInstruments[channels[channel].instrument].modulationTypes[modNum] > 2) // Apply low-pass.
                     {
                         int modType = loadedInstruments[channels[channel].instrument].modulationTypes[modNum];
+                        float lpCutoff; // Cutoff frequency in Hz
 
                         // Set initial parameters
                         if (modType == 4)
-                            channels[channel].waveforms[op].cutoff = (loadedInstruments[channels[channel].instrument].lPResonances[modNum]) * 4000.0f * abs(notePitch);
+                            lpCutoff = loadedInstruments[channels[channel].instrument].lPResonances[modNum] * 4000.0f * abs(notePitch);
                         else
-                            channels[channel].waveforms[op].cutoff = (abs(mods[modNum][i * 2 + stereoOffset])) * 4000.0f * abs(notePitch);
+                            lpCutoff = (abs(mods[modNum][i * 2 + stereoOffset])) * 4000.0f * abs(notePitch);
 
-                        if (channels[channel].waveforms[op].cutoff < 200.0f) channels[channel].waveforms[op].cutoff = 200.0f;
-                        else if (channels[channel].waveforms[op].cutoff > 24000.0f) channels[channel].waveforms[op].cutoff = 24000.0f;
+                        
+                        if (lpCutoff < 200.0f) lpCutoff = 200.0f;
+                        else if (lpCutoff > 24000.0f) lpCutoff = 24000.0f;
 
                         // Update parameters.
                         // Normalize cutoff frequency (0 to 1, where 1 = Nyquist)
-                        channels[channel].waveforms[op].f = 2.0f * channels[channel].waveforms[op].cutoff / 48000.0f;
+                        float f = 2.0f * lpCutoff / 48000.0f;
 
                         // Clamp to valid range
-                        if (channels[channel].waveforms[op].f > 0.99) channels[channel].waveforms[op].f = 0.99;
+                        if (f > 0.99) f = 0.99;
 
                         // Calculate feedback amount from resonance
                         float resonance;
@@ -383,33 +331,13 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
                         else
                             resonance = abs(mods[modNum][i * 2 + stereoOffset]) * 2.0f;
 
-                        channels[channel].waveforms[op].q = 1.0 - channels[channel].waveforms[op].f;
-                        channels[channel].waveforms[op].fb = resonance + resonance / (1.0f - channels[channel].waveforms[op].f);
+                        float q = 1.0 - f;
+                        float fb = resonance + resonance / (1.0f - f);
 
                         // Process audio samples
-                        frameVolStereo[stereoOffset] = channels[channel].waveforms[op].process(frameVol);
+                        frameVolStereo[stereoOffset] = channels[channel].waveforms[op].process(frameVol, f, fb, q);
                     }
                 }
-            }
-        }
-
-        // Modulation effects additive wave reading position.
-        readPosMovedByMods += resampleIndex;
-        if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].operatorType == 2)
-        {
-            int sampleLen = loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames.size();
-
-            for (int freq = 0; freq < 11; freq++)
-            {
-                float freqScale = float(freq - 2);
-                if (freq < 3)
-                    freqScale = 1.0f / float(4 - freq);
-
-                channels[channel].additiveSynth.waves[op].freqReadPos[freq] += readPosMovedByMods * freqScale;
-
-                // End of sample.
-                while (channels[channel].additiveSynth.waves[op].freqReadPos[freq] >= sampleLen) channels[channel].additiveSynth.waves[op].freqReadPos[freq] -= sampleLen;
-                while (channels[channel].additiveSynth.waves[op].freqReadPos[freq] < 0) channels[channel].additiveSynth.waves[op].freqReadPos[freq] += sampleLen;
             }
         }
         
@@ -474,35 +402,7 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
                 channels[channel].waveforms[op].glideDest = 0;
         }
 
-        // Additive harmonic slides
-        /*
-        if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].operatorType == 2)
-        {
-            for (int freq = 0; freq < 11; freq++)
-            {
-                channels[channel].additiveSynth.freqVolumes[freq] += channels[channel].additiveSynth.freqSlides[freq] * 0.0001f * 120.0f;
-            
-                // Additive waveShape slide
-                if (channels[channel].additiveSynth.shapeWaveToOp > -1)
-                {
-                    float interp = channels[channel].additiveSynth.waveShapeSlide * 0.005f;
 
-                    channels[channel].additiveSynth.freqVolumes[freq] = channels[channel].additiveSynth.freqVolumes[freq] * (1.0f - interp) + loadedInstruments[channels[channel].instrument].waveforms[channels[channel].additiveSynth.shapeWaveToOp].frequencies[freq] * interp;
-                }
-
-                // Cap harmonic volumes.
-                if (channels[channel].additiveSynth.freqVolumes[freq] < 0.0f)
-                {
-                    channels[channel].additiveSynth.freqVolumes[freq] = 0.0f;
-                    channels[channel].additiveSynth.freqSlides[freq] = 0.0f;
-                }
-                else if (channels[channel].additiveSynth.freqVolumes[freq] > 8.0f)
-                {
-                    channels[channel].additiveSynth.freqVolumes[freq] = 8.0f;
-                    channels[channel].additiveSynth.freqSlides[freq] = 0.0f;
-                }
-            }
-        }*/
          
 
 
@@ -564,20 +464,10 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
         }
     }
 
-    channels[channel].waveforms[op].patternReadPos = resampleIndex;
+    channels[channel].waveforms[op].sampleReadPos = resampleIndex;
 
 
 
-
-    /*
-    // Restore additive harmonics.
-    if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].operatorType == 2)
-    {
-        for (int freq = 0; freq < 11; freq++)
-        {
-            channels[channel].additiveSynth.freqVolumes[freq] = initialAdditiveVols[freq];
-        }
-    }*/
 
 
     return;
@@ -589,39 +479,7 @@ void applySubtractiveFilters(float* pOutputF32, ma_uint64 frameCount, int channe
 {
     // Add parameter slides
 
-    // Additive harmonic slides
-    for (int wave = 0; wave < 4; wave++)
-    {
-        if (loadedInstruments[channels[channel].instrument].waveforms[wave].operatorType == 2)
-        {
-            for (int freq = 0; freq < 11; freq++)
-            {
-                // Harmonic volume slide
-                channels[channel].additiveSynth.freqVolumes[freq] += channels[channel].additiveSynth.freqSlides[freq] * 0.0001f * 120.0f * frameCount;
-
-                // Additive waveShape slide
-                if (channels[channel].additiveSynth.shapeWaveToOp > -1)
-                {
-                    float interp = channels[channel].additiveSynth.waveShapeSlide * 0.005f;
-
-                    for (int i = 0; i < frameCount; i++)
-                        channels[channel].additiveSynth.freqVolumes[freq] = channels[channel].additiveSynth.freqVolumes[freq] * (1.0f - interp) + loadedInstruments[channels[channel].instrument].waveforms[channels[channel].additiveSynth.shapeWaveToOp].frequencies[freq] * interp;
-                }
-
-                // Cap harmonic volumes.
-                if (channels[channel].additiveSynth.freqVolumes[freq] < 0.0f)
-                {
-                    channels[channel].additiveSynth.freqVolumes[freq] = 0.0f;
-                    channels[channel].additiveSynth.freqSlides[freq] = 0.0f;
-                }
-                else if (channels[channel].additiveSynth.freqVolumes[freq] > 8.0f)
-                {
-                    channels[channel].additiveSynth.freqVolumes[freq] = 8.0f;
-                    channels[channel].additiveSynth.freqSlides[freq] = 0.0f;
-                }
-            }
-        }
-    }
+    
 
     float volumeL = 0;
     float volumeR = 0;
@@ -655,23 +513,7 @@ void applySubtractiveFilters(float* pOutputF32, ma_uint64 frameCount, int channe
         float frameR = input[i * 2 + 1] * 0.5f;
 
         
-        /*
-        // Add the fuzz effect.
-        float fuzz = channels[channel].fuzzLevel;
-        frameL *= fuzz;
-        frameR *= fuzz;
-
-
-        // Clamp the volume to a normal range.
-        if (frameL > 2.0f) frameL = 2.0f;
-        else if (frameL < -2.0f) frameL = -2.0f;
-
-        if (frameR > 2.0f) frameR = 2.0f;
-        else if (frameR < -2.0f) frameR = -2.0f;
-
-        frameL /= fuzz * 0.5f;
-        frameR /= fuzz * 0.5f;
-        */
+        
         
 
         // Lowpass
@@ -692,45 +534,7 @@ void applySubtractiveFilters(float* pOutputF32, ma_uint64 frameCount, int channe
 
 
 
-        // Reverb
-        /*
-        int combDelays[4] = { 20, 50, 90, 127 };
-        float combDecays[4] = { 1.0f, 0.75f, 0.5f, 0.25f };
 
-        float combinedCombL = 0.0f;
-        float combinedCombR = 0.0f;
-
-        for (int comb = 0; comb < 4; comb++)
-        {
-            combinedCombL += channels[channel].pastVolsL[combDelays[comb]] * combDecays[comb];
-            combinedCombR += channels[channel].pastVolsR[combDelays[comb]] * combDecays[comb];
-        }
-
-        //combinedCombL /= 4.0f;
-        //combinedCombR /= 4.0f;
-
-        float decay = 0.8f;
-
-        //channels[channel].reverbCombVolL *= decay;
-        //channels[channel].reverbCombVolR *= decay;
-
-        //channels[channel].reverbCombVolL += combinedCombL;
-        //channels[channel].reverbCombVolR += combinedCombR;
-
-
-        for (int oldVols = 127; oldVols > 0; oldVols--)
-        {
-            channels[channel].pastVolsL[oldVols] = channels[channel].pastVolsL[oldVols - 1];
-            channels[channel].pastVolsR[oldVols] = channels[channel].pastVolsR[oldVols - 1];
-        }
-
-        channels[channel].pastVolsL[0] = frameL;
-        channels[channel].pastVolsR[0] = frameR;
-
-
-        frameL += combinedCombL;
-        frameR += combinedCombR;
-        */
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1133,9 +937,8 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
 
 void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount)
 {
-    std::lock_guard<std::mutex> lock(mtx);
-
-    
+    std::lock_guard<std::shared_mutex> lock(mtx);
+    //std::shared_lock<std::shared_mutex> lock(mtx);
 
     
     float* pOutputF32 = (float*)pOutput;
@@ -1222,7 +1025,7 @@ void PlayChannels(float* pOutputF32, ma_uint32 frameCount, ma_uint32 frameOffset
             {
                 channels[channel].patternOffset -= frameCount;
 
-                if (channels[channel].patternOffset < 0) // Start the new note.
+                if (channels[channel].patternOffset <= 0) // Start the new note.
                 {
                     int framesOver = -channels[channel].patternOffset;
 
@@ -1251,7 +1054,8 @@ void PlayChannels(float* pOutputF32, ma_uint32 frameCount, ma_uint32 frameOffset
                         StartSample(channel, channels[channel].offsetInstrument, channels[channel].offsetNote, channels[channel].jumpPoint);
                         for (int wave = 0; wave < 4; wave++)
                         {
-                            channels[channel].waveforms[wave].patternReadPos = 0;
+                            if (!loadedInstruments[channels[channel].offsetInstrument].waveforms[wave].continueNote)
+                                channels[channel].waveforms[wave].sampleReadPos = channels[channel].jumpPoint;
                             channels[channel].waveforms[wave].envelopePos = 0;
                         }
                     }
@@ -1322,7 +1126,20 @@ void StartSample(int channel, int sampleNumber, float pitch, int startFrame)
     if (sampleNumber < 0) // Don't play notes with samples below zero. (-1 is used to stop notes.)
         return;
 
+    
+
     StopSample(channel);
+
+
+    // Set interpolation values for the previous sample.
+    for (int wave = 0; wave < 4; wave++)
+    {
+        channels[channel].waveforms[wave].interpLastReadPos = channels[channel].waveforms[wave].sampleReadPos;
+        channels[channel].interpLastInstrument = channels[channel].instrument;
+
+        if (loadedInstruments[channels[channel].instrument].interpolation)
+            channels[channel].waveforms[wave].interpTimer = 1.0f;
+    }
 
     channels[channel].instrument = sampleNumber;
 
@@ -1343,9 +1160,13 @@ void StartSample(int channel, int sampleNumber, float pitch, int startFrame)
 
     for (int wave = 0; wave < 4; wave++)
     {
-        int opWave = loadedInstruments[channels[channel].instrument].operatorWavesToUse[wave];
+        //int opWave = loadedInstruments[channels[channel].instrument].operatorWavesToUse[wave];
 
-        if (loadedInstruments[sampleNumber].waveforms[opWave].pitchToNote)
+        if (loadedInstruments[channels[channel].instrument].interpolation)
+            channels[channel].waveforms[wave].interpTimer = 1.0f;
+
+
+        if (loadedInstruments[sampleNumber].waveforms[wave].pitchToNote)
         {
             channels[channel].waveforms[wave].glideDest = pitch;
         }
@@ -1365,25 +1186,25 @@ void StartSample(int channel, int sampleNumber, float pitch, int startFrame)
 
 
         // Set frame reading position.
-        if (!loadedInstruments[sampleNumber].waveforms[opWave].continueNote || (loadedSong.currentNote == 0 && editor.playingSong))
+        if (!loadedInstruments[sampleNumber].waveforms[wave].continueNote || (loadedSong.currentNote == 0 && editor.playingSong))
         {
             if (channels[channel].waveforms[wave].reverse)
-                channels[channel].waveforms[wave].patternReadPos = loadedInstruments[sampleNumber].waveforms[opWave].pcmFrames.size() - 1;
+                channels[channel].waveforms[wave].sampleReadPos = loadedInstruments[sampleNumber].waveforms[wave].pcmFrames.size() - 1;
             else
-                channels[channel].waveforms[wave].patternReadPos = 0;
+                channels[channel].waveforms[wave].sampleReadPos = 0;
 
 
             if (channels[channel].waveforms[wave].reverse)
-                channels[channel].waveforms[wave].patternReadPos -= startFrame;
+                channels[channel].waveforms[wave].sampleReadPos -= startFrame;
             else
-                channels[channel].waveforms[wave].patternReadPos += startFrame;
+                channels[channel].waveforms[wave].sampleReadPos += startFrame;
 
 
             // Make sure that the sample reading position is inside the sample.
-            while (channels[channel].waveforms[wave].patternReadPos < 0)
-                channels[channel].waveforms[wave].patternReadPos += loadedInstruments[channels[channel].instrument].waveforms[opWave].pcmFrames.size();
-            while (channels[channel].waveforms[wave].patternReadPos >= loadedInstruments[channels[channel].instrument].waveforms[opWave].pcmFrames.size())
-                channels[channel].waveforms[wave].patternReadPos -= loadedInstruments[channels[channel].instrument].waveforms[opWave].pcmFrames.size();
+            while (channels[channel].waveforms[wave].sampleReadPos < 0)
+                channels[channel].waveforms[wave].sampleReadPos += loadedInstruments[channels[channel].instrument].waveforms[wave].pcmFrames.size();
+            while (channels[channel].waveforms[wave].sampleReadPos >= loadedInstruments[channels[channel].instrument].waveforms[wave].pcmFrames.size())
+                channels[channel].waveforms[wave].sampleReadPos -= loadedInstruments[channels[channel].instrument].waveforms[wave].pcmFrames.size();
         }
 
         // Set envelope position.
@@ -1709,6 +1530,20 @@ int updateChannelOnBeat(int ch)
     }
 
 
+    if (!channels[ch].extendEffectsPastNote) // If a new note starts, reset channel effects.
+    {
+        if (loadedSong.toNextChannelNote[ch] < 0)
+        {
+            if (noteIndex < loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch].notes.size()) // Stop notes do not reset notes.
+            {
+                int note = loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch].notes[noteIndex];
+                if (note != 255)
+                    channels[ch].resetChannelEffects(false);
+            }
+        }
+    }
+
+
     bool readingEffects = true;
     int effectNum = 0;
     ma_uint64 sampleStartOffset = 0;
@@ -1799,8 +1634,8 @@ int updateChannelOnBeat(int ch)
 
                         for (int wave = 0; wave < 4; wave++)
                         {
-                            channels[ch].waveforms[wave].patternReadPos = loadedInstruments[channels[ch].instrument].jumpPoints[effectValue];
-                            sampleStartOffset = channels[ch].waveforms[wave].patternReadPos;
+                            channels[ch].waveforms[wave].sampleReadPos = loadedInstruments[channels[ch].instrument].jumpPoints[effectValue];
+                            sampleStartOffset = channels[ch].waveforms[wave].sampleReadPos;
                             channels[ch].jumpPoint = sampleStartOffset;
                         }
                     }
@@ -1882,59 +1717,17 @@ int updateChannelOnBeat(int ch)
                     channels[ch].sampleRateSlide = float(effectValue) / -100.0f;
                 else if (effect == 201) // Increase sample rate.
                     channels[ch].sampleRateSlide = float(effectValue) / 100.0f;
-                /*
-                else if (effect == 8) // Set additive harmonic volume.
+                if (effect == 4) // Set sample rate.
                 {
-                    int p1 = effectValue / 16;
-                    if (p1 > 10)
-                        p1 = 10;
-                    int p2 = effectValue % 16;
-
-                    channels[ch].additiveSynth.freqVolumes[p1] = (float(p2) / 15.0f) * 8.0f;
+                    if (effectValue == 0)
+                        channels[ch].extendEffectsPastNote = false;
+                    else
+                        channels[ch].extendEffectsPastNote = true;
                 }
-                else if (effect == 108) // Decrease additive harmonic volume.
-                {
-                    int p1 = effectValue / 16;
-                    if (p1 > 10)
-                        p1 = 10;
-                    int p2 = effectValue % 16;
-
-                    channels[ch].additiveSynth.freqSlides[p1] = -(float(p2) / 15.0f) / 16.0f;
-                }
-                else if (effect == 208) // Increase additive harmonic volume.
-                {
-                    int p1 = effectValue / 16;
-                    if (p1 > 10)
-                        p1 = 10;
-                    int p2 = effectValue % 16;
-
-                    channels[ch].additiveSynth.freqSlides[p1] = (float(p2) / 15.0f) / 16.0f;
-                }
-                else if (effect == 22) // Additive operator wave shape to operator.
-                {
-                    int p1 = effectValue / 16;
-                    if (p1 > 10)
-                        p1 = 10;
-                    int p2 = effectValue % 16;
-
-                    channels[ch].additiveSynth.shapeWaveToOp = p1 - 1;
-                    channels[ch].additiveSynth.waveShapeSlide = 0.0f;
-
-                    if (p2 > 0)
-                    {
-                        if (loadedInstruments[channels[ch].instrument].waveforms[p2].operatorType != 2)
-                        {
-                            channels[ch].additiveSynth.waveShapeSlide = float(p2) / 256.0f;
-                        }
-                        else
-                            channels[ch].additiveSynth.shapeWaveToOp = -1;
-                    }
-
-                }*/
 
 
 
-
+                
 
 
                 if (effectIndex < loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch].effects.size())
@@ -1991,8 +1784,10 @@ int updateChannelOnBeat(int ch)
             if (note == 255) // Stop note.
             {
                 channels[ch].noteStopped = true;
-                for (int wave = 0; wave <4; wave++)
+                for (int wave = 0; wave < 4; wave++)
+                {
                     channels[ch].waveforms[wave].envelopePos = loadedInstruments[channels[ch].instrument].waveforms[wave].attack + loadedInstruments[channels[ch].instrument].waveforms[wave].sustain * 2.0f;
+                }
             }
             else
             {
@@ -2176,14 +1971,22 @@ void StartOrStopSong()
             loadedSong.toNextChannelVolume[ch] = 0;
             loadedSong.toNextChannelEffect[ch] = 0;
 
-            for (int freq = 0; freq < 11; freq++)
-                channels[ch].additiveSynth.freqStartingVolumes[freq] = 0;
 
             for (int wave = 0; wave < 4; wave++)
             {
                 channels[ch].waveforms[wave].glideVolume = 0.0f;
                 channels[ch].waveforms[wave].note = 0;
                 channels[ch].waveforms[wave].volume = 1.0f;
+
+                // Reset low-pass values.
+                channels[ch].waveforms[wave].y1 = 0.0f;
+                channels[ch].waveforms[wave].y2 = 0.0f;
+                channels[ch].waveforms[wave].y3 = 0.0f;
+                channels[ch].waveforms[wave].y4 = 0.0f;
+                channels[ch].waveforms[wave].oldx = 0.0f;
+                channels[ch].waveforms[wave].oldy1 = 0.0f;
+                channels[ch].waveforms[wave].oldy2 = 0.0f;
+                channels[ch].waveforms[wave].oldy3 = 0.0f;
 
                 if (loadedSong.patterns[loadedSong.patternSequence[loadedSong.currentPattern]].channels[ch].notes.size() > 1)
                 {
@@ -2195,14 +1998,6 @@ void StartOrStopSong()
                 }
                 else
                     channels[ch].waveforms[wave].pitch = 0.0f;
-
-
-                // Set starting frequencies for additive synth operators.
-                if (loadedInstruments[channels[ch].instrument].waveforms[wave].operatorType == 2)
-                {
-                    for (int freq = 0; freq < 11; freq++)
-                        channels[ch].additiveSynth.freqStartingVolumes[freq] = loadedInstruments[channels[ch].instrument].waveforms[wave].frequencies[freq];
-                }
             }
 
 
@@ -2667,7 +2462,7 @@ void GenerateAdditiveWave(Instrument* instrument, int op)
             for (int ch = 0; ch < channels.size(); ch++)
             {
                 for (int op = 0; op < 4; op++)
-                    channels[ch].waveforms[op].patternReadPos = 0;
+                    channels[ch].waveforms[op].sampleReadPos = 0;
             }
 
             return;
@@ -2774,7 +2569,11 @@ void GenerateAdditiveWave(Instrument* instrument, int op)
     }
 
     for (int x = 0; x < instrument->waveforms[op].pcmFrames.size(); x++)
+    {
         instrument->waveforms[op].pcmFrames[x] += (instrument->waveforms[op].offset - 0.5f) * 2.0f;
+        if (instrument->waveforms[op].pcmFrames[x] > 0.85f) instrument->waveforms[op].pcmFrames[x] = 0.85f;
+        else if (instrument->waveforms[op].pcmFrames[x] < -0.85f) instrument->waveforms[op].pcmFrames[x] = -0.85f;
+    }
 
 
     
@@ -2793,7 +2592,7 @@ void GenerateAdditiveWave(Instrument* instrument, int op)
     for (int ch = 0; ch < channels.size(); ch++)
     {
         for (int op = 0; op < 4; op++)
-            channels[ch].waveforms[op].patternReadPos = 0;
+            channels[ch].waveforms[op].sampleReadPos = 0;
     }
 
 

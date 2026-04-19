@@ -3,16 +3,16 @@
 
 
 #include <vector>
-#include <deque>
+//#include <deque>
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <chrono> // Deals with time
-#include <stdlib.h> // For rand()
+//#include <chrono> // Deals with time
+//#include <stdlib.h> // For rand()
 
 // For searching file directories. New as of c++ 17.
 #include <filesystem>
-#include <cstdlib>
+//#include <cstdlib>
 
 
 
@@ -24,12 +24,13 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <thread>
-#include <mutex>
+//#include <mutex>
+#include <shared_mutex>
 
 
 
 // The thread lock to make sure that the audio and main threads do not interfere.
-std::mutex mtx;
+std::shared_mutex mtx;
 
 
 
@@ -54,11 +55,7 @@ struct RGBColor
 };
 
 
-/*
-struct AdditiveSynth
-{
-	
-};*/
+
 
 
 struct InstrumentWave
@@ -87,6 +84,8 @@ struct InstrumentWave
 	float sustain = 0.0f;
 	float decay = 0.0f;
 	float release = 0.0f;
+
+	
 
 	float fuzz = 0.0f;
 
@@ -135,6 +134,8 @@ struct Instrument
 	float glide = 0.0f;
 
 	int algorithmType = 0;
+
+	bool interpolation = true;
 };
 
 
@@ -417,31 +418,13 @@ struct Editor
 
 
 
-struct ChannelWaveAdditiveSynth
-{
-	float freqReadPos[11] = { 0,0,0,0,0,0,0,0,0,0,0 };
-};
 
-
-struct ChannelAdditiveSynth
-{
-	// Frequencies (1 = fundamental frequency)
-	// (1/4) (1/3) (1/2) (1) (2) (3) (4) (5) (6) (7) (8)
-	float freqStartingVolumes[11] = { 0,0,0,0,0,0,0,0,0,0,0 };
-	float freqVolumes[11] = { 0,0,0,0,0,0,0,0,0,0,0 };
-	float freqSlides[11] = { 0,0,0,0,0,0,0,0,0,0,0 };
-
-	int shapeWaveToOp = -1;
-	float waveShapeSlide = 0.0f;
-
-	ChannelWaveAdditiveSynth waves[4];
-};
 
 
 
 struct ChannelWaveform
 {
-	float patternReadPos = 0.0f;
+	float sampleReadPos = 0.0f;
 
 
 	float pitch = 0.0f;
@@ -459,20 +442,18 @@ struct ChannelWaveform
 
 	bool reverse = false;
 
+	// Interpolation between notes to prevent clipping.
+	float interpTimer = 0.0f; // Decrements from 0 to 1, then stops.
+	float interpLastReadPos = 0.0f;
+
 
 	// Low-pass filter.
 	float y1, y2, y3, y4;
 	float oldx, oldy1, oldy2, oldy3;
 
-	// Filter parameters
-	float cutoff = 1000.0f;      // Cutoff frequency in Hz
-
-	// Coefficients
-	float f, fb, q;
-
 
 	// Process a single sample (4-pole Moog-style ladder filter)
-	float process(float input)
+	float process(float input, float f, float fb, float q)
 	{
 		// Apply feedback to create resonance
 		input -= y4 * fb;
@@ -491,7 +472,9 @@ struct ChannelWaveform
 		y4 = y3 + 0.3f * oldy3 + (1.0f - f) * y4;
 		oldy3 = y3;
 
-		y4 = std::max(-1.0f, std::min(y4, 1.0f));
+
+		if (y4 < -1.0f) y4 = -1.0f;
+		else if (y4 > 1.0f) y4 = 1.0f;
 
 		return y4;
 	}
@@ -515,7 +498,6 @@ struct Channel
 	
 	ChannelWaveform waveforms[4];
 
-	ChannelAdditiveSynth additiveSynth;
 
 
 	float panValue = 0.0f;
@@ -545,6 +527,8 @@ struct Channel
 
 	int instrument = 0;
 
+	int interpLastInstrument = 0;
+
 	int retriggerTimer = 0;
 
 
@@ -573,6 +557,9 @@ struct Channel
 	float prevHighPassSampleLI = 0.0f;      // Previous output sample (for filtering)
 	float prevHighPassSampleRI = 0.0f;      // Previous output sample (for filtering)
 
+
+	bool extendEffectsPastNote = false;
+
 	/*
 	float reverbCombVolL = 0.0f;
 	float reverbCombVolR = 0.0f;
@@ -583,6 +570,7 @@ struct Channel
 
 	void resetChannelEffects(bool resetVolume)
 	{
+
 		for (int wave = 0; wave < 4; wave++)
 		{
 			waveforms[wave].volumeSlide = 0.0f;
@@ -614,17 +602,13 @@ struct Channel
 		retrigger = 0.0f;
 		retriggerSlide = 0.0f;
 
-		jumpPoint = -1.0f;
+		jumpPoint = 0.0f;
 		jumpSlide = 0.0f;
 
 		sampleRate = 1.0f;
 		sampleRateSlide = 0.0f;
 
-		for (int i = 0; i < 11; i++)
-		{
-			additiveSynth.freqVolumes[i] = additiveSynth.freqStartingVolumes[i];
-			additiveSynth.freqSlides[i] = 0.0f;
-		}
+		noteStopped = true;
 	}
 };
 

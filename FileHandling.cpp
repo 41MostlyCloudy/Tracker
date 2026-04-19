@@ -762,7 +762,7 @@ void WriteInstrument(std::ofstream* instrumentFile, Instrument* instrument)
         instrumentFile->write((char*)&volume, 1);
         uint8_t glide = instrument->glide * 16.0f;
         instrumentFile->write((char*)&glide, 1);
-        uint8_t algo = instrument->algorithmType;
+        uint8_t algo = (uint8_t)instrument->interpolation * 4 + instrument->algorithmType;
         instrumentFile->write((char*)&algo, 1);
 
         // Arp
@@ -916,6 +916,12 @@ Instrument ReadInstrument(std::ifstream* instrumentFile)
     newInstrument.glide = float(glide) / 16.0f;
     uint8_t algo;
     instrumentFile->read((char*)&algo, 1);
+    int interp = algo / 4;
+    if (interp == 0)
+        newInstrument.interpolation = false;
+    else
+        newInstrument.interpolation = true;
+    algo -= (interp * 4);
     newInstrument.algorithmType = algo;
 
     uint8_t readVar = 0;
@@ -1091,12 +1097,16 @@ void LoadCurrentInstrument(std::string name)
 
     if (instrumentFile.is_open())
     {
+        
+
         newInstrument = ReadInstrument(&instrumentFile);
+        
+        loadedInstruments[editor.selectedInstrument] = newInstrument;
+        loadedInstruments[editor.selectedInstrument].name = name;
+        DrawSampleDisplay();
     }
 
-    loadedInstruments[editor.selectedInstrument] = newInstrument;
-
-    loadedInstruments[editor.selectedInstrument].name = name;
+    
 
     instrumentFile.close();
 

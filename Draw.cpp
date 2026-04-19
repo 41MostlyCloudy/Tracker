@@ -14,8 +14,6 @@ void DrawEDOKey(int key, Vector2i pos);
 
 void DrawMute();
 int DrawChannelMuteGlass(int xPos, int i);
-int DrawChannelMuteSynth(int xPos, int i);
-int DrawChannelMuteModulator(int xPos, int i, int dialNum);
 void DrawChannelNumber(int channelNum, int offsetX);
 
 void DrawFrameBorder();
@@ -49,11 +47,7 @@ void DrawVerticalSlider(int yStart, int yEnd, int xVal, float value);
 void DrawHorizontalScrollBar(int xStart, int xEnd, int yVal, float value);
 void DrawVerticalScrollBar(int yStart, int yEnd, int xVal, float value);
 
-void DrawDial(Vector2 pos, float val, int style);
-
 void DrawBackground(float startPos);
-
-void DrawEffect(Vector2 pos, int type, int value);
 
 void DrawAlgorithm(Vector2i pos, int type, bool selected);
 
@@ -61,7 +55,8 @@ void DrawAlgorithm(Vector2i pos, int type, bool selected);
 
 void DrawEverything()
 {
-	std::lock_guard<std::mutex> lock(mtx);
+	std::shared_lock<std::shared_mutex> lock(mtx);
+
 
 	// Scroll vertically when playing the song.
 	if (editor.playingSong)
@@ -459,47 +454,6 @@ void  DrawTopUI()
 
 	gui.activeUI[19][11].sprite = { 5, 29 };
 	gui.activeUI[34][11].sprite = { 6, 29 };
-	/*
-	if (loadedSong.unsavedChanges)
-		DrawText("SAVE", 20, 26, 8, 4, 2);
-	else
-		DrawText("SAVE", 20, 26, 8, 1, 2);
-	gui.activeUI[19][8].sprite = { 24, 0 };
-	gui.activeUI[26][8].sprite = { 25, 0 };
-	
-
-	DrawText("LOAD", 20, 26, 9, 4, 2);
-	gui.activeUI[19][9].sprite = { 24, 0 };
-	gui.activeUI[26][9].sprite = { 25, 0 };
-
-	DrawText("NEW", 20, 26, 10, 4, 2);
-	gui.activeUI[19][10].sprite = { 24, 0 };
-	gui.activeUI[26][10].sprite = { 25, 0 };
-
-	DrawText("EXPORT", 20, 26, 11, 4, 2);
-	gui.activeUI[19][11].sprite = { 24, 0 };
-	gui.activeUI[26][11].sprite = { 25, 0 };
-
-
-	DrawText("HELP", 28, 35, 9, 4, 2);
-	gui.activeUI[27][9].sprite = { 24, 0 };
-	gui.activeUI[34][9].sprite = { 25, 0 };
-
-	DrawText("CONFIG", 28, 35, 10, 4, 2);
-	gui.activeUI[27][10].sprite = { 24, 0 };
-	gui.activeUI[34][10].sprite = { 25, 0 };
-
-	DrawText("EDITOR", 28, 35, 11, 4, 2);
-	gui.activeUI[27][11].sprite = { 24, 0 };
-	gui.activeUI[34][11].sprite = { 25, 0 };
-	*/
-	// Eye
-	/*
-	logoY -= 2;
-	activeUI[logoX + 15][logoY].sprite = { 26, 1 }; activeUI[logoX + 16][logoY].sprite = { 27, 1 };
-	activeUI[logoX + 15][logoY + 1].sprite = { 26, 2 }; activeUI[logoX + 16][logoY + 1].sprite = { 27, 2 };
-	activeUI[logoX + 15][logoY + 2].sprite = { 28, 2 }; activeUI[logoX + 16][logoY + 2].sprite = { 29, 2 };
-	*/
 
 
 
@@ -601,6 +555,7 @@ void  DrawTopUI()
 		DrawGUIText("J:Jump", 43, 54, 6, 3, 0);
 		DrawGUIText("R:Retrigger", 43, 54, 7, 3, 0);
 		DrawGUIText("M:Mute", 43, 54, 8, 3, 0);
+		DrawGUIText("E:Extend", 43, 54, 9, 3, 0);
 		for (int y = 1; y < 12; y++)
 			gui.activeUI[54][y].sprite = { 2, 4 };
 		DrawGUIText("S:Stereo", 55, 68, 2, 3, 0);
@@ -1130,535 +1085,6 @@ int DrawChannelMuteGlass(int xPos, int i)
 
 
 
-int DrawChannelMuteSynth(int xPos, int i)
-{
-	// Border
-	for (int x = 0; x < 7 + channels[i].effectCountPerRow * 5; x++)
-	{
-		if (xPos + x > 4 && xPos + x < 91)
-		{
-			gui.activeUI[xPos + x][12].sprite = { 2, 3 }; gui.activeUI[xPos + x][15].sprite = { 2, 3 };
-		}
-	}
-	int muteBorderEnd = xPos + 7 + channels[i].effectCountPerRow * 5;
-	if (muteBorderEnd > 4 && muteBorderEnd < 91)
-	{
-		gui.activeUI[muteBorderEnd][12].sprite = { 3, 3 }; gui.activeUI[muteBorderEnd][15].sprite = { 5, 3 };
-	}
-
-	float muteOffset = 0;
-
-	if (channels[i].muted)
-		muteOffset = 3;
-
-	int color = 1;
-
-
-
-	if (channels[i].compressed)
-	{
-		if (xPos > 4)
-		{
-			gui.activeUI[xPos][13].sprite = { 0, 14 }; gui.activeUI[xPos][14].sprite = { 0, 15 };
-		}
-		xPos++;
-		if (xPos > 90) return xPos;
-
-		if (xPos > 4)
-		{
-			if (channels[i].muted)
-			{
-				gui.activeUI[xPos][13].sprite = { 17, 14 }; gui.activeUI[xPos][14].sprite = { 17, 15 };
-			}
-			else
-			{
-				gui.activeUI[xPos][13].sprite = { 15, 14 }; gui.activeUI[xPos][14].sprite = { 15, 15 };
-			}
-			
-		}
-		xPos++;
-
-		/*
-		if (xPos > 4)
-		{
-			DrawDial({ float(xPos), 13 }, 0);
-			gui.dials[dialNum].position = { float(xPos + 1), 14.0f };
-		}
-		xPos += 2;*/
-
-		if (xPos > 90) return xPos;
-
-		if (xPos > 4)
-		{
-			gui.activeUI[xPos][13].sprite = { 27, 10 }; gui.activeUI[xPos][14].sprite = { 27, 11 };
-
-			if (channels[i].muted)
-				gui.activeUI[xPos][15].sprite = { 16, 15 };
-			else
-				gui.activeUI[xPos][15].sprite = { 16, 14 };
-		}
-		xPos++;
-
-		if (xPos > 90) return xPos;
-	}
-	else
-	{
-		// Glass
-		if (xPos > 4)
-		{
-			gui.activeUI[xPos][13].sprite = { 0, 14 }; gui.activeUI[xPos][14].sprite = { 0, 15 };
-		}
-		xPos++;
-		if (xPos > 90) return xPos;
-
-		//DrawDial({ float(xPos), 13 }, 0);
-		//gui.dials[dialNum].position = { float(xPos + 1), 14.0f };
-
-		if (xPos > 90) return xPos;
-
-		if (xPos > 4)
-		{
-			gui.activeUI[xPos][13].sprite = { 6, 14 }; gui.activeUI[xPos][14].sprite = { 6, 15 };
-		}
-		xPos++;
-
-		for (int x = 0; x < 4; x++)
-		{
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				if (channels[i].muted)
-				{
-					gui.activeUI[xPos][13].sprite = { 17, 14 }; gui.activeUI[xPos][14].sprite = { 17, 15 };
-				}
-				else
-				{
-					gui.activeUI[xPos][13].sprite = { 15, 14 }; gui.activeUI[xPos][14].sprite = { 15, 15 };
-				}
-			}
-			xPos++;
-		}
-
-		
-
-
-		if (xPos > 90) return xPos;
-
-		if (xPos > 4)
-		{
-			gui.activeUI[xPos][13].sprite = { 1, 14 }; gui.activeUI[xPos][14].sprite = { 1, 15 };
-		}
-		xPos++;
-
-		// Draw the channel effects
-		if (channels[i].effectCountPerRow > 1)
-		{
-			for (int ef = 0; ef < channels[i].effectCountPerRow - 1; ef++)
-			{
-				if (xPos > 90) return xPos;
-
-				if (xPos > 4)
-				{
-					gui.activeUI[xPos][13].sprite = { 6, 14 }; gui.activeUI[xPos][14].sprite = { 6, 15 };
-				}
-				xPos++;
-				if (xPos > 90) return xPos;
-
-				if (xPos > 4)
-				{
-					gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-				}
-				xPos++;
-				if (xPos > 90) return xPos;
-
-				if (xPos > 4)
-				{
-					gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-				}
-				xPos++;
-				if (xPos > 90) return xPos;
-
-				if (xPos > 4)
-				{
-					gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-				}
-				xPos++;
-				if (xPos > 90) return xPos;
-
-				if (xPos > 4)
-				{
-					gui.activeUI[xPos][13].sprite = { 1, 14 }; gui.activeUI[xPos][14].sprite = { 1, 15 };
-				}
-				xPos++;
-			}
-
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				if (channels[i].effectCountPerRow < 8)
-				{
-					gui.activeUI[xPos][13].sprite = { 2, 14 }; gui.activeUI[xPos][14].sprite = { 2, 15 };
-				}
-				else
-				{
-					gui.activeUI[xPos][13].sprite = { 6, 14 }; gui.activeUI[xPos][14].sprite = { 6, 15 };
-				}
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 3, 14 }; gui.activeUI[xPos][14].sprite = { 3, 15 };
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				if (i < channels.size() - 1)
-				{
-					gui.activeUI[xPos][13].sprite = { 5, 14 }; gui.activeUI[xPos][14].sprite = { 5, 15 };
-				}
-				else
-				{
-					gui.activeUI[xPos][13].sprite = { 9, 14 }; gui.activeUI[xPos][14].sprite = { 9, 15 };
-				}
-			}
-			xPos++;
-		}
-		else
-		{
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 2, 14 }; gui.activeUI[xPos][14].sprite = { 2, 15 };
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 8, 14 }; gui.activeUI[xPos][14].sprite = { 8, 15 };
-			}
-
-			xPos++;
-		}
-
-
-
-		if (xPos > 90) return xPos;
-
-
-		if (xPos > 4)
-		{
-			gui.activeUI[xPos][13].sprite = { 27, 10 }; gui.activeUI[xPos][14].sprite = { 27, 11 };
-
-			if (channels[i].muted)
-				gui.activeUI[xPos][15].sprite = { 16, 15 };
-			else
-				gui.activeUI[xPos][15].sprite = { 16, 14 };
-		}
-		xPos++;
-	}
-
-	return xPos;
-}
-
-
-
-
-int DrawChannelMuteModulator(int xPos, int i, int dialNum)
-{
-	// Border
-	for (int x = 0; x < 7 + channels[i].effectCountPerRow * 5; x++)
-	{
-		if (xPos + x > 4 && xPos + x < 91)
-		{
-			gui.activeUI[xPos + x][12].sprite = { 2, 3 };
-			gui.activeUI[xPos + x][15].sprite = { 2, 3 };
-		}
-	}
-	int muteBorderEnd = xPos + 7 + channels[i].effectCountPerRow * 5;
-	if (muteBorderEnd > 4 && muteBorderEnd < 91)
-	{
-		gui.activeUI[muteBorderEnd][12].sprite = { 3, 3 };
-		gui.activeUI[muteBorderEnd][15].sprite = { 5, 3 };
-	}
-
-	float muteOffset = 0;
-
-	if (channels[i].muted)
-		muteOffset = 3;
-
-	int color = 1;
-
-
-
-	if (channels[i].compressed)
-	{
-		if (xPos > 4)
-		{
-			
-		}
-		xPos += 2;
-		if (xPos > 90) return xPos;
-
-		if (xPos > 4)
-		{
-			gui.activeUI[xPos][13].sprite = { 27, 10 }; gui.activeUI[xPos][14].sprite = { 27, 11 };
-
-			if (channels[i].muted)
-				gui.activeUI[xPos][15].sprite = { 16, 15 };
-			else
-				gui.activeUI[xPos][15].sprite = { 16, 14 };
-		}
-		xPos++;
-
-		if (xPos > 90) return xPos;
-	}
-	else
-	{
-		// Glass
-		if (xPos > 4)
-		{
-			gui.activeUI[xPos][13].sprite = { 0, 14 }; gui.activeUI[xPos][14].sprite = { 0, 15 };
-		}
-		xPos++;
-		if (xPos > 90) return xPos;
-
-		
-		
-		xPos += 2;
-		if (xPos > 90) return xPos;
-
-		if (xPos > 4)
-		{
-			gui.activeUI[xPos][13].sprite = { 12, 14 };
-			gui.activeUI[xPos][14].sprite = { 12, 15 };
-		}
-		xPos++;
-
-		if (xPos > 90) return xPos;
-
-		if (xPos > 4)
-		{
-			gui.activeUI[xPos][13].sprite = { 13, 14 };
-			gui.activeUI[xPos][14].sprite = { 13, 15 };
-		}
-		xPos++;
-
-		if (xPos > 90) return xPos;
-
-		if (xPos > 4)
-		{
-			gui.activeUI[xPos][13].sprite = { 14, 14 };
-			gui.activeUI[xPos][14].sprite = { 14, 15 };
-		}
-		xPos++;
-
-		if (xPos > 90) return xPos;
-
-		if (xPos > 4)
-		{
-			gui.activeUI[xPos][13].sprite = { 1, 14 }; gui.activeUI[xPos][14].sprite = { 1, 15 };
-		}
-		xPos++;
-
-		// Draw the channel effects
-		if (channels[i].effectCountPerRow > 1)
-		{
-			for (int ef = 0; ef < channels[i].effectCountPerRow - 1; ef++)
-			{
-				if (xPos > 90) return xPos;
-
-				if (xPos > 4)
-				{
-					gui.activeUI[xPos][13].sprite = { 6, 14 }; gui.activeUI[xPos][14].sprite = { 6, 15 };
-				}
-				xPos++;
-				if (xPos > 90) return xPos;
-
-				if (xPos > 4)
-				{
-					gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-				}
-				xPos++;
-				if (xPos > 90) return xPos;
-
-				if (xPos > 4)
-				{
-					gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-				}
-				xPos++;
-				if (xPos > 90) return xPos;
-
-				if (xPos > 4)
-				{
-					gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-				}
-				xPos++;
-				if (xPos > 90) return xPos;
-
-				if (xPos > 4)
-				{
-					gui.activeUI[xPos][13].sprite = { 1, 14 }; gui.activeUI[xPos][14].sprite = { 1, 15 };
-				}
-				xPos++;
-			}
-
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				if (channels[i].effectCountPerRow < 8)
-				{
-					gui.activeUI[xPos][13].sprite = { 2, 14 }; gui.activeUI[xPos][14].sprite = { 2, 15 };
-				}
-				else
-				{
-					gui.activeUI[xPos][13].sprite = { 6, 14 }; gui.activeUI[xPos][14].sprite = { 6, 15 };
-				}
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 3, 14 }; gui.activeUI[xPos][14].sprite = { 3, 15 };
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				if (i < channels.size() - 1)
-				{
-					gui.activeUI[xPos][13].sprite = { 5, 14 }; gui.activeUI[xPos][14].sprite = { 5, 15 };
-				}
-				else
-				{
-					gui.activeUI[xPos][13].sprite = { 9, 14 }; gui.activeUI[xPos][14].sprite = { 9, 15 };
-				}
-			}
-			xPos++;
-		}
-		else
-		{
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 2, 14 }; gui.activeUI[xPos][14].sprite = { 2, 15 };
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 4, 14 }; gui.activeUI[xPos][14].sprite = { 4, 15 };
-			}
-			xPos++;
-			if (xPos > 90) return xPos;
-
-			if (xPos > 4)
-			{
-				gui.activeUI[xPos][13].sprite = { 9, 14 }; gui.activeUI[xPos][14].sprite = { 9, 15 };
-			}
-
-			xPos++;
-		}
-
-
-
-		if (xPos > 90) return xPos;
-
-
-		if (xPos > 4)
-		{
-			gui.activeUI[xPos][13].sprite = { 27, 10 }; gui.activeUI[xPos][14].sprite = { 27, 11 };
-
-			if (channels[i].muted)
-				gui.activeUI[xPos][15].sprite = { 16, 15 };
-			else
-				gui.activeUI[xPos][15].sprite = { 16, 14 };
-		}
-		xPos++;
-	}
-
-	return xPos;
-}
-
-
-
 void DrawChannelNumber(int channelNum, int offsetX)
 {
 	int channelNum2 = 0;
@@ -1760,11 +1186,7 @@ void DrawFrameBorder()
 
 	for (int x = 0; x < 4; x++)
 		gui.activeUI[x][56].sprite = { 2, 3 };
-	//for (int x = 7; x < 89; x++)
-		//gui.activeUI[x][56].sprite = { 28, 2 };
-	
-	//gui.activeUI[6][56].sprite = { 27, 2 };
-	//gui.activeUI[89][56].sprite = { 29, 2 };
+
 
 	DrawHorizontalScrollBar(6, 90, 56, gui.patternHorizontalScrollBar.position);
 
@@ -1887,11 +1309,9 @@ void DrawFrameBorder()
 
 void DrawBackground(float startPos)
 {
-	//if (gui.lightMode)
-
 	Vector2i themeOffset = { int((gui.background - 1) % 3), int((gui.background - 1) / 3) };
 
-	for (int x = startPos; x < 92; x++)
+	for (int x = startPos; x < 91; x++)
 	{
 		gui.activeUI[x][12].sprite = { 2, 3 };
 		gui.activeUI[x][15].sprite = { 2, 3 };
@@ -1901,155 +1321,6 @@ void DrawBackground(float startPos)
 			gui.activeUI[x][y].sprite = { 16 + x % 4 + themeOffset.x * 4, 21 + y % 4 + themeOffset.y * 4 };
 		}
 	}
-
-	return;
-
-
-	srand(0);
-
-
-	for (int x = startPos; x < 92; x++)
-	{
-		gui.activeUI[x][12].sprite = { 2, 3 };
-		gui.activeUI[x][15].sprite = { 2, 3 };
-
-		
-
-		for (int y = 16; y < 40; y++)
-		{
-			int star = rand() % 6;
-
-			if (y + star * 4 < 20)
-				star += 4;
-			else if (y + star * 4 > 30)
-			{
-				if (y + star * 4 > 60)
-					gui.activeUI[x][y].sprite = { 27, 21 };
-				else
-				{
-					star += 4;
-					if (y + star * 4 > 50)
-						star += 4;
-					gui.activeUI[x][y].sprite = { 16 + star, 21 };
-				}
-			}
-				
-			gui.activeUI[x][y].sprite = { 16 + star, 21 };
-		}
-		for (int y = 32; y < 56; y++)
-		{
-			gui.activeUI[x][y].sprite = { 16 + y - 36, 22 };
-		}
-	}
-
-	srand(3);
-
-	int yVal = 20;
-	bool goUp = true;
-
-	// Draw the mountains.
-	for (int x = startPos; x < 92; x++)
-	{
-		bool newGoUp = rand() % 2;
-
-
-		if (yVal > 20) newGoUp = false;
-		else if (yVal < 1) newGoUp = true;
-
-
-		if (goUp == newGoUp)
-		{
-			if (goUp) yVal++;
-			else yVal--;
-		}
-
-		goUp = newGoUp;
-
-		int mountTexX = 22 + rand() % 3;
-		int mountTexY = 23;
-
-		if (yVal < 20) mountTexY++;
-		if (yVal < 14) mountTexY++;
-		if (yVal < 12) mountTexY++;
-		if (yVal < 9) mountTexY++;
-
-		if (!goUp) mountTexX += 3;
-
-		gui.activeUI[x][57 - yVal].sprite = { mountTexX, mountTexY };
-
-		for (int y = 58 - yVal; y < 56; y++)
-		{
-			gui.activeUI[x][y].sprite.x += 2;
-		}
-	}
-
-	srand(4);
-
-	yVal = 10;
-	goUp = false;
-
-	for (int x = startPos; x < 92; x++)
-	{
-		if (int(x - startPos) % 2 == 0)
-		{
-			bool newGoUp = rand() % 2;
-
-
-			if (yVal > 20)
-				newGoUp = false;
-			else if (yVal < 1)
-				newGoUp = true;
-
-
-			if (goUp == newGoUp)
-			{
-				if (goUp) yVal++;
-				else yVal--;
-			}
-
-			goUp = newGoUp;
-		}
-		else
-		{
-			if (goUp) yVal++;
-			else yVal--;
-		}
-
-		
-
-		int mountTexX = 16 + rand() % 3;
-		int mountTexY = 23;
-
-		if (yVal < 22) mountTexY++;
-		if (yVal < 16) mountTexY++;
-		if (yVal < 14) mountTexY++;
-		if (yVal < 11) mountTexY++;
-
-		if (!goUp) mountTexX += 3;
-
-		gui.activeUI[x][57 - yVal].sprite = { mountTexX, mountTexY };
-
-		if (goUp) mountTexY = 28;
-		else mountTexY = 29;
-
-		for (int y = 58 - yVal; y < 56; y++)
-		{
-			mountTexX = 16 + rand() % 4;
-
-			if (y + yVal > 60) mountTexX++;
-			if (y + yVal > 62) mountTexX++;
-			if (y + yVal > 64) mountTexX++;
-			if (y + yVal > 66) mountTexX++;
-			if (y + yVal > 68) mountTexX++;
-
-			gui.activeUI[x][y].sprite = { mountTexX, mountTexY };
-		}
-	}
-
-	gui.activeUI[int(startPos) + 8][24].sprite = { 25, 28 };
-	gui.activeUI[int(startPos) + 9][24].sprite = { 26, 28 };
-	gui.activeUI[int(startPos) + 8][25].sprite = { 25, 29 };
-	gui.activeUI[int(startPos) + 9][25].sprite = { 26, 29 };
 
 	return;
 }
@@ -3517,7 +2788,41 @@ void DrawFloatingWindow(FloatingWindow* wind)
 	// Draw contents
 	if (wind->name == "Themes")
 	{
-		std::string themeText[32] = {
+		std::string lightModeText = "LIGHT MODE";
+
+		if (gui.lightMode)
+		{
+			std::string themeText[32] = {
+			"PURPLE", "LIGHT BLUE", "LIGHT RED", "LIGHT YELLOW",
+			"ORANGE", "AQUATIC", "SUNNY", "BRIGHT",
+			"GRASS", "RED BLUE", "RED", "GREY PINK",
+			"SATURATED","LOSS", "CREEK", "PLASTIC",
+			"LEAVES", "ANOTHER GREEN", "TERRACOTTA", "OFFICE BLUE",
+			"OFFICE RED", "LICHEN", "VERY BLUE", "OAK",
+			"BRIGHT YELLOW", "BRIGHT PURPLE", "BRIGHT GREEN", "MINT",
+			"PAPER ONE", "PAPER TWO", "PAPER THREE", "STONE",
+			};
+
+			for (int i = 0; i < 32; i++)
+			{
+				DrawGUIText(themeText[i], wind->position.x + 2, wind->position.x + 15, wind->position.y + 1 + i, 4, -1);
+				if (i == gui.uiColorTheme)
+				{
+					gui.activeUI[int(wind->position.x + 1)][int(wind->position.y + 1 + i)].sprite = { 5, 4 };
+					gui.activeUI[int(wind->position.x + 15)][int(wind->position.y + 1 + i)].sprite = { 5, 4 };
+				}
+				else
+				{
+					gui.activeUI[int(wind->position.x + 1)][int(wind->position.y + 1 + i)].sprite = { 5, 28 };
+					gui.activeUI[int(wind->position.x + 15)][int(wind->position.y + 1 + i)].sprite = { 6, 28 };
+				}
+			}
+
+			lightModeText = "DARK MODE";
+		}
+		else
+		{
+			std::string themeText[32] = {
 			"RED", "BROWN PINK", "CLAY", "MAGNOLIA",
 			"PALE", "BLUE", "CLOUDY", "RED SAND",
 			"SAND", "AMBER", "BURNT", "WHITE",
@@ -3526,26 +2831,21 @@ void DrawFloatingWindow(FloatingWindow* wind)
 			"LOTIS", "ORANGE", "NAUTICAL", "SILVER",
 			"LUNAR", "BLUE GLASS", "STANDARD", "PLASTIC",
 			"DEEP SEA", "BRIGHT PINK", "PURPLE", "COSMIC",
-		};
+			};
 
-		std::string lightModeText = "LIGHT MODE";
-		if (gui.lightMode)
-			lightModeText = "DARK MODE";
-		
-
-
-		for (int i = 0; i < 32; i++)
-		{
-			DrawGUIText(themeText[i], wind->position.x + 2, wind->position.x + 15, wind->position.y + 1 + i, 4, -1);
-			if (i == gui.uiColorTheme)
+			for (int i = 0; i < 32; i++)
 			{
-				gui.activeUI[int(wind->position.x + 1)][int(wind->position.y + 1 + i)].sprite = { 5, 4 };
-				gui.activeUI[int(wind->position.x + 15)][int(wind->position.y + 1 + i)].sprite = { 5, 4 };
-			}
-			else
-			{
-				gui.activeUI[int(wind->position.x + 1)][int(wind->position.y + 1 + i)].sprite = { 5, 28 };
-				gui.activeUI[int(wind->position.x + 15)][int(wind->position.y + 1 + i)].sprite = { 6, 28 };
+				DrawGUIText(themeText[i], wind->position.x + 2, wind->position.x + 15, wind->position.y + 1 + i, 4, -1);
+				if (i == gui.uiColorTheme)
+				{
+					gui.activeUI[int(wind->position.x + 1)][int(wind->position.y + 1 + i)].sprite = { 5, 4 };
+					gui.activeUI[int(wind->position.x + 15)][int(wind->position.y + 1 + i)].sprite = { 5, 4 };
+				}
+				else
+				{
+					gui.activeUI[int(wind->position.x + 1)][int(wind->position.y + 1 + i)].sprite = { 5, 28 };
+					gui.activeUI[int(wind->position.x + 15)][int(wind->position.y + 1 + i)].sprite = { 6, 28 };
+				}
 			}
 		}
 
@@ -3650,7 +2950,9 @@ void DrawFloatingWindow(FloatingWindow* wind)
 		{
 			if (y - 2 + fileNavigator.fileListScroll < fileNavigator.fileNames.size())
 			{
-				if (y - 2 + fileNavigator.fileListScroll == editor.selectedFile)
+				if (fileNavigator.fileNames[y - 2 + fileNavigator.fileListScroll].at(0) == '0' || fileNavigator.fileNames[y - 2 + fileNavigator.fileListScroll].at(0) == '4')
+					DrawGUIText(fileNavigator.fileNames[y - 2 + fileNavigator.fileListScroll], wind->position.x + 1, wind->position.x + 39, wind->position.y + y, 2, 0);
+				else if (y - 2 + fileNavigator.fileListScroll == editor.selectedFile)
 					DrawGUIText(fileNavigator.fileNames[y - 2 + fileNavigator.fileListScroll], wind->position.x + 1, wind->position.x + 39, wind->position.y + y, 5, 1);
 				else
 					DrawGUIText(fileNavigator.fileNames[y - 2 + fileNavigator.fileListScroll], wind->position.x + 1, wind->position.x + 39, wind->position.y + y, 3, 0);
@@ -3743,7 +3045,10 @@ void DrawFloatingWindow(FloatingWindow* wind)
 		gui.activeUI[int(wind->position.x + 2)][int(wind->position.y + 5)].sprite = { 8, 3 };
 		gui.activeUI[int(wind->position.x + 3)][int(wind->position.y + 5)].sprite = { 9, 3 };
 		gui.activeUI[int(wind->position.x + 4)][int(wind->position.y + 5)].sprite = { 10, 3 };
-		DrawGUIText("C-4 to ", wind->position.x + 2, wind->position.x + 12, wind->position.y + 7, 3, 0);
+
+
+		DrawEDONote(48, wind->position.x + 2, wind->position.y + 7, 3, 0, -1, -1);
+		DrawGUIText(" to ", wind->position.x + 5, wind->position.x + 12, wind->position.y + 7, 3, 0);
 		DrawEDONote(editor.transposeValue + 48, wind->position.x + 9, wind->position.y + 7, 3, 0, -1, -1);
 
 		DrawGUIText("APPLY", wind->position.x + 9, wind->position.x + 14, wind->position.y + 9, 4, -1);
@@ -3805,11 +3110,11 @@ void DrawFloatingWindow(FloatingWindow* wind)
 
 
 		// Sample name
-		DrawGUIText("INSTRUMENT NAME: ", wind->position.x + 1, wind->position.x + 17, wind->position.y + 1, 3, 1);
+		DrawGUIText("INSTRUMENT: ", wind->position.x + 1, wind->position.x + 17, wind->position.y + 1, 3, 1);
 		if (!loadedInstruments[editor.selectedInstrument].enabled)
-			DrawGUIText("NO SAMPLE LOADED", wind->position.x + 17, wind->position.x + 34, wind->position.y + 1, 3, 1);
+			DrawGUIText("NO SAMPLE LOADED", wind->position.x + 12, wind->position.x + 34, wind->position.y + 1, 3, 1);
 		else
-			DrawGUIText(loadedInstruments[editor.selectedInstrument].name, wind->position.x + 14, wind->position.x + 34, wind->position.y + 1, 3, 1);
+			DrawGUIText(loadedInstruments[editor.selectedInstrument].name, wind->position.x + 12, wind->position.x + 34, wind->position.y + 1, 3, 1);
 
 		// Volume/Arp speed
 		if (sampleDisplay.displayArp)
@@ -4031,23 +3336,46 @@ void DrawFloatingWindow(FloatingWindow* wind)
 		
 		if (loadedInstruments[editor.selectedInstrument].enabled)
 		{
-			int frameCount = loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
+
+			// Snap button
+			DrawGUIText("Snap:" + std::to_string(sampleDisplay.snapSubdivisions), wind->position.x + 6, wind->position.x + 14, wind->position.y + 38, 3, 0);
+
+			if (sampleDisplay.enableSnap)
+				gui.activeUI[int(wind->position.x + 13)][int(wind->position.y + 38)].sprite = { 24, 6 };
+			else
+				gui.activeUI[int(wind->position.x + 13)][int(wind->position.y + 38)].sprite = { 23, 6 };
+
+			DrawHorizontalSlider(int(wind->position.x + 14), int(wind->position.x + 22), int(wind->position.y + 38), float(sampleDisplay.snapSubdivisions) / 64.0f);
+
+
 			// Sample length display
-			gui.activeUI[int(wind->position.x + 6)][int(wind->position.y + 38)].sprite = { 5, 26 };
+			int frameCount = loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
+			
+			gui.activeUI[int(wind->position.x + 6)][int(wind->position.y + 39)].sprite = { 5, 26 };
 			if (sampleDisplay.measurementSystem == 0)
-				DrawGUIText("FRAMES:" + std::to_string(frameCount), wind->position.x + 7, wind->position.x + 24, wind->position.y + 38, 4, -1);
+				DrawGUIText("FRAMES:" + std::to_string(frameCount), wind->position.x + 7, wind->position.x + 24, wind->position.y + 39, 4, -1);
 			else if (sampleDisplay.measurementSystem == 1)
 			{
 				float milis = (frameCount / 48000.0f) * 1000.0f;
-				DrawGUIText("MS:" + std::to_string(milis), wind->position.x + 7, wind->position.x + 24, wind->position.y + 38, 4, -1);
+				DrawGUIText("MS:" + std::to_string(milis), wind->position.x + 7, wind->position.x + 24, wind->position.y + 39, 4, -1);
 			}
 			else
 			{
 				float seconds = (frameCount) / 48000.0f;
-				DrawGUIText("SECONDS:" + std::to_string(seconds), wind->position.x + 7, wind->position.x + 24, wind->position.y + 38, 4, -1);
+				DrawGUIText("SECONDS:" + std::to_string(seconds), wind->position.x + 7, wind->position.x + 24, wind->position.y + 39, 4, -1);
 			}
+			gui.activeUI[int(wind->position.x + 24)][int(wind->position.y + 39)].sprite = { 6, 26 };
 
-			gui.activeUI[int(wind->position.x + 24)][int(wind->position.y + 38)].sprite = { 6, 26 };
+
+			// Snap button
+			DrawGUIText("Interpolate:", wind->position.x + 1, wind->position.x + 14, wind->position.y + 10, 3, 0);
+			if (loadedInstruments[editor.selectedInstrument].interpolation)
+				gui.activeUI[int(wind->position.x + 13)][int(wind->position.y + 10)].sprite = { 24, 6 };
+			else
+				gui.activeUI[int(wind->position.x + 13)][int(wind->position.y + 10)].sprite = { 23, 6 };
+			
+			//DrawHorizontalSlider(int(wind->position.x + 9), int(wind->position.x + 17), int(wind->position.y + 10), loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].interpolation);
+
 
 
 			// Loop button
@@ -4071,13 +3399,7 @@ void DrawFloatingWindow(FloatingWindow* wind)
 			gui.activeUI[int(wind->position.x + 12)][int(wind->position.y + 9)].sprite = { 6, 26 };
 
 
-			// Snap button
-			DrawGUIText("Snap:" + std::to_string(sampleDisplay.snapSubdivisions), wind->position.x + 1, wind->position.x + 9, wind->position.y + 10, 3, 0);
-			if (sampleDisplay.enableSnap)
-				gui.activeUI[int(wind->position.x + 8)][int(wind->position.y + 10)].sprite = { 24, 6 };
-			else
-				gui.activeUI[int(wind->position.x + 8)][int(wind->position.y + 10)].sprite = { 23, 6 };
-			DrawHorizontalSlider(int(wind->position.x + 9), int(wind->position.x + 17), int(wind->position.y + 10), float(sampleDisplay.snapSubdivisions) / 64.0f);
+			
 
 
 			// ASDR
@@ -4723,105 +4045,6 @@ void DrawVerticalScrollBar(int yStart, int yEnd, int xVal, float value)
 	// Scroll arrows
 	gui.activeUI[xVal][yStart - 1].sprite = { 6, 3 };
 	gui.activeUI[xVal][yEnd].sprite = { 6, 4 };
-
-	return;
-}
-
-
-
-void DrawDial(Vector2 pos, float val, int style)
-{
-
-	
-	gui.activeUI[int(pos.x)][int(pos.y)].sprite = { 2 + style * 2, 7 };
-	gui.activeUI[int(pos.x + 1)][int(pos.y)].sprite = { 3 + style * 2, 7 };
-
-	gui.activeUI[int(pos.x)][int(pos.y + 1)].sprite = { 2 + style * 2, 8 };
-	gui.activeUI[int(pos.x + 1)][int(pos.y + 1)].sprite = { 3 + style * 2, 8 };
-
-
-	return;
-}
-
-
-
-void DrawEffect(Vector2 pos, int type, int value)
-{
-	switch (type)
-	{
-	case -1: // None
-	{
-		gui.activeUI[int(pos.x)][int(pos.y)].sprite = { 9, 23 };
-		gui.activeUI[int(pos.x + 1)][int(pos.y)].sprite = { 10, 23 };
-		gui.activeUI[int(pos.x + 2)][int(pos.y)].sprite = { 10, 23 };
-		gui.activeUI[int(pos.x + 3)][int(pos.y)].sprite = { 13, 23 };
-		break;
-	}
-
-	case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7:
-	{
-		// 10s: 0=set, 1=increase, 2=decrease
-		// 1s: value
-
-		gui.activeUI[int(pos.x)][int(pos.y)].sprite = { 9, 24 + type };
-		gui.activeUI[int(pos.x + 1)][int(pos.y)].sprite = { 10, 24 + type };
-		int val1 = value % 10;
-		int val10 = (value - val1) / 10;
-		if (val10 == 0)
-			gui.activeUI[int(pos.x + 2)][int(pos.y)].sprite = { 13, 24 }; // Set
-		else if (val10 == 1)
-			gui.activeUI[int(pos.x + 2)][int(pos.y)].sprite = { 13, 25 }; // Increase
-		else
-			gui.activeUI[int(pos.x + 2)][int(pos.y)].sprite = { 13, 26 }; // Decrease
-		gui.activeUI[int(pos.x + 3)][int(pos.y)].sprite = { val1, 0 };
-		break;
-	}
-
-	case 8: case 9:
-	{
-		// 0=off, 1=on
-
-		gui.activeUI[int(pos.x)][int(pos.y)].sprite = { 11, 15 + type };
-		gui.activeUI[int(pos.x + 1)][int(pos.y)].sprite = { 12, 15 + type };
-		if (value == 0)
-			gui.activeUI[int(pos.x + 2)][int(pos.y)].sprite = { 13, 27 }; // off
-		else
-			gui.activeUI[int(pos.x + 2)][int(pos.y)].sprite = { 13, 28 }; // on
-		gui.activeUI[int(pos.x + 3)][int(pos.y)].sprite = { 13, 23 };
-		break;
-	}
-
-	case 10: case 11: case 12: case 13:
-	{
-		gui.activeUI[int(pos.x)][int(pos.y)].sprite = { 11, 15 + type };
-		gui.activeUI[int(pos.x + 1)][int(pos.y)].sprite = { 12, 15 + type };
-		int val1 = value % 10;
-		int val10 = (value - val1) / 10;
-		gui.activeUI[int(pos.x + 2)][int(pos.y)].sprite = { val10, 0 };
-		gui.activeUI[int(pos.x + 3)][int(pos.y)].sprite = { val1, 0 };
-		break;
-	}
-
-	case 14:
-	{
-		gui.activeUI[int(pos.x)][int(pos.y)].sprite = { 11, 15 + type };
-		int val1 = value % 10;
-		int val10 = (value % 100) - val1;
-		int val100 = value - val10 - val1;
-		gui.activeUI[int(pos.x + 1)][int(pos.y)].sprite = { val100 / 100, 0 };
-		gui.activeUI[int(pos.x + 2)][int(pos.y)].sprite = { val10 / 10, 0 };
-		gui.activeUI[int(pos.x + 3)][int(pos.y)].sprite = { val1 , 0 };
-		break;
-	}
-
-
-
-
-
-	default:
-		break;
-	}
-
 
 	return;
 }

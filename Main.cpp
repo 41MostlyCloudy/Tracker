@@ -303,7 +303,7 @@ void RunEngine()
 
         if (editor.toRecordSong)
         {
-            std::lock_guard<std::mutex> lock(mtx);
+            std::lock_guard<std::shared_mutex> lock(mtx);
             editor.toRecordSong = false;
             RecordSong();
             for (int wind = 0; wind < windowController.windows.size(); wind++) // Stop dragging windows.
@@ -1386,8 +1386,7 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
             {
                 if (!screen.keyDown) // Play the note sound.
                 {
-                    channels[selectedChannel].volume = 64.0f;
-
+                    channels[selectedChannel].resetChannelEffects(true);
                     StartSample(selectedChannel, editor.selectedInstrument, noteNum, 0);
                     for (int wave = 0; wave < 4; wave++)
                         channels[selectedChannel].waveforms[wave].note = noteNum;
@@ -2041,8 +2040,8 @@ void pressButton(GLFWwindow* window)
                     }
                     else // Delete sample.
                     {
-                        //delete loadedSamples[editor.selectedSample];
-                        //loadedSamples[editor.selectedSample] = nullptr;
+                        Instrument emptyinstrument;
+                        loadedInstruments[editor.selectedInstrument] = emptyinstrument;
                         loadedInstruments[editor.selectedInstrument].enabled = false;
                     }
                 }

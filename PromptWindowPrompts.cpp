@@ -28,7 +28,7 @@ void selectAlgorithmOperator(Vector2 pos);
 
 void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos, GLFWwindow* windMain)
 {
-	std::lock_guard<std::mutex> lock(mtx);
+	std::lock_guard<std::shared_mutex> lock(mtx);
 
 	clickPos.x = int(clickPos.x);
 	clickPos.y = int(clickPos.y);
@@ -212,6 +212,9 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 			}
 			else if (clickPos.y == 19 && clickPos.x > 28 && clickPos.x < 35) // Load.
 			{
+				if (editor.selectedFile < 0 || editor.selectedFile >= fileNavigator.fileNames.size())
+					return;
+
 				if (fileNavigator.fileNames[editor.selectedFile].at(0) == '1') // Load Song
 				{
 					gui.drawUIThisFrame = true;
@@ -236,7 +239,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 					for (int ch = 0; ch < channels.size(); ch++)
 					{
 						for (int op = 0; op < 4; op++)
-							channels[ch].waveforms[op].patternReadPos = 0;
+							channels[ch].waveforms[op].sampleReadPos = 0;
 					}
 
 					ma_decoder loadingDecoder;
@@ -263,6 +266,11 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 						for (int i = 0; i < framesRead * 2; i += 2) // Mix the frames together into 1 channel.
 						{
 							float mixedFrame = (frames[i] + frames[i + 1]) * 0.5f;
+
+							// Scale the frame to the bit depth of the modules.
+							int scaledFrame = int(mixedFrame * 128.0f);
+							mixedFrame = float(scaledFrame) / 128.0f;
+
 							loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].pcmFrames.emplace_back(mixedFrame);
 						}
 
@@ -345,6 +353,9 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 					SaveSong();
 				else
 					SaveCurrentInstrument();
+
+				// Refresh the preset menu.
+				presetMenu.NavigateToFile();
 			}
 			else if (clickPos.y > 0 && clickPos.x > 0 && clickPos.x < 39)
 			{
@@ -633,16 +644,23 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 			}
 
 
-			if (int(clickPos.y) == 8) // Set number sample periods.
+			if (int(clickPos.y) == 8) // Toggle using arps.
 			{
 				if (clickPos.x == 10)
 					loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].useArp = !loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].useArp;
 
 				DrawSampleDisplay();
 			}
-			else if (clickPos.y == 10) // Grid snap settings
+			if (int(clickPos.y) == 10) // Toggle interpolation.
 			{
-				if (clickPos.x == 8)
+				if (clickPos.x == 13)
+					loadedInstruments[editor.selectedInstrument].interpolation = !loadedInstruments[editor.selectedInstrument].interpolation;
+
+				DrawSampleDisplay();
+			}
+			else if (clickPos.y == 38) // Grid snap settings
+			{
+				if (clickPos.x == 13)
 					sampleDisplay.enableSnap = !sampleDisplay.enableSnap;
 
 				DrawSampleDisplay();
@@ -850,13 +868,13 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 					{
 						if (!editor.playingSong) // Play the note sound.
 						{
-							channels[0].volume = 64.0f;
+							channels[0].resetChannelEffects(true);
 							StartSample(0, editor.selectedInstrument, 48, 0);
 							for (int wave = 0; wave < 4; wave++)
 								channels[0].waveforms[wave].note = 48;
 							sampleDisplay.playingInstrument = true;
 							for (int wave = 0; wave < 4; wave++)
-								channels[0].waveforms[wave].patternReadPos = sampleDisplay.sampleStartPos;
+								channels[0].waveforms[wave].sampleReadPos = sampleDisplay.sampleStartPos;
 						}
 					}
 					else if (clickPos.x == 3 || clickPos.x == 4) // Pause sample
@@ -898,7 +916,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 							loadedSong.unsavedChanges = true;
 						}
 					}
-					else if (clickPos.y == 38)
+					else if (clickPos.y == 39)
 					{
 						if (clickPos.x > 5 && clickPos.x < 25) // Change sample length display units
 						{
@@ -1267,14 +1285,12 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 
 					loadedInstruments[editor.selectedInstrument].name = presetMenu.fileNames[presetMenu.selectedSample];
 
+					DrawSampleDisplay();
+
 					instrumentFile.close();
 
 					loadedSong.unsavedChanges = true;
 				}
-
-				//LoadInstrumentPreset(presetMenu.selectedSample, &loadedInstruments[editor.selectedInstrument]);
-				//windowController.windows.erase(windowController.windows.begin() + windowIndex);
-				//windowController.windows.shrink_to_fit();
 				
 				return;
 			}
@@ -1377,7 +1393,7 @@ void RightClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 cli
 	clickPos.x = int(clickPos.x);
 	clickPos.y = int(clickPos.y);
 
-	std::lock_guard<std::mutex> lock(mtx);
+	std::lock_guard<std::shared_mutex> lock(mtx);
 
 
 
@@ -1436,9 +1452,7 @@ void RightClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 cli
 
 void HoldClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos, GLFWwindow* windMain)
 {
-	//clickPos.x = int(clickPos.x);
-	//clickPos.y = int(clickPos.y);
-	std::lock_guard<std::mutex> lock(mtx);
+	std::lock_guard<std::shared_mutex> lock(mtx);
 
 	
 
@@ -1566,22 +1580,8 @@ void HoldClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clic
 					}
 					return;
 				}*/
-				else if (int(clickPos.y) == 10) // Set sample display subdivisions.
-				{
-					if (loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].operatorType != 2)
-					{
-						sampleDisplay.snapSubdivisions = (float(int((clickPos.x - 9) * 4.0f)) / 32.0f) * 64.0f;
+				
 
-						if (sampleDisplay.snapSubdivisions < 0.0f)
-							sampleDisplay.snapSubdivisions = 0.0f;
-						if (sampleDisplay.snapSubdivisions > 64.0f)
-							sampleDisplay.snapSubdivisions = 64.0f;
-
-
-						DrawSampleDisplay();
-					}
-					return;
-				}
 				else if (int(clickPos.y) == 12) // Set sample attack.
 				{
 					loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].attack = (float(int((clickPos.x - 9) * 2.0f)) / 16.0f);;
@@ -1661,6 +1661,21 @@ void HoldClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clic
 					return;
 				}
 			}
+			if (clickPos.x > 14 && clickPos.x < 23)
+			{
+				if (int(clickPos.y) == 38) // Set sample display subdivisions.
+				{
+					sampleDisplay.snapSubdivisions = (float(int((clickPos.x - 14) * 4.0f)) / 32.0f) * 64.0f;
+
+					if (sampleDisplay.snapSubdivisions < 0.0f)
+						sampleDisplay.snapSubdivisions = 0.0f;
+					if (sampleDisplay.snapSubdivisions > 64.0f)
+						sampleDisplay.snapSubdivisions = 64.0f;
+
+					DrawSampleDisplay();
+					return;
+				}
+			}
 
 			if (clickPos.x > 13 && clickPos.x < 22) // Low-pass filter resonance.
 			{
@@ -1733,35 +1748,8 @@ void HoldClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clic
 							loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].frequencies[int(clickPos.x) - 18 - 4] = newFreqVal;
 
 							// Update additive operator frequencies.
-							if (loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].operatorType == 2)
-							{
-								for (int ch = 0; ch < channels.size(); ch++)
-								{
-									if (channels[ch].instrument == editor.selectedInstrument)
-									{
-										for (int freq = 0; freq < 11; freq++)
-										{
-											channels[ch].additiveSynth.freqStartingVolumes[freq] = loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].frequencies[freq];
-											channels[ch].additiveSynth.freqVolumes[freq] = channels[ch].additiveSynth.freqStartingVolumes[freq];
-										}
-									}
-								}
-								
-
-								for (int wave = 0; wave < 4; wave++)
-								{
-									if (wave != sampleDisplay.selectedOperator && loadedInstruments[editor.selectedInstrument].waveforms[wave].operatorType == 2)
-									{
-										for (int freq = 0; freq < 11; freq++)
-											loadedInstruments[editor.selectedInstrument].waveforms[wave].frequencies[freq] = loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].frequencies[freq];
-									}
-								}
-							}
-							else
-							{
-								GenerateAdditiveWave(&loadedInstruments[editor.selectedInstrument], sampleDisplay.selectedOperator);
-								DrawSampleDisplay();
-							}
+							GenerateAdditiveWave(&loadedInstruments[editor.selectedInstrument], sampleDisplay.selectedOperator);
+							DrawSampleDisplay();
 							
 
 							loadedSong.unsavedChanges = true;
