@@ -84,13 +84,14 @@ ma_encoder encoder;
 
 void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op, float* mods[4])
 {
-    int waveForm = loadedInstruments[channels[channel].instrument].operatorWavesToUse[op];
-
+    int mappedWave = loadedInstruments[channels[channel].instrument].operatorMapping[op];
+    // For a mapped wave, all instrument properties are used.
+    // The channel waveform state uses the direct operator waveform.
 
 
     float notePitch = channels[channel].waveforms[op].pitch;
 
-    if (channels[channel].arpIndex > -1 && loadedInstruments[channels[channel].instrument].waveforms[waveForm].useArp) // Arpeggiate note and find pitch.
+    if (channels[channel].arpIndex > -1 && loadedInstruments[channels[channel].instrument].waveforms[mappedWave].useArp) // Arpeggiate note and find pitch.
     {
         float arpNote = ((channels[channel].arpP[channels[channel].arpIndex]) - 7.75f) * 4.0f;
         arpNote /= loadedSong.edo;
@@ -98,7 +99,7 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
         notePitch *= arpNote;
     }
 
-    int lfo = loadedInstruments[channels[channel].instrument].waveforms[waveForm].lfo;
+    int lfo = loadedInstruments[channels[channel].instrument].waveforms[mappedWave].octave - 3;
     float lfoMultiplier = pow(0.5f, lfo);
 
     notePitch *= lfoMultiplier;
@@ -126,8 +127,8 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
     // Make sure that the frame reading position is inside the sample.
     if (resampleIndex < 0.0f)
         resampleIndex = 0.0f;
-    if (resampleIndex >= loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames.size() - 1)
-        resampleIndex = loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames.size() - 1;
+    if (resampleIndex >= loadedInstruments[channels[channel].instrument].waveforms[mappedWave].pcmFrames.size() - 1)
+        resampleIndex = loadedInstruments[channels[channel].instrument].waveforms[mappedWave].pcmFrames.size() - 1;
 
 
 
@@ -142,26 +143,26 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
         // Envelope
         channels[channel].waveforms[op].envelopePos += 0.00004f;
         float envPos = channels[channel].waveforms[op].envelopePos;
-        if (envPos < loadedInstruments[channels[channel].instrument].waveforms[waveForm].attack) // In attack section.
+        if (envPos < loadedInstruments[channels[channel].instrument].waveforms[mappedWave].attack) // In attack section.
         {
-            channels[channel].waveforms[op].envelopeVol = channels[channel].waveforms[op].envelopePos / loadedInstruments[channels[channel].instrument].waveforms[waveForm].attack;
+            channels[channel].waveforms[op].envelopeVol = channels[channel].waveforms[op].envelopePos / loadedInstruments[channels[channel].instrument].waveforms[mappedWave].attack;
             channels[channel].waveforms[op].envelopeReleasePointVol = channels[channel].waveforms[op].envelopeVol;
         }
         else
         {
             // Sustain/decay.
-            envPos -= loadedInstruments[channels[channel].instrument].waveforms[waveForm].attack;
-            if ((loadedInstruments[channels[channel].instrument].waveforms[waveForm].sustainForever && !channels[channel].noteStopped) || envPos < loadedInstruments[channels[channel].instrument].waveforms[waveForm].sustain * 2.0f)
+            envPos -= loadedInstruments[channels[channel].instrument].waveforms[mappedWave].attack;
+            if ((loadedInstruments[channels[channel].instrument].waveforms[mappedWave].sustainForever && !channels[channel].noteStopped) || envPos < loadedInstruments[channels[channel].instrument].waveforms[mappedWave].sustain * 2.0f)
             {
-                channels[channel].waveforms[op].envelopeVol -= loadedInstruments[channels[channel].instrument].waveforms[waveForm].decay * 0.00005f;
+                channels[channel].waveforms[op].envelopeVol -= loadedInstruments[channels[channel].instrument].waveforms[mappedWave].decay * 0.00005f;
                 channels[channel].waveforms[op].envelopeReleasePointVol = channels[channel].waveforms[op].envelopeVol;
             }
             else // Release.
             {
-                envPos -= loadedInstruments[channels[channel].instrument].waveforms[waveForm].sustain * 2.0f;
-                if (envPos < loadedInstruments[channels[channel].instrument].waveforms[waveForm].release)
+                envPos -= loadedInstruments[channels[channel].instrument].waveforms[mappedWave].sustain * 2.0f;
+                if (envPos < loadedInstruments[channels[channel].instrument].waveforms[mappedWave].release)
                 {
-                    channels[channel].waveforms[op].envelopeVol = channels[channel].waveforms[op].envelopeReleasePointVol * (1.0f - (envPos / loadedInstruments[channels[channel].instrument].waveforms[waveForm].release));
+                    channels[channel].waveforms[op].envelopeVol = channels[channel].waveforms[op].envelopeReleasePointVol * (1.0f - (envPos / loadedInstruments[channels[channel].instrument].waveforms[mappedWave].release));
                 }
                 else
                     channels[channel].waveforms[op].envelopeVol = 0.0f;
@@ -185,7 +186,7 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
         
         notePitch = channels[channel].waveforms[op].pitch;
 
-        if (channels[channel].arpIndex > -1 && loadedInstruments[channels[channel].instrument].waveforms[waveForm].useArp) // Arpeggiate note and find pitch.
+        if (channels[channel].arpIndex > -1 && loadedInstruments[channels[channel].instrument].waveforms[mappedWave].useArp) // Arpeggiate note and find pitch.
         {
             float arpNote = ((channels[channel].arpP[channels[channel].arpIndex]) - 7.75f) * 4.0f;
             arpNote /= loadedSong.edo;
@@ -211,10 +212,10 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
         float t = resampleIndex - index1;  // Fractional part
 
 
-        if (index2 >= loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames.size())
+        if (index2 >= loadedInstruments[channels[channel].instrument].waveforms[mappedWave].pcmFrames.size())
             index2 = 0;
 
-        float frameVol = loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[index1] * (1.0f - t) + loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[index2] * t;
+        float frameVol = loadedInstruments[channels[channel].instrument].waveforms[mappedWave].pcmFrames[index1] * (1.0f - t) + loadedInstruments[channels[channel].instrument].waveforms[mappedWave].pcmFrames[index2] * t;
 
 
         float frameVolStereo[2] = { frameVol, frameVol };
@@ -232,8 +233,8 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
             // Make sure that the frame reading position is inside the sample.
             if (interpolateIndex < 0.0f)
                 interpolateIndex = 0.0f;
-            if (interpolateIndex >= loadedInstruments[lastInstrument].waveforms[waveForm].pcmFrames.size() - 1)
-                interpolateIndex = loadedInstruments[lastInstrument].waveforms[waveForm].pcmFrames.size() - 1;
+            if (interpolateIndex >= loadedInstruments[lastInstrument].waveforms[mappedWave].pcmFrames.size() - 1)
+                interpolateIndex = loadedInstruments[lastInstrument].waveforms[mappedWave].pcmFrames.size() - 1;
 
 
 
@@ -248,10 +249,10 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
             float interpT = interpolateIndex - interpIndex1;  // Fractional part
 
 
-            if (interpIndex2 >= loadedInstruments[lastInstrument].waveforms[waveForm].pcmFrames.size())
+            if (interpIndex2 >= loadedInstruments[lastInstrument].waveforms[mappedWave].pcmFrames.size())
                 interpIndex2 = 0;
 
-            float interpFrameVol = loadedInstruments[lastInstrument].waveforms[waveForm].pcmFrames[interpIndex1] * (1.0f - interpT) + loadedInstruments[lastInstrument].waveforms[waveForm].pcmFrames[interpIndex2] * interpT;
+            float interpFrameVol = loadedInstruments[lastInstrument].waveforms[mappedWave].pcmFrames[interpIndex1] * (1.0f - interpT) + loadedInstruments[lastInstrument].waveforms[mappedWave].pcmFrames[interpIndex2] * interpT;
 
 
             frameVolStereo[0] = interpFrameVol * iTime + frameVolStereo[0] * (1.0f - iTime);
@@ -265,6 +266,9 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
 
         //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+        
+
+
         float readPosMovedByMods = -resampleIndex;
 
         for (int modNum = 0; modNum < 4; modNum++)
@@ -275,7 +279,7 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
                 {
                     if (loadedInstruments[channels[channel].instrument].modulationTypes[modNum] == 0) // FM
                     {
-                        resampleIndex += mods[modNum][i * 2 + stereoOffset] * 0.5f;
+                        resampleIndex += mods[modNum][i * 2 + stereoOffset] * loadedInstruments[channels[channel].instrument].modScale[modNum] * 2.0f;
                         if ((notePitch > 0 && resampleIndex < 0) || (notePitch < 0 && resampleIndex > 0))
                         {
                             notePitch *= -1;
@@ -283,13 +287,14 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
                     }
                     else if (loadedInstruments[channels[channel].instrument].modulationTypes[modNum] == 1) // AM
                     {
-                        frameVolStereo[stereoOffset] *= abs(mods[modNum][i * 2 + stereoOffset]);
+                        // AM
+                        frameVolStereo[stereoOffset] *= abs(mods[modNum][i * 2 + stereoOffset]) * loadedInstruments[channels[channel].instrument].modScale[modNum] * 2.0f;
                     }
                     else if (loadedInstruments[channels[channel].instrument].modulationTypes[modNum] == 2) // Apply delay.
                     {
-                        int sampleLen = loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames.size();
+                        int sampleLen = loadedInstruments[channels[channel].instrument].waveforms[mappedWave].pcmFrames.size();
 
-                        float delayIndex = resampleIndex + mods[modNum][i * 2 + stereoOffset] * 100.0f;
+                        float delayIndex = resampleIndex + mods[modNum][i * 2 + stereoOffset] * 100.0f * loadedInstruments[channels[channel].instrument].modScale[modNum] * 2.0f;
                         while (delayIndex >= sampleLen) delayIndex -= sampleLen;
                         while (delayIndex < 0) delayIndex += sampleLen;
 
@@ -300,7 +305,92 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
                         if (dIndex2 >= sampleLen)
                             dIndex2 = 0;
 
-                        frameVolStereo[stereoOffset] += loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[dIndex1] * (1.0f - t2) + loadedInstruments[channels[channel].instrument].waveforms[waveForm].pcmFrames[dIndex2] * t2;
+                        frameVolStereo[stereoOffset] += loadedInstruments[channels[channel].instrument].waveforms[mappedWave].pcmFrames[dIndex1] * (1.0f - t2) + loadedInstruments[channels[channel].instrument].waveforms[mappedWave].pcmFrames[dIndex2] * t2;
+                    }
+                    else if (loadedInstruments[channels[channel].instrument].modulationTypes[modNum] == 6) // Apply fuzz.
+                    {
+                        float drySignal = frameVolStereo[stereoOffset];
+
+                        float modFuzz = abs(mods[modNum][i * 2 + stereoOffset]) * 1.0f;
+
+                        if (modFuzz > 1.0f) modFuzz = 1.0f; // Cap fuzz level.
+                        modFuzz *= 16.0f;
+                        frameVolStereo[stereoOffset] *= 1.0f + modFuzz;
+
+                        float effect = loadedInstruments[channels[channel].instrument].modScale[modNum];
+
+                        if (loadedInstruments[channels[channel].instrument].waveforms[mappedWave].fuzzType == 0) // Clip
+                        {
+                            // Clamp the volume to a normal range.
+                            if (frameVolStereo[stereoOffset] > 1.0f) frameVolStereo[stereoOffset] = 1.0f;
+                            else if (frameVolStereo[stereoOffset] < -1.0f) frameVolStereo[stereoOffset] = -1.0f;
+
+                        }
+                        else if (loadedInstruments[channels[channel].instrument].waveforms[mappedWave].fuzzType == 1) // Fold
+                        {
+                            bool waveFolded = false;
+                            while (!waveFolded)
+                            {
+                                if (frameVolStereo[stereoOffset] <= 1.0f && frameVolStereo[stereoOffset] >= -1.0f)
+                                    waveFolded = true;
+
+                                if (frameVolStereo[stereoOffset] > 1.0f)
+                                {
+                                    frameVolStereo[stereoOffset] -= 1.0f;
+                                    frameVolStereo[stereoOffset] *= -1.0f;
+                                    frameVolStereo[stereoOffset] += 1.0f;
+                                }
+                                else if (frameVolStereo[stereoOffset] < -1.0f)
+                                {
+                                    frameVolStereo[stereoOffset] += 1.0f;
+                                    frameVolStereo[stereoOffset] *= -1.0f;
+                                    frameVolStereo[stereoOffset] -= 1.0f;
+                                }
+                            }
+                        }
+                        else // Ring
+                        {
+                            bool waveFolded = false;
+                            while (!waveFolded)
+                            {
+                                if (frameVolStereo[stereoOffset] <= 1.0f && frameVolStereo[stereoOffset] >= -1.0f)
+                                    waveFolded = true;
+
+                                if (frameVolStereo[stereoOffset] > 1.0f)
+                                {
+                                    frameVolStereo[stereoOffset] -= 1.0f;
+                                    frameVolStereo[stereoOffset] *= -1.0f;
+                                    frameVolStereo[stereoOffset] += 1.0f;
+                                }
+                                else if (frameVolStereo[stereoOffset] < 0.0f)
+                                {
+                                    frameVolStereo[stereoOffset] *= -1.0f;
+                                }
+                            }
+                        }
+
+                        frameVolStereo[stereoOffset] /= (1.0f + modFuzz * 0.125f);
+
+                        frameVolStereo[stereoOffset] = frameVolStereo[stereoOffset] * (1.0f - effect) + drySignal * effect;
+
+                    }
+                    else if (loadedInstruments[channels[channel].instrument].modulationTypes[modNum] == 7) // Apply MAP.
+                    {
+                        float mapPos = ((mods[modNum][i * 2 + stereoOffset] * mods[modNum][i * 2 + stereoOffset] * mods[modNum][i * 2 + stereoOffset] * loadedInstruments[channels[channel].instrument].modScale[modNum]) + 0.5f) * 4.0f;
+                        while (mapPos > 1.0f) mapPos--;
+                        while (mapPos < 0.0f) mapPos++;
+                        int sampleLen = loadedInstruments[channels[channel].instrument].waveforms[mappedWave].pcmFrames.size() - 1;
+                        mapPos *= sampleLen;
+                        resampleIndex = mapPos;
+                    }
+                    else if (loadedInstruments[channels[channel].instrument].modulationTypes[modNum] == 8) // Apply bit depth.
+                    {
+                        float bitDepth = abs(mods[modNum][i * 2 + stereoOffset] * loadedInstruments[channels[channel].instrument].modScale[modNum]) * 256.0f;
+                        if (bitDepth > 256.0f) bitDepth = 256.0f;
+                        else if (bitDepth < 1.0f) bitDepth = 1.0f;
+                        frameVolStereo[stereoOffset] *= 256.0f;
+                        frameVolStereo[stereoOffset] = int(frameVolStereo[stereoOffset] / bitDepth) * bitDepth;
+                        frameVolStereo[stereoOffset] /= 256.0f;
                     }
                     else if (loadedInstruments[channels[channel].instrument].modulationTypes[modNum] > 2) // Apply low-pass.
                     {
@@ -309,10 +399,13 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
 
                         // Set initial parameters
                         if (modType == 4)
-                            lpCutoff = loadedInstruments[channels[channel].instrument].lPResonances[modNum] * 4000.0f * abs(notePitch);
+                            lpCutoff = loadedInstruments[channels[channel].instrument].modScale[modNum] * 4000.0f * abs(notePitch);
+                        else if (modType == 5)
+                            lpCutoff = (abs(mods[modNum][i * 2 + stereoOffset])) * 4000.0f * abs(notePitch) * loadedInstruments[channels[channel].instrument].modScale[modNum] * 2.0f;
                         else
                             lpCutoff = (abs(mods[modNum][i * 2 + stereoOffset])) * 4000.0f * abs(notePitch);
 
+                        
                         
                         if (lpCutoff < 200.0f) lpCutoff = 200.0f;
                         else if (lpCutoff > 24000.0f) lpCutoff = 24000.0f;
@@ -327,7 +420,9 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
                         // Calculate feedback amount from resonance
                         float resonance;
                         if (modType == 3)
-                            resonance = loadedInstruments[channels[channel].instrument].lPResonances[modNum] * 2.0f;
+                            resonance = loadedInstruments[channels[channel].instrument].modScale[modNum] * 2.0f;
+                        else if (modType == 5)
+                            resonance = loadedInstruments[channels[channel].instrument].modScale[modNum] * 2.0f * loadedInstruments[channels[channel].instrument].modScale[modNum];
                         else
                             resonance = abs(mods[modNum][i * 2 + stereoOffset]) * 2.0f;
 
@@ -343,6 +438,12 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
         
 
 
+        // The added fuzz level.
+        float fuzzLevel = loadedInstruments[channels[channel].instrument].waveforms[mappedWave].fuzz + channels[channel].fuzz;
+        if (fuzzLevel > 1.0f) fuzzLevel = 1.0f; // Cap fuzz level.
+        else if (fuzzLevel < 0.0f) fuzzLevel = 0.0f; // Cap fuzz level.
+        float fuzz = fuzzLevel * 16.0f;
+
         
         for (int j = 0; j < 2; j++)
         {
@@ -350,15 +451,61 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
             frameVolStereo[j] *= channels[channel].waveforms[op].glideVolume;
 
             // Add the fuzz effect.
-            float fuzz = loadedInstruments[channels[channel].instrument].waveforms[waveForm].fuzz * 16.0f * 1.0f;
-            frameVolStereo[j] *= 1.0f + fuzz;
+            if (fuzzLevel > 0)
+            {
+                frameVolStereo[j] *= 1.0f + fuzz;
 
+                if (loadedInstruments[channels[channel].instrument].waveforms[mappedWave].fuzzType == 0) // Clip
+                {
+                    // Clamp the volume to a normal range.
+                    if (frameVolStereo[j] > 1.0f) frameVolStereo[j] = 1.0f;
+                    else if (frameVolStereo[j] < -1.0f) frameVolStereo[j] = -1.0f;
+                }
+                else if (loadedInstruments[channels[channel].instrument].waveforms[mappedWave].fuzzType == 1) // Fold
+                {
+                    bool waveFolded = false;
+                    while (!waveFolded)
+                    {
+                        if (frameVolStereo[j] <= 1.0f && frameVolStereo[j] >= -1.0f)
+                            waveFolded = true;
 
-            // Clamp the volume to a normal range.
-            if (frameVolStereo[j] > 1.0f) frameVolStereo[j] = 1.0f;
-            else if (frameVolStereo[j] < -1.0f) frameVolStereo[j] = -1.0f;
+                        if (frameVolStereo[j] > 1.0f)
+                        {
+                            frameVolStereo[j] -= 1.0f;
+                            frameVolStereo[j] *= -1.0f;
+                            frameVolStereo[j] += 1.0f;
+                        }
+                        else if (frameVolStereo[j] < -1.0f)
+                        {
+                            frameVolStereo[j] += 1.0f;
+                            frameVolStereo[j] *= -1.0f;
+                            frameVolStereo[j] -= 1.0f;
+                        }
+                    }
+                }
+                else // Ring
+                {
+                    bool waveFolded = false;
+                    while (!waveFolded)
+                    {
+                        if (frameVolStereo[j] <= 1.0f && frameVolStereo[j] >= -1.0f)
+                            waveFolded = true;
 
-            frameVolStereo[j] /= (1.0f + fuzz * 0.125f);
+                        if (frameVolStereo[j] > 1.0f)
+                        {
+                            frameVolStereo[j] -= 1.0f;
+                            frameVolStereo[j] *= -1.0f;
+                            frameVolStereo[j] += 1.0f;
+                        }
+                        else if (frameVolStereo[j] < 0.0f)
+                        {
+                            frameVolStereo[j] *= -1.0f;
+                        }
+                    }
+                }
+
+                frameVolStereo[j] /= (1.0f + fuzz * 0.125f);
+            }
         }
         
 
@@ -367,12 +514,12 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
 
         
 
-        if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].stereo == 0)
+        if (loadedInstruments[channels[channel].instrument].waveforms[mappedWave].stereo == 0)
         {
             pOutputF32[i * 2] += frameVolStereo[0];
             pOutputF32[i * 2 + 1] += frameVolStereo[1];
         }
-        else if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].stereo == 1)
+        else if (loadedInstruments[channels[channel].instrument].waveforms[mappedWave].stereo == 1)
         {
             pOutputF32[i * 2] += frameVolStereo[0];
         }
@@ -409,25 +556,25 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
         /////////////////////////////////////////////// End of sample.
         if (notePitch < 0.0f)
         {
-            if (resampleIndex < loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopStart)
+            if (resampleIndex < loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopStart)
             {
-                if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopType == 0)
+                if (loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopType == 0)
                 {
                     resampleIndex -= notePitch;
                     StopSample(channel);
                 }
-                else if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopType == 1)
+                else if (loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopType == 1)
                 {
-                    float loopLen = float(loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopEnd - loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopStart);
-                    while (resampleIndex < loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopStart)
+                    float loopLen = float(loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopEnd - loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopStart);
+                    while (resampleIndex < loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopStart)
                         resampleIndex += loopLen;
                 }
                 else
                 {
-                    float loopLen = float(loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopEnd - loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopStart);
-                    float overLoop = float(loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopStart) - resampleIndex;
-                    resampleIndex = float(loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopStart) + overLoop;
-                    while (resampleIndex >= loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopEnd)
+                    float loopLen = float(loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopEnd - loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopStart);
+                    float overLoop = float(loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopStart) - resampleIndex;
+                    resampleIndex = float(loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopStart) + overLoop;
+                    while (resampleIndex >= loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopEnd)
                         resampleIndex -= loopLen;
 
                     channels[channel].waveforms[op].reverse = !channels[channel].waveforms[op].reverse;
@@ -436,25 +583,25 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
         }
         else
         {
-            if (resampleIndex >= loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopEnd)
+            if (resampleIndex >= loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopEnd)
             {
-                if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopType == 0)
+                if (loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopType == 0)
                 {
                     resampleIndex -= notePitch;
                     StopSample(channel);
                 }
-                else if (loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopType == 1)
+                else if (loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopType == 1)
                 {
-                    float loopLen = float(loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopEnd - loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopStart);
-                    while (resampleIndex >= loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopEnd)
+                    float loopLen = float(loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopEnd - loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopStart);
+                    while (resampleIndex >= loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopEnd)
                         resampleIndex -= loopLen;
                 }
                 else
                 {
-                    float loopLen = float(loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopEnd - loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopStart);
-                    float overLoop = resampleIndex - float(loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopEnd);
-                    resampleIndex = float(loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopEnd) - overLoop - loopLen;
-                    while (resampleIndex < loadedInstruments[channels[channel].instrument].waveforms[waveForm].loopStart)
+                    float loopLen = float(loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopEnd - loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopStart);
+                    float overLoop = resampleIndex - float(loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopEnd);
+                    resampleIndex = float(loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopEnd) - overLoop - loopLen;
+                    while (resampleIndex < loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopStart)
                         resampleIndex += loopLen;
 
                     channels[channel].waveforms[op].reverse = !channels[channel].waveforms[op].reverse;
@@ -605,6 +752,14 @@ void applySubtractiveFilters(float* pOutputF32, ma_uint64 frameCount, int channe
             if (channels[channel].sampleRate < 1.0f) channels[channel].sampleRate = 1.0f;
             else if (channels[channel].sampleRate > 32.0f) channels[channel].sampleRate = 32.0f;
         }
+
+        // Fuzz Slide
+        if (channels[channel].fuzzSlide != 0)
+        {
+            channels[channel].fuzz += channels[channel].fuzzSlide * 0.0001f * 120.0f;
+            if (channels[channel].fuzz > 1) channels[channel].fuzz = 1;
+            else if (channels[channel].fuzz < 0) channels[channel].fuzz = 0;
+        }
     }
 
 
@@ -636,8 +791,8 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
 
     case 1:
     {
-        readModulator(framePointer, frameCount, channel, 0, nullPointer);
-        readModulator(framePointer, frameCount, channel, 1, nullPointer);
+        readModulator(framePointer, frameCount, channel, 0, nullPointer); // READ CARRIER 1
+        readModulator(framePointer, frameCount, channel, 1, nullPointer); // READ CARRIER 2
         break;
     }
 
@@ -646,18 +801,18 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
         float mod2[480 * 2] = { 0 };
 
         float* goTo1[4] = { &mod2[0], NULL, NULL, NULL };
-        readModulator(goTo1[0], frameCount, channel, 1, nullPointer);
+        readModulator(goTo1[0], frameCount, channel, 1, nullPointer); // Read mod 2 to carrier 1
 
-        readModulator(framePointer, frameCount, channel, 0, goTo1);
+        readModulator(framePointer, frameCount, channel, 0, goTo1); // READ CARRIER 1
 
         break;
     }
 
     case 3:
     {
-        readModulator(framePointer, frameCount, channel, 0, nullPointer);
-        readModulator(framePointer, frameCount, channel, 1, nullPointer);
-        readModulator(framePointer, frameCount, channel, 2, nullPointer);
+        readModulator(framePointer, frameCount, channel, 0, nullPointer); // READ CARRIER 1
+        readModulator(framePointer, frameCount, channel, 1, nullPointer); // READ CARRIER 2
+        readModulator(framePointer, frameCount, channel, 2, nullPointer); // READ CARRIER 3
         
         break;
     }
@@ -667,10 +822,10 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
         float mod3[480 * 2] = { 0 };
 
         float* goTo1[4] = { &mod3[0], NULL, NULL, NULL };
-        readModulator(goTo1[0], frameCount, channel, 2, nullPointer);
+        readModulator(goTo1[0], frameCount, channel, 2, nullPointer); // Read mod 3 to 1
 
-        readModulator(framePointer, frameCount, channel, 0, goTo1);
-        readModulator(framePointer, frameCount, channel, 1, nullPointer);
+        readModulator(framePointer, frameCount, channel, 0, goTo1); // READ CARRIER 1
+        readModulator(framePointer, frameCount, channel, 1, nullPointer); // READ CARRIER 2
 
         break;
     }
@@ -681,10 +836,10 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
         float mod3[480 * 2] = { 0 };
 
         float* goTo1[4] = { &mod2[0], &mod3[0], NULL, NULL };
-        readModulator(goTo1[0], frameCount, channel, 1, nullPointer);
-        readModulator(goTo1[1], frameCount, channel, 2, nullPointer);
+        readModulator(goTo1[0], frameCount, channel, 1, nullPointer); // Read mod 2 to 1
+        readModulator(goTo1[1], frameCount, channel, 2, nullPointer); // Read mod 3 to 1
 
-        readModulator(framePointer, frameCount, channel, 0, goTo1);
+        readModulator(framePointer, frameCount, channel, 0, goTo1); // READ CARRIER 1
 
         break;
     }
@@ -695,12 +850,12 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
         float mod3[480 * 2] = { 0 };
 
         float* goTo2[4] = { NULL, &mod3[0], NULL, NULL };
-        readModulator(goTo2[1], frameCount, channel, 2, nullPointer);
+        readModulator(goTo2[1], frameCount, channel, 2, nullPointer); // Read mod 3 to 2
 
         float* goTo1[4] = { &mod2[0], NULL, NULL, NULL };
-        readModulator(goTo1[0], frameCount, channel, 1, goTo2);
+        readModulator(goTo1[0], frameCount, channel, 1, goTo2); // Read mod 2 to 1
 
-        readModulator(framePointer, frameCount, channel, 0, goTo1);
+        readModulator(framePointer, frameCount, channel, 0, goTo1); // READ CARRIER 1
 
         break;
     }
@@ -711,10 +866,10 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
 
         float* goTo1[4] = { &mod3[0], NULL, NULL, NULL };
         float* goTo2[4] = { NULL, &mod3[0], NULL, NULL };
-        readModulator(goTo1[0], frameCount, channel, 2, nullPointer);
+        readModulator(goTo1[0], frameCount, channel, 2, nullPointer); // Read mod 3 to 2 and 1
 
-        readModulator(framePointer, frameCount, channel, 0, goTo1);
-        readModulator(framePointer, frameCount, channel, 1, goTo2);
+        readModulator(framePointer, frameCount, channel, 0, goTo1); // READ CARRIER 1
+        readModulator(framePointer, frameCount, channel, 1, goTo2); // READ CARRIER 2
 
         break;
     }
@@ -726,15 +881,15 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
         float mod4[480 * 2] = { 0 };
 
         float* goTo3[4] = { NULL, NULL, &mod4[0], NULL };
-        readModulator(goTo3[2], frameCount, channel, 3, nullPointer);
+        readModulator(goTo3[2], frameCount, channel, 3, nullPointer); // Read mod 4 to 3
 
         float* goTo2[4] = { NULL, &mod3[0], NULL, NULL };
-        readModulator(goTo2[1], frameCount, channel, 2, goTo3);
+        readModulator(goTo2[1], frameCount, channel, 2, goTo3); // Read mod 3 to 2
 
         float* goTo1[4] = { &mod2[0], NULL, NULL, NULL };
-        readModulator(goTo1[0], frameCount, channel, 1, goTo2);
+        readModulator(goTo1[0], frameCount, channel, 1, goTo2); // Read mod 2 to 1
 
-        readModulator(framePointer, frameCount, channel, 0, goTo1);
+        readModulator(framePointer, frameCount, channel, 0, goTo1); // READ CARRIER 1
 
         break;
     }
@@ -746,13 +901,13 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
         float mod4[480 * 2] = { 0 };
 
         float* goTo2[4] = { NULL, &mod3[0], &mod4[0], NULL };
-        readModulator(goTo2[1], frameCount, channel, 2, nullPointer);
-        readModulator(goTo2[2], frameCount, channel, 3, nullPointer);
+        readModulator(goTo2[1], frameCount, channel, 2, nullPointer); // Read mod 3 to 2
+        readModulator(goTo2[2], frameCount, channel, 3, nullPointer); // Read mod 4 to 2
 
         float* goTo1[4] = { &mod2[0], NULL, NULL, NULL };
-        readModulator(goTo1[0], frameCount, channel, 1, goTo2);
+        readModulator(goTo1[0], frameCount, channel, 1, goTo2); // Read mod 2 to 1
 
-        readModulator(framePointer, frameCount, channel, 0, goTo1);
+        readModulator(framePointer, frameCount, channel, 0, goTo1); // READ CARRIER 1
 
         break;
     }
@@ -766,13 +921,13 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
         
         
         float* goTo2[4] = { NULL, NULL, &mod4[0], NULL };
-        readModulator(goTo2[2], frameCount, channel, 3, nullPointer);
+        readModulator(goTo2[2], frameCount, channel, 3, nullPointer); // Read mod 4 to 2
 
         float* goTo1[4] = { &mod2[0], &mod3[0], NULL, NULL };
-        readModulator(goTo1[0], frameCount, channel, 1, goTo2);
-        readModulator(goTo1[1], frameCount, channel, 2, nullPointer);
+        readModulator(goTo1[0], frameCount, channel, 1, goTo2); // Read mod 2 to 1
+        readModulator(goTo1[1], frameCount, channel, 2, nullPointer); // Read mod 3 to 1
 
-        readModulator(framePointer, frameCount, channel, 0, goTo1);
+        readModulator(framePointer, frameCount, channel, 0, goTo1); // READ CARRIER 1
 
         break;
     }
@@ -785,13 +940,13 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
         
         float* goTo3[4] = { NULL, NULL, NULL, &mod4[0] };
         float* goTo2[4] = { NULL, NULL, &mod4[0], NULL };
-        readModulator(goTo3[3], frameCount, channel, 3, nullPointer);
+        readModulator(goTo3[3], frameCount, channel, 3, nullPointer); // Read mod 4 to 2 and 3
 
         float* goTo1[4] = { &mod2[0], &mod3[0], NULL, NULL };
-        readModulator(goTo1[0], frameCount, channel, 1, goTo2);
-        readModulator(goTo1[1], frameCount, channel, 2, goTo3);
+        readModulator(goTo1[0], frameCount, channel, 1, goTo2); // Read mod 2 to 1
+        readModulator(goTo1[1], frameCount, channel, 2, goTo3); // Read mod 3 to 1
 
-        readModulator(framePointer, frameCount, channel, 0, goTo1);
+        readModulator(framePointer, frameCount, channel, 0, goTo1); // READ CARRIER 1
 
         break;
     }
@@ -803,14 +958,14 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
         
         float* goTo3[4] = { NULL, NULL, &mod4[0], NULL };
 
-        readModulator(goTo3[2], frameCount, channel, 3, nullPointer);
+        readModulator(goTo3[2], frameCount, channel, 3, nullPointer); // Read mod 4 to 3
 
         float* goTo1[4] = { &mod3[0], NULL, NULL, NULL };
         float* goTo2[4] = { NULL, &mod3[0], NULL, NULL };
-        readModulator(goTo1[0], frameCount, channel, 2, goTo3);
+        readModulator(goTo1[0], frameCount, channel, 2, goTo3); // Read mod 3 to 1 and 2
 
-        readModulator(framePointer, frameCount, channel, 0, goTo1);
-        readModulator(framePointer, frameCount, channel, 1, goTo2);
+        readModulator(framePointer, frameCount, channel, 0, goTo1); // READ CARRIER 1
+        readModulator(framePointer, frameCount, channel, 1, goTo2); // READ CARRIER 2
 
         break;
     }
@@ -821,13 +976,13 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
         float mod3[480 * 2] = { 0 };
 
         float* goTo3[4] = { NULL, &mod4[0], NULL, NULL };
-        readModulator(goTo3[1], frameCount, channel, 3, nullPointer);
+        readModulator(goTo3[1], frameCount, channel, 3, nullPointer); // Read mod 4 to 3
 
         float* goTo1[4] = { &mod3[0], NULL, NULL, NULL };
-        readModulator(goTo1[0], frameCount, channel, 2, goTo3);
+        readModulator(goTo1[0], frameCount, channel, 2, goTo3); // Read mod 3 to 1
 
-        readModulator(framePointer, frameCount, channel, 0, goTo1);
-        readModulator(framePointer, frameCount, channel, 1, nullPointer);
+        readModulator(framePointer, frameCount, channel, 0, goTo1); // READ CARRIER 1
+        readModulator(framePointer, frameCount, channel, 1, nullPointer); // READ CARRIER 2
 
         break;
     }
@@ -840,10 +995,10 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
         
         float* goTo1[4] = { &mod2[0], &mod3[0], &mod4[0], NULL };
 
-        readModulator(goTo1[0], frameCount, channel, 1, nullPointer);
-        readModulator(goTo1[1], frameCount, channel, 2, nullPointer);
-        readModulator(goTo1[2], frameCount, channel, 3, nullPointer);
-        readModulator(framePointer, frameCount, channel, 0, goTo1);
+        readModulator(goTo1[0], frameCount, channel, 1, nullPointer); // Read mod 2 to 1
+        readModulator(goTo1[1], frameCount, channel, 2, nullPointer); // Read mod 3 to 1
+        readModulator(goTo1[2], frameCount, channel, 3, nullPointer); // Read mod 4 to 1
+        readModulator(framePointer, frameCount, channel, 0, goTo1); // READ CARRIER 1
 
         break;
     }
@@ -855,11 +1010,11 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
 
         float* goTo1[4] = { &mod3[0], NULL, NULL, NULL };
         float* goTo2[4] = { NULL, &mod4[0], NULL, NULL };
-        readModulator(goTo1[0], frameCount, channel, 2, nullPointer);
-        readModulator(goTo2[1], frameCount, channel, 3, nullPointer);
+        readModulator(goTo1[0], frameCount, channel, 2, nullPointer); // Read mod 3 to 1
+        readModulator(goTo2[1], frameCount, channel, 3, nullPointer); // Read mod 4 to 2
 
-        readModulator(framePointer, frameCount, channel, 0, goTo1);
-        readModulator(framePointer, frameCount, channel, 1, goTo2);
+        readModulator(framePointer, frameCount, channel, 0, goTo1); // READ CARRIER 1
+        readModulator(framePointer, frameCount, channel, 1, goTo2); // READ CARRIER 2
 
 
         break;
@@ -872,11 +1027,11 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
         float* goTo1[4] = { &mod4[0], NULL, NULL, NULL };
         float* goTo2[4] = { NULL, &mod4[0], NULL, NULL };
         float* goTo3[4] = { NULL, NULL, &mod4[0], NULL };
-        readModulator(goTo1[0], frameCount, channel, 3, nullPointer);
+        readModulator(goTo1[0], frameCount, channel, 3, nullPointer); // Read mod 4 to 1, 2 and 3
 
-        readModulator(framePointer, frameCount, channel, 0, goTo1);
-        readModulator(framePointer, frameCount, channel, 1, goTo2);
-        readModulator(framePointer, frameCount, channel, 2, goTo3);
+        readModulator(framePointer, frameCount, channel, 0, goTo1); // READ CARRIER 1
+        readModulator(framePointer, frameCount, channel, 1, goTo2); // READ CARRIER 2
+        readModulator(framePointer, frameCount, channel, 2, goTo3); // READ CARRIER 3
 
         break;
     }
@@ -886,11 +1041,11 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
         float mod4[480 * 2] = { 0 };
 
         float* goTo2[4] = { &mod4[0], NULL, NULL, NULL };
-        readModulator(goTo2[0], frameCount, channel, 3, nullPointer);
+        readModulator(goTo2[0], frameCount, channel, 3, nullPointer); // Read mod 4 to 2
 
-        readModulator(framePointer, frameCount, channel, 0, nullPointer);
-        readModulator(framePointer, frameCount, channel, 1, goTo2);
-        readModulator(framePointer, frameCount, channel, 2, nullPointer);
+        readModulator(framePointer, frameCount, channel, 0, nullPointer); // READ CARRIER 1
+        readModulator(framePointer, frameCount, channel, 1, goTo2); // READ CARRIER 2
+        readModulator(framePointer, frameCount, channel, 2, nullPointer); // READ CARRIER 3
 
         break;
     }
@@ -901,20 +1056,20 @@ void readWithFMAlgorithm(float* pOutputF32, ma_uint64 frameCount, int channel, m
         float mod4[480 * 2] = { 0 };
 
         float* goTo1[4] = { &mod3[0], &mod4[0], NULL, NULL };
-        readModulator(goTo1[0], frameCount, channel, 2, nullPointer);
-        readModulator(goTo1[1], frameCount, channel, 3, nullPointer);
-        readModulator(framePointer, frameCount, channel, 0, goTo1);
-        readModulator(framePointer, frameCount, channel, 1, nullPointer);
+        readModulator(goTo1[0], frameCount, channel, 2, nullPointer); // Read mod 3 to 1
+        readModulator(goTo1[1], frameCount, channel, 3, nullPointer); // Read mod 4 to 1
+        readModulator(framePointer, frameCount, channel, 0, goTo1); // READ CARRIER 1
+        readModulator(framePointer, frameCount, channel, 1, nullPointer); // READ CARRIER 2
 
         break;
     }
 
     case 19:
     {
-        readModulator(framePointer, frameCount, channel, 0, nullPointer);
-        readModulator(framePointer, frameCount, channel, 1, nullPointer);
-        readModulator(framePointer, frameCount, channel, 2, nullPointer);
-        readModulator(framePointer, frameCount, channel, 3, nullPointer);
+        readModulator(framePointer, frameCount, channel, 0, nullPointer); // READ CARRIER 1
+        readModulator(framePointer, frameCount, channel, 1, nullPointer); // READ CARRIER 2
+        readModulator(framePointer, frameCount, channel, 2, nullPointer); // READ CARRIER 3
+        readModulator(framePointer, frameCount, channel, 3, nullPointer); // READ CARRIER 4
 
         break;
     }
@@ -1611,7 +1766,7 @@ int updateChannelOnBeat(int ch)
                     channels[ch].highPassSlide = float(effectValue) / 255.0f;
                 else if (effect == 18) // Set pan.
                     channels[ch].panValue = (float(effectValue) / 127.0f) - 1.0f;
-                else if (effect == 5) // Jump to frame.
+                else if (effect == 6) // Jump to pattern.
                     frameToJumpTo = effectValue;
                 else if (effect == 19) // Set tempo.
                 {
@@ -1724,6 +1879,12 @@ int updateChannelOnBeat(int ch)
                     else
                         channels[ch].extendEffectsPastNote = true;
                 }
+                if (effect == 25) // Set Fuzz.
+                    channels[ch].fuzz = float(effectValue) / 255.0f;
+                else if (effect == 125) // Decrease Fuzz.
+                    channels[ch].fuzzSlide = float(effectValue) / -25500.0f;
+                else if (effect == 225) // Increase Fuzz.
+                    channels[ch].fuzzSlide = float(effectValue) / 25500.0f;
 
 
 
@@ -2357,8 +2518,10 @@ void GenerateAdditiveWave(Instrument* instrument, int op)
 
     if (instrument->waveforms[op].waveType == 4) // Generate noise
     {
+        int sampleLen = 480 * instrument->waveforms[op].numOfSineWaves * instrument->waveforms[op].numOfSineWaves;
+
         instrument->waveforms[op].pcmFrames.clear();
-        for (int x = 0; x < 480 * 4 * instrument->waveforms[op].numOfSineWaves; x++)
+        for (int x = 0; x < sampleLen; x++)
             instrument->waveforms[op].pcmFrames.emplace_back(0.0f);
 
 
@@ -2372,7 +2535,9 @@ void GenerateAdditiveWave(Instrument* instrument, int op)
                 float noiseVol2 = float((rand() % 256) - 127) / 128.0f;
                 float index = 0.0f;
 
-                for (int x = 0; x < 480 * 4 * instrument->waveforms[op].numOfSineWaves; x++)
+                
+
+                for (int x = 0; x < sampleLen; x++)
                 {
                     if (int(index + 1.0f / (float(16 - wave))) != int(index))
                     {
@@ -2386,6 +2551,9 @@ void GenerateAdditiveWave(Instrument* instrument, int op)
                     float interpVol = noiseVol1 * (1.0f - interp) + noiseVol2 * interp;
 
                     interpVol *= (instrument->waveforms[op].frequencies[wave] + 2.0f) / 16.0f;
+
+                    if (x >= instrument->waveforms[op].dutyCycle * float(sampleLen)) // Duty cycle
+                        interpVol = 0.0f;
 
                     instrument->waveforms[op].pcmFrames[x] += interpVol;
                 }
@@ -2562,7 +2730,7 @@ void GenerateAdditiveWave(Instrument* instrument, int op)
 
                 //std::cout << "  " << waveSize;
 
-                if (instrument->waveforms[op].frequencies[freq] > 0)
+                if (instrument->waveforms[op].frequencies[freq] != 0)
                     ConstructWave(instrument, op, instrument->waveforms[op].waveType, instrument->waveforms[op].frequencies, framesToWrite, waveSize, freq, instrument->waveforms[op].pcmFrames.data());
             }
         }
@@ -2603,9 +2771,10 @@ void GenerateAdditiveWave(Instrument* instrument, int op)
 
 void ConstructWave(Instrument* instrument, int op, int waveType, float frequencies[16], float framesToWrite, float periodLength, int frequency, float* inputWave)
 {
-
     float periodLen = periodLength;
 
+
+    
 
 
     for (int x = 0; x < framesToWrite; x++)
@@ -2626,6 +2795,8 @@ void ConstructWave(Instrument* instrument, int op, int waveType, float frequenci
 
             if (periodPos <= instrument->waveforms[op].dutyCycle)
                 vol += sin(float(x) * 2.0f * 6.28312 / periodLen) * frequencies[frequency] * 0.07f;
+
+
 
             inputWave[x] += vol;
         }
@@ -2897,6 +3068,19 @@ void ConstructWave(Instrument* instrument, int op, int waveType, float frequenci
             }
 
             inputWave[x] += vol;
+        }
+    }
+
+
+
+    if (waveType == 0 || waveType == 2 || waveType == 4) // Sine/triangle imperfections.
+    {
+        for (int x = 0; x < framesToWrite; x++)
+        {
+            inputWave[x] += sin(float(x * 0.4f) * 2.0f * 6.28312 / periodLen) * 0.02f * (1.0f - instrument->waveforms[op].smoothness);
+            inputWave[x] += sin(float(x * 1.6f) * 2.0f * 6.28312 / periodLen) * 0.02f * (1.0f - instrument->waveforms[op].smoothness);
+            inputWave[x] += sin(float(x * 3.1f) * 2.0f * 6.28312 / periodLen) * 0.02f * (1.0f - instrument->waveforms[op].smoothness);
+            inputWave[x] += sin(float(x * 3.7f) * 2.0f * 6.28312 / periodLen) * 0.02f * (1.0f - instrument->waveforms[op].smoothness);
         }
     }
 

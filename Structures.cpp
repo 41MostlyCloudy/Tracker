@@ -58,12 +58,16 @@ struct RGBColor
 
 
 
+
+
 struct InstrumentWave
 {
 	int operatorType = 0; // 0=Wave, 1=sample, 2=vadditive synth
 
 	// Wave types: Sine, Square, Triangle, Saw, Noise, Bell thing
 	int waveType = 0; // -1: Constantly open (so that the modulator can be used as a standalone wave.)
+
+	int fuzzType = 0; // 0 = clip, 1 = fold, 2 = ring fold
 
 	int loopType = 1; // 0 = None, 1 = forwards, 2 = bounce
 	int loopStart = 0;
@@ -75,7 +79,7 @@ struct InstrumentWave
 
 	// The duty cycle.
 	float dutyCycle = 1.0f;
-	float smoothness = 0.0f; // Smoothness (not for sine wave).
+	float smoothness = 1.0f; // Smoothness
 	int numOfSineWaves = 15;
 	float offset = 0.5f; // Offsets the wave volume from center = 0.5f.
 	
@@ -89,7 +93,7 @@ struct InstrumentWave
 
 	float fuzz = 0.0f;
 
-	int lfo = 0; // 0=1, 1=0.1, 2=0.01, 3=0.001
+	int octave = 3; // 0-15
 
 	int stereo = 0; // 0=Mix, 1=Left, 2=Right
 
@@ -119,10 +123,10 @@ struct Instrument
 	bool enabled = false;
 
 	InstrumentWave waveforms[4];
-	int operatorWavesToUse[4] = { 0, 1, 2, 3 }; // Which sample is mapped to each operator.
+	int operatorMapping[4] = { 0, 1, 2, 3 }; // Which sample is mapped to each operator.
 
 	int modulationTypes[4] = { 0,0,0,0 };
-	float lPResonances[4] = { 0.0f,0.0f,0.0f,0.0f }; // Low-pass filter resonance values.
+	float modScale[4] = { 0.0f,0.0f,0.0f,0.0f }; // Low-pass filter resonance values.
 
 	float arpPitches[15] = { 7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f };
 	float arpSpeed = 0.5f; // Arpeggiation speed in subdivisions of a beat.
@@ -179,6 +183,9 @@ struct GUI
 	Vector2i patternScroll;
 	ScrollBar patternVerticalScrollBar;
 	ScrollBar patternHorizontalScrollBar;
+
+	int helpWindowScroll = 0;
+	ScrollBar helpWindowScrollBar;
 
 	int mixScroll = 0;
 	ScrollBar mixScrollBar;
@@ -515,6 +522,9 @@ struct Channel
 	float sampleRate = 1.0f;
 	float sampleRateSlide = 0.0f;
 
+	float fuzz = 0.0f;
+	float fuzzSlide = 0.0f;
+
 
 	// Channel arp pitches.
 	float arpP[15] = { 7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f,7.75f };
@@ -607,6 +617,9 @@ struct Channel
 
 		sampleRate = 1.0f;
 		sampleRateSlide = 0.0f;
+
+		fuzz = 0.0f;
+		fuzzSlide = 0.0f;
 
 		noteStopped = true;
 	}
@@ -963,4 +976,12 @@ struct PresetMenu
 
 
 
+};
+
+
+struct InstrumentFloatingWindow
+{
+	int selectedInstrument = 0;
+	int instrumentListScroll = 0;
+	ScrollBar instrumentListScrollBar;
 };

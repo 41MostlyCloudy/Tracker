@@ -496,25 +496,28 @@ void RunEngine()
                 
                 if (sampleDisplay.visible && windowController.windows[i].name == "Instrument Editor")
                 {
-                    glUseProgram(sampleShaderProgram);
+                    if (loadedInstruments[editor.selectedInstrument].enabled)
+                    {
+                        glUseProgram(sampleShaderProgram);
 
-                    glBindTexture(GL_TEXTURE_2D, sampleTex);
-                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 528, 192, 0, GL_RGB, GL_UNSIGNED_BYTE, sampleDisplay.pixelData);
-                    glBindVertexArray(sampleVAO);
+                        glBindTexture(GL_TEXTURE_2D, sampleTex);
+                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 528, 192, 0, GL_RGB, GL_UNSIGNED_BYTE, sampleDisplay.pixelData);
+                        glBindVertexArray(sampleVAO);
 
-                    GLint ratioInUIShader3 = glGetUniformLocation(sampleShaderProgram, "windowRatio");
-                    glUniform1f(ratioInUIShader3, screen.windowRatio);
-
-
-                    GLint posInShader3 = glGetUniformLocation(sampleShaderProgram, "offset");
-                    glUniform2f(posInShader3, sampleDisplay.position.x, sampleDisplay.position.y + 0.5f);
-
-                    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 1); // Draw the sprites.
+                        GLint ratioInUIShader3 = glGetUniformLocation(sampleShaderProgram, "windowRatio");
+                        glUniform1f(ratioInUIShader3, screen.windowRatio);
 
 
-                    glUseProgram(uiShaderProgram);
-                    glBindTexture(GL_TEXTURE_2D, gui.uiTexture);
-                    glBindVertexArray(sVAO);
+                        GLint posInShader3 = glGetUniformLocation(sampleShaderProgram, "offset");
+                        glUniform2f(posInShader3, sampleDisplay.position.x, sampleDisplay.position.y + 0.5f);
+
+                        glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 1); // Draw the sprites.
+
+
+                        glUseProgram(uiShaderProgram);
+                        glBindTexture(GL_TEXTURE_2D, gui.uiTexture);
+                        glBindVertexArray(sVAO);
+                    }
                 }
 
                 /*
@@ -1764,7 +1767,7 @@ void pressButton(GLFWwindow* window)
         }
         else if (gui.hoveredTile.y == 10) // Read Help Page
         {
-            windowController.InitializeWindow("Help", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 40, 40 });
+            windowController.InitializeWindow("Help", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 42, 40 });
         }
         else if (gui.hoveredTile.y == 11) // Open sample editor.
         {

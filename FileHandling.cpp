@@ -33,6 +33,17 @@ void SaveCurrentInstrument();
 
 void LoadCurrentInstrument(std::string name);
 
+// ------------------------------------------
+
+void AddBoolToByte(bool val, uint8_t* bits);
+
+bool GetBoolFromByte(uint8_t* bits);
+
+void AddFloatToByte(bool val, uint8_t* bits);
+
+bool GetFloatFromByte(uint8_t* bits);
+
+
 
 
 
@@ -102,90 +113,6 @@ void SaveSong() // Save the currently loaded song.
 
 
     loadedSong.unsavedChanges = false;
-
-    // Song file format.
-
-    // Song Body:
-    //      1 byte: Version number.
-    //      1 byte: Length of artist name.
-    //      For each character:
-    //          1 byte value.
-    // 
-    //      1 byte: # Of channels.
-    //      For each channel:
-    //          1 byte: compressed.
-    //          1 byte: voice samples enables.
-    //      1 byte: BPM
-    //      1 byte: EDO
-    //      1 byte: # Of frames in frame sequence.
-    //      For each index in the frame sequence:
-    //          1 byte: Frame index number.
-    //      1 byte: # Of frames in song.
-    //      For each frame:
-    //          1 byte: # of rows.
-    //          1 byte: beats per measure.
-    //          For each channel:
-    //              1 byte: # of notes.
-    //              For each note:
-    //                  1 byte: note value.
-    //              1 byte: # of volumes.
-    //              For each volume:
-    //                  1 byte: volume value.
-    //              1 byte: # of voice samples.
-    //              For each voice sample:
-    //                  1 bytes: sample value.
-    //              1 byte: # of effects.
-    //              For each effect:
-    //                  1 byte: note effect.
-    //              1 byte: # of voice samples.
-    //              For each voice sample:
-    //                  1 byte: voice sample.
-    
-
-
-    // For each sample:
-    //      1 bytes: enabled.
-    // 
-    // For each enabled sample:
-    //      1 byte: Length of name.
-    //      For each character:
-    //          1 byte value.
-    // 
-    //      (1 byte) # of jump points.
-    //      For each jump point:
-    //           4 bytes: Jump point position.
-    // 
-    //      (1 byte) Operator waves
-    //      (1 byte) Volume
-    //      (1 byte) Glide
-    //      (1 byte) Algorithm type
-    // 
-    //      (1 byte) Arp speed + Arp length
-    //      (15 bytes) Arp pitches
-    // 
-    //      For all for modulation paths:
-    //           -1 byte: modulation type + modulation resonance
-    // 
-    //      // Wave info: (For each wave used in the selected modulator algorithm type)
-    // 
-    //          4 bytes: Number of frames.
-    //          For each frame:
-    //              1 byte: Frame value.
-    // 
-    //          (1 byte) waveform + pitch fine-tune
-    //          if (waveform):
-    //              -(1 byte) Duty cycle
-    //              -(1 byte) Smoothness
-    //              -(1 byte) # of sine waves
-    // 
-    //          (1 byte) WaveType + LoopType
-    //          (1 byte) Offset + LFO
-    //          (1 byte) Attack + Sustain
-    //          (1 byte) Decay + Release
-    //          (1 byte) Boolean flags
-    //          (4 bytes) Loop start
-    //          (4 bytes) Loop end
-    //          (11 bytes) frequencies
     
 
     saveCurrentPattern();
@@ -225,8 +152,10 @@ void SaveSong() // Save the currently loaded song.
             uint8_t channelMixVol = channels[j].mixVolume * 16.0f;
             songFile.write((char*)&channelMixVol, 1);
         }
+
         uint8_t bpm = int(loadedSong.startingBPM); // BPM
         songFile.write((char*)&bpm, 1);
+
         uint8_t edo = int(loadedSong.edo); // EDO
         songFile.write((char*)&edo, 1);
 
@@ -234,16 +163,16 @@ void SaveSong() // Save the currently loaded song.
         uint8_t seqSize = loadedSong.patternSequence.size();
         songFile.write((char*)&seqSize, 1);
 
-        for (int i = 0; i < loadedSong.patternSequence.size(); i++) // Frame sequence.
+        for (int i = 0; i < loadedSong.patternSequence.size(); i++) // Pattern sequence.
         {
             uint8_t seqId = loadedSong.patternSequence[i];
             songFile.write((char*)&seqId, 1);
         }
 
-        uint8_t frameNum = loadedSong.patterns.size();
-        songFile.write((char*)&frameNum, 1);
+        uint8_t patternCount = loadedSong.patterns.size();
+        songFile.write((char*)&patternCount, 1);
 
-        for (int i = 0; i < loadedSong.patterns.size(); i++) // Frame.
+        for (int i = 0; i < loadedSong.patterns.size(); i++) // Pattern.
         {
             uint8_t frameRows = loadedSong.patterns[i].rows;
             songFile.write((char*)&frameRows, 1);
@@ -306,13 +235,9 @@ void SaveSong() // Save the currently loaded song.
             }
         }
 
-        
-
-
         songFile.close();
     }
 
-    
 
     return;
 }
@@ -340,94 +265,6 @@ void LoadSong(std::string name) // Load the song file with the given name.
 
     if (songFile.is_open())
     {
-    // Song file format.
-
-    // Song Body:
-    //      1 byte: Version number.
-    //      1 byte: Length of artist name.
-    //      For each character:
-    //          1 byte value.
-    // 
-    //      1 byte: # Of channels.
-    //      For each channel:
-    //          1 byte: compressed.
-    //          1 byte: voice samples enables.
-    //      1 byte: BPM
-    //      1 byte: EDO
-    //      1 byte: # Of frames in frame sequence.
-    //      For each index in the frame sequence:
-    //          1 byte: Frame index number.
-    //      1 byte: # Of frames in song.
-    //      For each frame:
-    //          1 byte: # of rows.
-    //          1 byte: beats per measure.
-    //          For each channel:
-    //              1 byte: # of notes.
-    //              For each note:
-    //                  1 byte: note value.
-    //              1 byte: # of volumes.
-    //              For each volume:
-    //                  1 byte: volume value.
-    //              1 byte: # of voice samples.
-    //              For each voice sample:
-    //                  1 bytes: sample value.
-    //              1 byte: # of effects.
-    //              For each effect:
-    //                  1 byte: note effect.
-    //              1 byte: # of voice samples.
-    //              For each voice sample:
-    //                  1 byte: voice sample.
-
-
-    // For each sample:
-    //      1 bytes: enabled.
-    // 
-    // For each enabled sample:
-    //      1 byte: Length of name.
-    //      For each character:
-    //          1 byte value.
-    // 
-    //      (1 byte) # of jump points.
-    //      For each jump point:
-    //           4 bytes: Jump point position.
-    //    
-    //      (1 byte) Operator waves
-    //      (1 byte) Volume
-    //      (1 byte) Glide
-    //      (1 byte) Algorithm type
-    // 
-    //      (1 byte) Arp speed + Arp length
-    //      (15 bytes) Arp pitches
-    // 
-    //      (1 byte) Arp speed + Arp length
-    //      (15 bytes) Arp pitches
-    // 
-    //      For all for modulation paths:
-    //           -1 byte: modulation type + modulation resonance
-    // 
-    //      // Wave info: (For each wave used in the selected modulator algorithm type)
-    // 
-    //          4 bytes: Number of frames.
-    //          For each frame:
-    //              1 byte: Frame value.
-    // 
-    //          (1 byte) waveform + pitch fine-tune
-    //          if (waveform):
-    //              -(1 byte) Duty cycle
-    //              -(1 byte) Smoothness
-    //              -(1 byte) # of sine waves
-    // 
-    //          (1 byte) WaveType + LoopType
-    //          (1 byte) Offset + LFO
-    //          (1 byte) Attack + Sustain
-    //          (1 byte) Decay + Release
-    //          (1 byte) Boolean flags
-    //          (4 bytes) Loop start
-    //          (4 bytes) Loop end
-    //          (11 bytes) frequencies
-
-
-        ////////////////////// SONG
 
         uint8_t version;
         songFile.read((char*)&version, 1);
@@ -444,12 +281,12 @@ void LoadSong(std::string name) // Load the song file with the given name.
 
         loadedSong.songName = name;
 
-        uint8_t artistNameNum;
-        songFile.read((char*)&artistNameNum, 1);
+        uint8_t artistNameLen;
+        songFile.read((char*)&artistNameLen, 1);
 
         // Artist name
         std::string artistName = "";
-        for (int j = 0; j < artistNameNum; j++)
+        for (int j = 0; j < artistNameLen; j++)
         {
             uint8_t newChar;
             songFile.read((char*)&newChar, 1);
@@ -484,12 +321,12 @@ void LoadSong(std::string name) // Load the song file with the given name.
         loadedSong.edo = edo;
         
 
-        // Frame sequence
-        uint8_t frameSeqNum;
-        songFile.read((char*)&frameSeqNum, 1);
+        // FPattern sequence
+        uint8_t patternSeqLen;
+        songFile.read((char*)&patternSeqLen, 1);
         loadedSong.patternSequence.clear();
-        loadedSong.patternSequence.resize(frameSeqNum);
-        for (int i = 0; i < frameSeqNum; i++)
+        loadedSong.patternSequence.resize(patternSeqLen);
+        for (int i = 0; i < patternSeqLen; i++)
         {
             songFile.read((char*)&loadedSong.patternSequence[i], 1);
         }
@@ -503,7 +340,7 @@ void LoadSong(std::string name) // Load the song file with the given name.
         loadedSong.patterns.resize(patternNum);
         for (int i = 0; i < patternNum; i++)
         {
-            loadedSong.patterns[i].channels.resize(loadedSong.numberOfChannels); // Resize frame to match the number of channels.
+            loadedSong.patterns[i].channels.resize(loadedSong.numberOfChannels); // Resize pattern to match the number of channels.
 
             uint8_t rows;
             songFile.read((char*)&rows, 1);
@@ -745,130 +582,138 @@ void LoadSettings()
 void WriteInstrument(std::ofstream* instrumentFile, Instrument* instrument)
 {
 
-    if (instrument->enabled)
+    uint8_t jumpPoints = instrument->jumpPoints.size();
+    instrumentFile->write((char*)&jumpPoints, 1);
+
+    for (int j = 0; j < jumpPoints; j++)
     {
-        uint8_t jumpPoints = instrument->jumpPoints.size();
-        instrumentFile->write((char*)&jumpPoints, 1);
+        int point = instrument->jumpPoints[j];
+        instrumentFile->write((char*)&point, 4);
+    }
 
-        for (int j = 0; j < jumpPoints; j++)
-        {
-            int point = instrument->jumpPoints[j];
-            instrumentFile->write((char*)&point, 4);
-        }
+    uint8_t opWaves = instrument->operatorMapping[3] * 64.0f + instrument->operatorMapping[2] * 16.0f + instrument->operatorMapping[1] * 4.0f + instrument->operatorMapping[0];
+    instrumentFile->write((char*)&opWaves, 1);
 
-        uint8_t opWaves = instrument->operatorWavesToUse[3] * 64.0f + instrument->operatorWavesToUse[2] * 16.0f + instrument->operatorWavesToUse[1] * 4.0f + instrument->operatorWavesToUse[0];
-        instrumentFile->write((char*)&opWaves, 1);
-        uint8_t volume = instrument->volume * 16.0f;
-        instrumentFile->write((char*)&volume, 1);
-        uint8_t glide = instrument->glide * 16.0f;
-        instrumentFile->write((char*)&glide, 1);
-        uint8_t algo = (uint8_t)instrument->interpolation * 4 + instrument->algorithmType;
-        instrumentFile->write((char*)&algo, 1);
+    uint8_t volume = instrument->volume * 16.0f;
+    instrumentFile->write((char*)&volume, 1);
 
-        // Arp
-        if (instrument->arpSpeed > 0.9375f) instrument->arpSpeed = 0.9375f;
-        uint8_t arpVar = int((instrument->arpSpeed * 16.0f) * 16.0f) + int(instrument->arpLength);
+    uint8_t glide = instrument->glide * 16.0f;
+    instrumentFile->write((char*)&glide, 1);
+
+    uint8_t algo = (uint8_t)instrument->interpolation * 32 + instrument->algorithmType;
+    instrumentFile->write((char*)&algo, 1);
+
+    // Arp
+    if (instrument->arpSpeed > 0.9375f) instrument->arpSpeed = 0.9375f;
+    uint8_t arpVar = int((instrument->arpSpeed * 16.0f) * 16.0f) + int(instrument->arpLength);
+    instrumentFile->write((char*)&arpVar, 1);
+
+    for (int arp = 0; arp < 15; arp++)
+    {
+        arpVar = instrument->arpPitches[arp] * 4.0f;
         instrumentFile->write((char*)&arpVar, 1);
+    }
 
-        for (int arp = 0; arp < 15; arp++)
+    // Modulation paths
+    for (int mod = 0; mod < 4; mod++)
+    {
+        if (instrument->modScale[mod] > 0.9375f) instrument->modScale[mod] = 0.9375f;
+        uint8_t modPath = int((instrument->modulationTypes[mod]) * 16.0f) + int(instrument->modScale[mod] * 16.0f);
+        instrumentFile->write((char*)&modPath, 1);
+    }
+
+    bool modsUsed[4] = { false, false, false, false };
+
+    for (int j = 0; j < 4; j++)
+    {
+        modsUsed[instrument->operatorMapping[j]] = true;
+    }
+
+
+    // For each used sample.
+    for (int j = 0; j < 4; j++)
+    {
+        if (modsUsed[j])
         {
-            arpVar = instrument->arpPitches[arp] * 4.0f;
-            instrumentFile->write((char*)&arpVar, 1);
-        }
+            int frameCount = instrument->waveforms[j].pcmFrames.size();
+            instrumentFile->write((char*)&frameCount, 4);
 
-        // Modulation paths
-        for (int mod = 0; mod < 4; mod++)
-        {
-            if (instrument->lPResonances[mod] > 0.9375f) instrument->lPResonances[mod] = 0.9375f;
-            uint8_t modPath = int((instrument->modulationTypes[mod]) * 16.0f) + int(instrument->lPResonances[mod] * 16.0f);
-            instrumentFile->write((char*)&modPath, 1);
-        }
-
-        bool modsUsed[4] = { false, false, false, false };
-
-        for (int j = 0; j < 4; j++)
-        {
-            modsUsed[instrument->operatorWavesToUse[j]] = true;
-        }
-
-
-        // For each used sample.
-        for (int j = 0; j < 4; j++)
-        {
-            if (modsUsed[j])
+            for (int fr = 0; fr < frameCount; fr++)
             {
-                int frameCount = instrument->waveforms[j].pcmFrames.size();
-                instrumentFile->write((char*)&frameCount, 4);
-
-                for (int fr = 0; fr < frameCount; fr++)
-                {
-                    float scaledFrame = ((instrument->waveforms[j].pcmFrames[fr] * 128.0f) + 128.0f);
-                    uint8_t frameVal = uint8_t(scaledFrame);
-                    instrumentFile->write((char*)&frameVal, 1);
-                }
-
-                uint8_t isWaveform = 0;
-                int periods = int(instrument->waveforms[j].fuzz * 16.0f);
-                isWaveform = periods * 16.0f + instrument->waveforms[j].operatorType;
-                instrumentFile->write((char*)&isWaveform, 1);
-
-                uint8_t waveVar = 0;
-
-                if (instrument->waveforms[j].operatorType != 1) // Waveform-specific data.
-                {
-                    waveVar = int(instrument->waveforms[j].dutyCycle * 16.0f);
-                    instrumentFile->write((char*)&waveVar, 1);
-                    waveVar = int(instrument->waveforms[j].smoothness * 16.0f);
-                    instrumentFile->write((char*)&waveVar, 1);
-                    waveVar = instrument->waveforms[j].numOfSineWaves;
-                    instrumentFile->write((char*)&waveVar, 1);
-                }
-
-
-
-                waveVar = instrument->waveforms[j].waveType * 16.0f + instrument->waveforms[j].loopType;
-                instrumentFile->write((char*)&waveVar, 1);
-                if (instrument->waveforms[j].offset > 0.9375f) instrument->waveforms[j].offset = 0.9375f;
-                waveVar = int((instrument->waveforms[j].offset * 16.0f) * 16.0f) + int(instrument->waveforms[j].lfo);
-                instrumentFile->write((char*)&waveVar, 1);
-                if (instrument->waveforms[j].attack > 0.9375f) instrument->waveforms[j].attack = 0.9375f;
-                if (instrument->waveforms[j].sustain > 0.9375f) instrument->waveforms[j].sustain = 0.9375f;
-                waveVar = int(instrument->waveforms[j].attack * 16.0f) * 16.0f + int(instrument->waveforms[j].sustain * 16.0f);
-                instrumentFile->write((char*)&waveVar, 1);
-                if (instrument->waveforms[j].decay > 0.9375f) instrument->waveforms[j].decay = 0.9375f;
-                if (instrument->waveforms[j].release > 0.9375f) instrument->waveforms[j].release = 0.9375f;
-                waveVar = int(instrument->waveforms[j].decay * 16.0f) * 16.0f + int(instrument->waveforms[j].release * 16.0f);
-                instrumentFile->write((char*)&waveVar, 1);
-
-
-
-                // Boolean flags
-                bool stereo1 = false;
-                bool stereo2 = false;
-                if (instrument->waveforms[j].stereo == 1)
-                    stereo1 = true;
-                else if (instrument->waveforms[j].stereo == 2)
-                    stereo2 = true;
-
-
-                waveVar = (int)instrument->waveforms[j].useArp * 128.0f + (int)stereo1 * 64.0f + (int)stereo2 * 32.0f + (int)instrument->waveforms[j].generateFromSines * 16.0f + (int)instrument->waveforms[j].reverseFrames * 8.0f + (int)instrument->waveforms[j].sustainForever * 4.0f + (int)instrument->waveforms[j].pitchToNote * 2.0f + (int)instrument->waveforms[j].continueNote;
-                instrumentFile->write((char*)&waveVar, 1);
-
-                //std::cout << " Write: " << int(waveVar);
-
-                int loopStart = instrument->waveforms[j].loopStart;
-                instrumentFile->write((char*)&loopStart, 4);
-                int loopEnd = instrument->waveforms[j].loopEnd;
-                instrumentFile->write((char*)&loopEnd, 4);
-
-                for (int f = 0; f < 11; f++)
-                {
-                    waveVar = instrument->waveforms[j].frequencies[f];
-                    instrumentFile->write((char*)&waveVar, 1);
-                }
+                float scaledFrame = ((instrument->waveforms[j].pcmFrames[fr] * 128.0f) + 128.0f);
+                uint8_t frameVal = uint8_t(scaledFrame);
+                instrumentFile->write((char*)&frameVal, 1);
             }
 
+            uint8_t isWaveform = 0;
+            int fuzz = int(instrument->waveforms[j].fuzz * 16.0f);
+            if (fuzz > 15) fuzz = 15; else if (fuzz < 0) fuzz = 0; // Clamp
+            isWaveform = fuzz * 16.0f + instrument->waveforms[j].operatorType;
+            instrumentFile->write((char*)&isWaveform, 1);
+
+
+            uint8_t fuzzType = 0;
+            fuzzType = instrument->waveforms[j].fuzzType;
+            instrumentFile->write((char*)&fuzzType, 1);
+
+
+            uint8_t waveVar = 0;
+
+            if (instrument->waveforms[j].operatorType != 1) // Waveform-specific data.
+            {
+                waveVar = int(instrument->waveforms[j].dutyCycle * 16.0f);
+                instrumentFile->write((char*)&waveVar, 1);
+                waveVar = int(instrument->waveforms[j].smoothness * 16.0f);
+                instrumentFile->write((char*)&waveVar, 1);
+                waveVar = instrument->waveforms[j].numOfSineWaves;
+                instrumentFile->write((char*)&waveVar, 1);
+            }
+
+
+
+            waveVar = instrument->waveforms[j].waveType * 16.0f + instrument->waveforms[j].loopType;
+            instrumentFile->write((char*)&waveVar, 1);
+
+            if (instrument->waveforms[j].offset > 0.9375f) instrument->waveforms[j].offset = 0.9375f;
+            waveVar = int((instrument->waveforms[j].offset * 16.0f) * 16.0f) + int(instrument->waveforms[j].octave);
+            instrumentFile->write((char*)&waveVar, 1);
+
+            if (instrument->waveforms[j].attack > 0.9375f) instrument->waveforms[j].attack = 0.9375f;
+            if (instrument->waveforms[j].sustain > 0.9375f) instrument->waveforms[j].sustain = 0.9375f;
+            waveVar = int(instrument->waveforms[j].attack * 16.0f) * 16.0f + int(instrument->waveforms[j].sustain * 16.0f);
+            instrumentFile->write((char*)&waveVar, 1);
+
+            if (instrument->waveforms[j].decay > 0.9375f) instrument->waveforms[j].decay = 0.9375f;
+            if (instrument->waveforms[j].release > 0.9375f) instrument->waveforms[j].release = 0.9375f;
+            waveVar = int(instrument->waveforms[j].decay * 16.0f) * 16.0f + int(instrument->waveforms[j].release * 16.0f);
+            instrumentFile->write((char*)&waveVar, 1);
+
+
+
+            // Boolean flags
+            bool stereo1 = false;
+            bool stereo2 = false;
+            if (instrument->waveforms[j].stereo == 1) stereo1 = true;
+            else if (instrument->waveforms[j].stereo == 2) stereo2 = true;
+
+
+            waveVar = (int)instrument->waveforms[j].useArp * 128.0f + (int)stereo1 * 64.0f + (int)stereo2 * 32.0f + (int)instrument->waveforms[j].generateFromSines * 16.0f + (int)instrument->waveforms[j].reverseFrames * 8.0f + (int)instrument->waveforms[j].sustainForever * 4.0f + (int)instrument->waveforms[j].pitchToNote * 2.0f + (int)instrument->waveforms[j].continueNote;
+            instrumentFile->write((char*)&waveVar, 1);
+
+            //std::cout << " Write: " << int(waveVar);
+
+            int loopStart = instrument->waveforms[j].loopStart;
+            instrumentFile->write((char*)&loopStart, 4);
+            int loopEnd = instrument->waveforms[j].loopEnd;
+            instrumentFile->write((char*)&loopEnd, 4);
+
+            for (int f = 0; f < 11; f++)
+            {
+                waveVar = instrument->waveforms[j].frequencies[f];
+                instrumentFile->write((char*)&waveVar, 1);
+            }
         }
+
     }
 
     return;
@@ -903,10 +748,10 @@ Instrument ReadInstrument(std::ifstream* instrumentFile)
     float op3 = int(opWaves / 4.0f) - (op1 * 16.0f + op2 * 4.0f);
     float op4 = int(opWaves) - (op1 * 64.0f + op2 * 16.0f + op3 * 4.0f);
 
-    newInstrument.operatorWavesToUse[0] = op4;
-    newInstrument.operatorWavesToUse[1] = op3;
-    newInstrument.operatorWavesToUse[2] = op2;
-    newInstrument.operatorWavesToUse[3] = op1;
+    newInstrument.operatorMapping[0] = op4;
+    newInstrument.operatorMapping[1] = op3;
+    newInstrument.operatorMapping[2] = op2;
+    newInstrument.operatorMapping[3] = op1;
 
     uint8_t volume;
     instrumentFile->read((char*)&volume, 1);
@@ -916,12 +761,12 @@ Instrument ReadInstrument(std::ifstream* instrumentFile)
     newInstrument.glide = float(glide) / 16.0f;
     uint8_t algo;
     instrumentFile->read((char*)&algo, 1);
-    int interp = algo / 4;
+    int interp = algo / 32;
     if (interp == 0)
         newInstrument.interpolation = false;
     else
         newInstrument.interpolation = true;
-    algo -= (interp * 4);
+    algo -= (interp * 32);
     newInstrument.algorithmType = algo;
 
     uint8_t readVar = 0;
@@ -950,14 +795,14 @@ Instrument ReadInstrument(std::ifstream* instrumentFile)
         var1 = int(readVar / 16.0f);
         var2 = readVar - var1 * 16.0f;
         newInstrument.modulationTypes[mod] = var1;
-        newInstrument.lPResonances[mod] = var2 / 16.0f;
+        newInstrument.modScale[mod] = var2 / 16.0f;
     }
 
     bool modUsed[4] = { false, false, false, false };
 
     for (int j = 0; j < 4; j++)
     {
-        modUsed[newInstrument.operatorWavesToUse[j]] = true;
+        modUsed[newInstrument.operatorMapping[j]] = true;
     }
 
     // For each used sample.
@@ -986,6 +831,10 @@ Instrument ReadInstrument(std::ifstream* instrumentFile)
             newInstrument.waveforms[j].operatorType = var2;
 
 
+            uint8_t fuzzType = 0;
+            instrumentFile->read((char*)&fuzzType, 1);
+            newInstrument.waveforms[j].fuzzType = int(fuzzType);
+
             uint8_t waveVar = 0;
 
             if (newInstrument.waveforms[j].operatorType != 1) // Waveform-specific data.
@@ -1008,7 +857,7 @@ Instrument ReadInstrument(std::ifstream* instrumentFile)
             var1 = int(readVar / 16.0f);
             var2 = readVar - var1 * 16.0f;
             newInstrument.waveforms[j].offset = float(var1) / 16.0f;
-            newInstrument.waveforms[j].lfo = var2;
+            newInstrument.waveforms[j].octave = var2;
             instrumentFile->read((char*)&readVar, 1);
             var1 = int(readVar / 16.0f);
             var2 = readVar - var1 * 16.0f;
@@ -1112,3 +961,47 @@ void LoadCurrentInstrument(std::string name)
 
     return;
 }
+
+
+
+
+void AddBoolToByte(bool val, uint8_t* bits)
+{
+    // Shifts the byte up one and adds the new value at the end.
+    *bits << 1;
+    *bits += val;
+    return;
+}
+
+bool GetBoolFromByte(uint8_t* bits)
+{
+    // Shifts the byte up one and adds the new value at the end.
+    bool end;
+    end = int(bits) % 2 > 0;
+    *bits >> 1;
+
+    return bits;
+}
+
+void AddFloatToByte(bool val, uint8_t* bits)
+{
+    // Shifts the byte up one and adds the new value at the end.
+    val *= 16.0f;
+    if (val > 15.0f) val = 15.0f;
+    else if (val < 0.0f) val = 0.0f;
+    uint8_t newVal = uint8_t(val);
+    *bits << 4;
+    *bits += newVal;
+
+    return;
+}
+
+bool GetFloatFromByte(uint8_t* bits)
+{
+    // Shifts the byte up one and adds the new value at the end.
+    float newVal = float(int(bits) % 16) / 16.0f;
+    *bits >> 4;
+
+    return bits;
+}
+
