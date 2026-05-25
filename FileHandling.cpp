@@ -33,6 +33,7 @@ void SaveCurrentInstrument();
 
 void LoadCurrentInstrument(std::string name);
 
+void SaveCurrentSample();
 // ------------------------------------------
 
 void AddBoolToByte(bool val, uint8_t* bits);
@@ -42,6 +43,10 @@ bool GetBoolFromByte(uint8_t* bits);
 void AddFloatToByte(bool val, uint8_t* bits);
 
 bool GetFloatFromByte(uint8_t* bits);
+
+// ------------------------------------------
+
+void LoadCrackleSample();
 
 
 
@@ -246,16 +251,16 @@ void SaveSong() // Save the currently loaded song.
 
 void LoadSong(std::string name) // Load the song file with the given name.
 {
+
     if (loadedSong.unsavedChanges)
     {
         editor.fileToLoad = name;
         windowController.InitializeWindow("Save and Load", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 20, 16 });
-        //promptWind.AskSaveBeforeLoadingSong();
         return;
     }
     
 
-    editor.playingSong = false;
+    
     loadedSong.currentPattern = 0;
     loadedSong.currentNote = 0;
 
@@ -480,6 +485,13 @@ void LoadSong(std::string name) // Load the song file with the given name.
 
     DrawSampleDisplay();
 
+
+    if (editor.playingSong) // Reset the song if playing.
+    {
+        StartOrStopSong();
+        StartOrStopSong();
+    }
+
     return;
 }
 
@@ -525,7 +537,7 @@ void LoadGUIThemes()
 
 void SaveSettings()
 {
-    std::ofstream settingsFile("SuperSound Settings.bin", std::ios::binary | std::ios::out);
+    std::ofstream settingsFile("DualTracker Settings.bin", std::ios::binary | std::ios::out);
 
     if (settingsFile.is_open())
     {
@@ -551,7 +563,7 @@ void SaveSettings()
 
 void LoadSettings()
 {
-    std::ifstream settingsFile("SuperSound Settings.bin", std::ios::binary | std::ios::out);
+    std::ifstream settingsFile("DualTracker Settings.bin", std::ios::binary | std::ios::out);
 
     if (settingsFile.is_open())
     {
@@ -905,6 +917,11 @@ Instrument ReadInstrument(std::ifstream* instrumentFile)
             instrumentFile->read((char*)&loopEnd, 4);
             newInstrument.waveforms[j].loopEnd = loopEnd;
 
+            if (newInstrument.waveforms[j].loopType > 2)
+                newInstrument.waveforms[j].loopType = 2;
+
+            newInstrument.waveforms[j].clampLoopPoints();
+
             for (int f = 0; f < 11; f++)
             {
                 instrumentFile->read((char*)&waveVar, 1);
@@ -1005,3 +1022,63 @@ bool GetFloatFromByte(uint8_t* bits)
     return bits;
 }
 
+
+
+void LoadCrackleSample()
+{
+    int sizeX, sizeY, comps;
+    unsigned char* data;
+
+    data = stbi_load("CrackleSample.png", &sizeX, &sizeY, &comps, 3);
+
+
+    if (data)
+    {
+        editor.crackleSample.clear();
+
+        for (int x = 0; x < sizeX; x++)
+        {
+            for (int y = 0; y < sizeY; y++)
+            {
+                unsigned char* pixelOffset = data + ((sizeX * y) + x) * 3;
+
+                if (pixelOffset[0] > 0)
+                {
+                    editor.crackleSample.emplace_back(1.0f + (float(y - 127) / 127.0f) * 4.f);
+                    //std::cout << 1.0f + (float(y - 127) / 127.0f) * 4.f << ", ";
+                }
+            }
+        }
+    }
+
+    stbi_image_free(data);
+
+    return;
+}
+
+
+void SaveCurrentSample()
+{
+    ma_encoder_config sampleEncoderConfig;
+    ma_encoder sampleEncoder;
+
+    sampleEncoderConfig = ma_encoder_config_init(ma_encoding_format_wav, ma_format_f32, 1, 48000);
+
+
+    std::string fileName = "C:/" + fileNavigator.currentFilePath.std::filesystem::path::string() + "/" + loadedInstruments[editor.selectedInstrument].name + ".wav";
+    const char* name = &fileName[0];
+    ma_encoder_init_file(name, &sampleEncoderConfig, &sampleEncoder);
+
+
+    float framesToWrite = loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
+    float* pOutputF32 = loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].pcmFrames.data();
+    ma_uint64 framesWritten;
+    ma_encoder_write_pcm_frames(&sampleEncoder, pOutputF32, framesToWrite, &framesWritten); // Write frames to file.
+
+    ma_encoder_uninit(&sampleEncoder);
+
+
+
+
+    return;
+}

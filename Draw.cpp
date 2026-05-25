@@ -2942,7 +2942,7 @@ void DrawFloatingWindow(FloatingWindow* wind)
 		DrawGUIText(" NO", wind->position.x + 8, wind->position.x + 12, wind->position.y + 9, 4, -1);
 		gui.activeUI[int(wind->position.x + 12)][int(wind->position.y + 9)].sprite = { 6, 26 };
 	}
-	else if (wind->name == "Save Song" || wind->name == "Save Instrument" || wind->name == "Load File" || wind->name == "Export as .WAV")
+	else if (wind->name == "Save Song" || wind->name == "Save Instrument" || wind->name == "Save Sample" || wind->name == "Load File" || wind->name == "Export as .WAV")
 	{
 		gui.activeUI[int(wind->position.x + 1)][int(wind->position.y + 1)].sprite = { 25, 5 };
 		DrawGUIText(fileNavigator.filePathName, wind->position.x + 2, wind->position.x + 40, wind->position.y + 1, 4, 2);
@@ -3699,10 +3699,10 @@ void DrawFloatingWindow(FloatingWindow* wind)
 	}
 	else if (wind->name == "File")
 	{
-		std::string settingsText[5] = {
-			"NEW", "SAVE SONG", "SAVE INSTR.", "LOAD", "EXPORT"
+		std::string settingsText[6] = {
+			"NEW", "SAVE SONG", "SAVE INSTR.", "SAVE SAMPLE", "LOAD", "EXPORT"
 		};
-		for (int i = 0; i < 5; i++)
+		for (int i = 0; i < 6; i++)
 		{
 			DrawGUIText(settingsText[i], wind->position.x + 2, wind->position.x + 15, wind->position.y + 2 + i * 2, 4, -1);
 			gui.activeUI[int(wind->position.x + 1)][int(wind->position.y + 2 + i * 2)].sprite = { 5, 26 };
@@ -3934,6 +3934,12 @@ void DrawWaveTypeButton(int type, int xVal, int yVal)
 			break;
 		}
 
+		case 7:
+		{
+			DrawGUIText("WAVE C", xVal, xVal + 9, yVal, 4, -1);
+			break;
+		}
+
 		default:
 		{
 			DrawGUIText("SINE", xVal, xVal + 9, yVal, 4, -1);
@@ -3951,12 +3957,12 @@ void DrawWaveTypeButton(int type, int xVal, int yVal)
 		DrawGUIText("Duty:" + std::to_string(int(loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].dutyCycle * 100)), xVal - 2, xVal + 8, yVal + 1, 3, 0);
 		DrawHorizontalSlider(int(xVal + 6), int(xVal + 14), int(yVal + 1), loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].dutyCycle);
 
-		if (type > 3) // Bell
+		if (type > 3 && type != 7) // Bell
 		{
 			DrawGUIText("Waves:" + std::to_string(int(loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].numOfSineWaves)), xVal - 2, xVal + 8, yVal + 2, 3, 0);
 			DrawHorizontalSlider(int(xVal + 6), int(xVal + 14), int(yVal + 2), float(loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].numOfSineWaves) / 16.0f);
 		}
-		else if (type > 0 && type != 2) // There is no smoothness effect for: triangle, noise.
+		else if (type > 0 && type != 2 && type != 7) // There is no smoothness effect for: triangle, noise.
 		{
 			if (loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].generateFromSines)
 			{

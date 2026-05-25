@@ -28,7 +28,7 @@ void selectAlgorithmOperator(Vector2 pos);
 
 void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos, GLFWwindow* windMain)
 {
-	std::lock_guard<std::shared_mutex> lock(mtx);
+	//std::lock_guard<std::shared_mutex> lock(mtx);
 
 	clickPos.x = int(clickPos.x);
 	clickPos.y = int(clickPos.y);
@@ -336,7 +336,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				}
 			}
 		}
-		else if (wind->name == "Save Song" || wind->name == "Save Instrument")
+		else if (wind->name == "Save Song" || wind->name == "Save Instrument" || wind->name == "Save Sample")
 		{
 			//gui.scrollBars[4].length = 17;
 			if (clickPos.y == 1 && clickPos.x == 1)
@@ -351,8 +351,10 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				//fileN.erase(0, 1);
 				if (wind->name == "Save Song")
 					SaveSong();
-				else
+				else if (wind->name == "Save Instrument")
 					SaveCurrentInstrument();
+				else
+					SaveCurrentSample();
 
 				// Refresh the preset menu.
 				presetMenu.NavigateToFile();
@@ -615,7 +617,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 					if (loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].operatorType != 1)
 					{
 						loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].waveType++;
-						if (loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].waveType > 6)
+						if (loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].waveType > 7)
 							loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].waveType = 0;
 						GenerateAdditiveWave(&loadedInstruments[editor.selectedInstrument], sampleDisplay.selectedOperator);
 						DrawSampleDisplay();
@@ -633,15 +635,19 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				}
 				else if (clickPos.y == 9) // Set sample to loop
 				{
+					for (int ch = 0; ch < channels.size(); ch++)
+					{
+						for (int wave = 0;wave < 4; wave++)
+						{
+							channels[ch].waveforms[wave].sampleReadPos = 0.0f;
+						}
+					}
+
 					loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopType++;
 					if (loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopType > 2)
 						loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopType = 0;
-					loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopStart = 0;
+					
 
-					if (editor.playingSong)
-						StartOrStopSong();
-
-					loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopEnd = loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].pcmFrames.size();
 					DrawSampleDisplay();
 					loadedSong.unsavedChanges = true;
 					return;
@@ -691,6 +697,8 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 
 					DrawSampleDisplay();
 					loadedSong.unsavedChanges = true;
+
+					return;
 				}
 			}
 			else if (clickPos.y == 13) // Toggle sustain forever
@@ -879,9 +887,8 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 					if (!editor.playingSong) // Play the note sound.
 					{
 						channels[0].resetChannelEffects(true);
-						StartSample(0, editor.selectedInstrument, 48, 0);
-						for (int wave = 0; wave < 4; wave++)
-							channels[0].waveforms[wave].note = 48;
+						StartNote(0, editor.selectedInstrument, 48, 0);
+						
 						sampleDisplay.playingInstrument = true;
 						for (int wave = 0; wave < 4; wave++)
 							channels[0].waveforms[wave].sampleReadPos = sampleDisplay.sampleStartPos;
@@ -889,7 +896,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				}
 				else if (clickPos.x == 3 || clickPos.x == 4) // Pause sample
 				{
-					channels[0].toUninitialize = true;
+					channels[0].playing = false;
 					sampleDisplay.playingInstrument = false;
 					DrawSampleDisplay();
 				}
@@ -1176,6 +1183,16 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 							loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopEnd = (sampleDisplay.sampleStartPos) + inSelection + 1;
 					}
 
+					// Clamp loop points.
+					if (loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopStart < 0)
+						loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopStart = 0;
+					if (loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopEnd < 0)
+						loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopEnd = 0;
+					if (loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopStart >= loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].pcmFrames.size())
+						loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopStart = loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].pcmFrames.size() - 1;
+					if (loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopEnd >= loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].pcmFrames.size())
+						loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopEnd = loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].pcmFrames.size() - 1;
+
 					
 					sampleDisplay.sampleSelectionEnd = selectionEndPos;
 
@@ -1346,7 +1363,17 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				gui.drawUIThisFrame = true;
 				gui.drawFrameThisFrame = true;
 			}
-			else if (clickPos.y == 8) // Load
+			else if (clickPos.y == 8) // Save sample
+			{
+				windowController.windows.erase(windowController.windows.begin() + windowIndex);
+				windowController.windows.shrink_to_fit();
+
+				fileNavigator.NavigateToFile();
+				windowController.InitializeWindow("Save Sample", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 40, 20 });
+				gui.drawUIThisFrame = true;
+				gui.drawFrameThisFrame = true;
+			}
+			else if (clickPos.y == 10) // Load
 			{
 				windowController.windows.erase(windowController.windows.begin() + windowIndex);
 				windowController.windows.shrink_to_fit();
@@ -1356,7 +1383,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				gui.drawUIThisFrame = true;
 				gui.drawFrameThisFrame = true;
 			}
-			else if (clickPos.y == 10) // Export
+			else if (clickPos.y == 12) // Export
 			{
 				windowController.windows.erase(windowController.windows.begin() + windowIndex);
 				windowController.windows.shrink_to_fit();
@@ -1413,7 +1440,7 @@ void RightClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 cli
 	clickPos.x = int(clickPos.x);
 	clickPos.y = int(clickPos.y);
 
-	std::lock_guard<std::shared_mutex> lock(mtx);
+	//std::lock_guard<std::shared_mutex> lock(mtx);
 
 
 
@@ -1472,7 +1499,7 @@ void RightClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 cli
 
 void HoldClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos, GLFWwindow* windMain)
 {
-	std::lock_guard<std::shared_mutex> lock(mtx);
+	//std::lock_guard<std::shared_mutex> lock(mtx);
 
 	
 
@@ -1568,7 +1595,11 @@ void HoldClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clic
 				{
 					if (loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].operatorType != 1)
 					{
-						if (loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].generateFromSines || loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].waveType > 3)
+						if ((loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].generateFromSines
+							&& (loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].waveType == 1
+							|| loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].waveType == 3))
+							|| (loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].waveType > 3
+								&& loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].waveType != 7))
 						{
 							loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].numOfSineWaves = (float(int((clickPos.x - 9) * 2.0f)) / 16.0f) * 16;
 
@@ -1835,6 +1866,8 @@ void HoldClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clic
 				std::swap(sampleDisplay.dragLoopStart, sampleDisplay.dragLoopEnd);
 				std::swap(loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopStart, loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].loopEnd);
 			}
+
+			loadedInstruments[editor.selectedInstrument].waveforms[sampleDisplay.selectedOperator].clampLoopPoints();
 
 			if (clickPos.y > 26 && clickPos.y < 38) // Move sample selection / draw.
 			{

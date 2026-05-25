@@ -282,6 +282,8 @@ void RunEngine()
 
     fileNavigator.NavigateToSamplesFile();
 
+    //LoadCrackleSample();
+
 
     
     
@@ -326,6 +328,13 @@ void RunEngine()
        
         // Process player input
         processInput(mainWindow);
+
+
+        if (toIconifyScreen) // Iconifying the window is done outside input check so that mutex locks are released.
+        {
+            glfwIconifyWindow(mainWindow);
+            toIconifyScreen = false;
+        }
 
 
         if (screen.mouseDown)
@@ -451,6 +460,7 @@ void RunEngine()
             //glUniform1f(ratioInUIShader, screen.windowRatio);
 
 
+            std::lock_guard<std::shared_mutex> lock(mtx);
 
             for (int i = windowController.windows.size() - 1; i > -1; i--) // Draw windows.
             {
@@ -571,6 +581,8 @@ void RunEngine()
 
 void processInput(GLFWwindow* window)
 {
+    
+
     double mouseX, mouseY;
     glfwGetCursorPos(window, &mouseX, &mouseY);
 
@@ -620,6 +632,9 @@ void processInput(GLFWwindow* window)
     
     if (screen.mouseDown) // Select note (End selection)
     {
+
+        std::lock_guard<std::shared_mutex> lock(mtx);
+
         for (int wind = 0; wind < windowController.windows.size(); wind++) // Drag windows.
         {
             if (windowController.windows[wind].dragWindow)
@@ -660,31 +675,21 @@ void processInput(GLFWwindow* window)
                 loadedSong.currentNote = mouseTileY;
 
                 gui.drawFrameThisFrame = true;
+
+
+                if (loadedSong.currentNote >= loadedPattern.rows.size()) // Snap the current selected note to the end of the frame.
+                    loadedSong.currentNote = loadedPattern.rows.size() - 1;
+                if (editor.noteSelectionStart.y >= loadedPattern.rows.size())
+                    editor.noteSelectionStart.y = loadedPattern.rows.size() - 1;
+                if (editor.noteSelectionEnd.y >= loadedPattern.rows.size())
+                    editor.noteSelectionEnd.y = loadedPattern.rows.size() - 1;
             }
-
-        
-            if (loadedSong.currentNote >= loadedPattern.rows.size()) // Snap the current selected note to the end of the frame.
-                loadedSong.currentNote = loadedPattern.rows.size() - 1;
-            if (editor.noteSelectionStart.y >= loadedPattern.rows.size())
-                editor.noteSelectionStart.y = loadedPattern.rows.size() - 1;
-            if (editor.noteSelectionEnd.y >= loadedPattern.rows.size())
-                editor.noteSelectionEnd.y = loadedPattern.rows.size() - 1;
         }
-    }
-    else
-    {
-        /*
-        for (int bar = 0; bar < gui.scrollBars.size(); bar++) // Stop dragging scroll bars.
-        {
-            gui.scrollBars[bar].drag = false;
-        }*/
-    }
 
 
 
-    // Drag mouse on floating windows.
-    if (screen.mouseDown)
-    {
+
+
         if (gui.patternListScrollBar.drag) // Scroll pattern list.
         {
             gui.patternListScrollBar.position = (gui.floatHoveredTile.y - 3.5f) / 7.0f;
@@ -787,32 +792,35 @@ void processInput(GLFWwindow* window)
                 }
             }
         }
-    }
-    if (screen.rightMouseDown)
-    {
-        for (int wind = 0; wind < windowController.windows.size(); wind++)
+
+
+        if (screen.rightMouseDown)
         {
-            Vector2i posTL = windowController.windows[wind].position;
-            Vector2i posBR = posTL;
-            posBR.x += windowController.windows[wind].size.x + 1;
-            posBR.y += windowController.windows[wind].size.y;
-            if (gui.hoveredTile.y >= posTL.y && gui.hoveredTile.y < posBR.y)
+            for (int wind = 0; wind < windowController.windows.size(); wind++)
             {
-                if (gui.hoveredTile.x >= posTL.x && gui.hoveredTile.x < posBR.x)
+                Vector2i posTL = windowController.windows[wind].position;
+                Vector2i posBR = posTL;
+                posBR.x += windowController.windows[wind].size.x + 1;
+                posBR.y += windowController.windows[wind].size.y;
+                if (gui.hoveredTile.y >= posTL.y && gui.hoveredTile.y < posBR.y)
                 {
-                    Vector2 windowPos = gui.hoveredTile;
-                    windowPos.x -= posTL.x;
-                    windowPos.y -= posTL.y;
-                    RightHoldFloatingWindow(&windowController.windows[wind], wind, windowPos, window);
-                    gui.clickingOnFloatingWind = true;
-                    return;
+                    if (gui.hoveredTile.x >= posTL.x && gui.hoveredTile.x < posBR.x)
+                    {
+                        Vector2 windowPos = gui.hoveredTile;
+                        windowPos.x -= posTL.x;
+                        windowPos.y -= posTL.y;
+                        RightHoldFloatingWindow(&windowController.windows[wind], wind, windowPos, window);
+                        gui.clickingOnFloatingWind = true;
+                        return;
+                    }
                 }
             }
         }
-    }
 
-    if (gui.clickingOnFloatingWind)
-        return;
+        if (gui.clickingOnFloatingWind)
+            return;
+    }
+    
 
 
     
@@ -861,6 +869,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
     if (action == GLFW_PRESS || action == GLFW_REPEAT)
     {
+
+        std::lock_guard<std::shared_mutex> lock(mtx);
+
+
         if (key == GLFW_KEY_BACKSPACE)
         {
             if (editor.selectedButton == 0) // Delete text (Song name)
@@ -1037,15 +1049,18 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         {
             pasteNotes();
         }
+
+
+        if (key == GLFW_KEY_ESCAPE)
+        {
+            if (loadedSong.unsavedChanges)
+                windowController.InitializeWindow("Save and Exit", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 20, 16 });
+            else
+                glfwSetWindowShouldClose(window, true);
+        }
     }
 
-    if (key == GLFW_KEY_ESCAPE)
-    {
-        if (loadedSong.unsavedChanges)
-            windowController.InitializeWindow("Save and Exit", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 20, 16 });
-        else
-            glfwSetWindowShouldClose(window, true);
-    }
+    
 
 
     if (action == GLFW_PRESS || action == GLFW_RELEASE)
@@ -1060,6 +1075,9 @@ void mouse_button_callback(GLFWwindow* window, int key, int action, int mods)
     
     if (action == GLFW_PRESS)
     {
+        std::lock_guard<std::shared_mutex> lock(mtx);
+
+
         // Mouse click actions
         if (key == GLFW_MOUSE_BUTTON_LEFT)
         {
@@ -1090,6 +1108,8 @@ void mouse_button_callback(GLFWwindow* window, int key, int action, int mods)
     //////////////////////////////////////////////////////////////////////////////////////
     if (action == GLFW_PRESS)
     {
+        std::lock_guard<std::shared_mutex> lock(mtx);
+
         if (key == GLFW_MOUSE_BUTTON_LEFT && !editor.playingSong && !gui.clickingOnFloatingWind)
         {
             if (!editor.playingSong)
@@ -1128,6 +1148,8 @@ void mouse_button_callback(GLFWwindow* window, int key, int action, int mods)
 
     if (action == GLFW_RELEASE)
     {
+        std::lock_guard<std::shared_mutex> lock(mtx);
+
         // Mouse click actions
         if (key == GLFW_MOUSE_BUTTON_LEFT)
         {
@@ -1145,6 +1167,9 @@ void mouse_button_callback(GLFWwindow* window, int key, int action, int mods)
 
 void character_callback(GLFWwindow* window, unsigned int codepoint)
 {
+    std::lock_guard<std::shared_mutex> lock(mtx);
+
+
     // Set to draw the interface.
     gui.drawUIThisFrame = true;
     gui.drawFrameThisFrame = true;
@@ -1390,9 +1415,7 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
                 if (!screen.keyDown) // Play the note sound.
                 {
                     channels[selectedChannel].resetChannelEffects(true);
-                    StartSample(selectedChannel, editor.selectedInstrument, noteNum, 0);
-                    for (int wave = 0; wave < 4; wave++)
-                        channels[selectedChannel].waveforms[wave].note = noteNum;
+                    StartNote(selectedChannel, editor.selectedInstrument, noteNum, 0);
                 }
                 loadedPattern.rows[loadedSong.currentNote].note[selectedChannel] = noteNum;
                 loadedPattern.rows[loadedSong.currentNote].instrument[selectedChannel] = editor.selectedInstrument;
@@ -1556,6 +1579,7 @@ void character_callback(GLFWwindow* window, unsigned int codepoint)
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
+    std::lock_guard<std::shared_mutex> lock(mtx);
 
     if (!editor.playingSong)
     {
@@ -1596,8 +1620,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 
 void pressButton(GLFWwindow* window)
 {
-
-
 
     int hoveredXScrolled = gui.hoveredTile.x + gui.patternScroll.x;
 
@@ -1708,7 +1730,8 @@ void pressButton(GLFWwindow* window)
     {
         if (gui.hoveredTile.x == 86 || gui.hoveredTile.x == 87) // Minimize program
         {
-            glfwIconifyWindow(window);
+            toIconifyScreen = true;
+            return;
         }
         else if (gui.hoveredTile.x == 88 || gui.hoveredTile.x == 89) // Window program
         {
@@ -1740,6 +1763,8 @@ void pressButton(GLFWwindow* window)
 
                 // Create the window
                 glViewport(0, 0, screen.screenSize.x, screen.screenSize.y);
+
+                
             }
         }
         else if (gui.hoveredTile.x == 90 || gui.hoveredTile.x == 91) // Close program
@@ -1759,7 +1784,7 @@ void pressButton(GLFWwindow* window)
     {
         if (gui.hoveredTile.y == 8) // Open File window.
         {
-            windowController.InitializeWindow("File", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 16, 13 });
+            windowController.InitializeWindow("File", { int(gui.hoveredTile.x), int(gui.hoveredTile.y) }, { 16, 15 });
         }
         else if (gui.hoveredTile.y == 9) // Open Configure window.
         {
@@ -2936,34 +2961,7 @@ void releaseButton()
     if (sampleDisplay.sampleSelectionEnd < sampleDisplay.sampleStartPos)
         std::swap(sampleDisplay.sampleSelectionEnd, sampleDisplay.sampleStartPos);
 
-    /*
-    for (int y = 0; y < 5; y++) // Revert buttons to unpressed.
-    {
-        gui.activeUI[11][3 + 2 * y].sprite = { 8, 3 };
-        gui.activeUI[12][3 + 2 * y].sprite = { 9, 3 };
-        gui.activeUI[13][3 + 2 * y].sprite = { 10, 3 };
-    }
-    gui.activeUI[7][5].sprite = { 8, 3 };
-    gui.activeUI[8][5].sprite = { 9, 3 };
-    gui.activeUI[9][5].sprite = { 10, 3 };
-    gui.activeUI[7][8].sprite = { 8, 3 };
-    gui.activeUI[8][8].sprite = { 9, 3 };
-    gui.activeUI[9][8].sprite = { 10, 3 };
-    // Frame menu scroll arrows
-    gui.activeUI[6][2].sprite = { 6, 3 };
-    gui.activeUI[6][10].sprite = { 6, 4 };
-    // Frame scroll arrows
-    gui.activeUI[91][16].sprite = { 6, 3 };
-    gui.activeUI[91][55].sprite = { 6, 4 };
-    gui.activeUI[5][56].sprite = { 30, 4 };
-    gui.activeUI[90][56].sprite = { 30, 3 };
-    // File scroll arrows
-    gui.activeUI[77][2].sprite = { 6, 3 };
-    gui.activeUI[77][11].sprite = { 6, 4 };
-    // Sample scroll arrows
-    gui.activeUI[91][2].sprite = { 6, 3 };
-    gui.activeUI[91][11].sprite = { 6, 4 };
-    */
+
 
     for (int wind = 0; wind < windowController.windows.size(); wind++) // Stop dragging windows.
     {
