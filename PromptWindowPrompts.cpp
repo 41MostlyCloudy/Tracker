@@ -227,7 +227,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				{
 					std::string fileN = fileNavigator.fileNames[editor.selectedFile];
 					fileN.erase(0, 1);
-					std::string filePath = "C:/" + fileNavigator.currentFilePath.std::filesystem::path::string() + "/" + fileN;
+					std::string filePath = fileNavigator.currentFilePath.std::filesystem::path::string() + "/" + fileN;
 					fileN.erase(fileN.size() - 4, 4);
 					loadedInstruments[editor.selectedInstrument].name = fileN;
 					loadedInstruments[editor.selectedInstrument].enabled = true;
@@ -356,8 +356,9 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				else
 					SaveCurrentSample();
 
-				// Refresh the preset menu.
-				presetMenu.NavigateToFile();
+				// Refresh the preset menu and file menu.
+				presetMenu.NavigateToInstrumentType(presetMenu.categories[presetMenu.instrumentType]);
+				fileNavigator.NavigateToFile();
 			}
 			else if (clickPos.y > 0 && clickPos.x > 0 && clickPos.x < 39)
 			{
@@ -778,7 +779,7 @@ void ClickFloatingWindow(FloatingWindow* wind, int windowIndex, Vector2 clickPos
 				}
 			}
 
-			if (clickPos.y > 17 && clickPos.y < 23 && clickPos.x > 21 && clickPos.x < 30)
+			if (clickPos.y > 17 && clickPos.y < 23 && clickPos.x > 21 && clickPos.x < 31)
 			{
 				selectAlgorithmOperator({ clickPos.x - 24, clickPos.y - 18 });
 				return;
@@ -1979,10 +1980,21 @@ void ChangeTheme(int theme)
 	glBindTexture(GL_TEXTURE_2D, gui.uiTexture);
 	unsigned char* data;
 
+	std::string currentPath;
+
+	
+
 	if (gui.lightMode)
-		data = stbi_load("TilesLight.png", &sizeX, &sizeY, &comps, 3);
+		currentPath = fileNavigator.getRelativePath() + "/GUI/TilesLight.png";
 	else
-		data = stbi_load("Tiles.png", &sizeX, &sizeY, &comps, 3);
+		currentPath = fileNavigator.getRelativePath() + "/GUI/Tiles.png";
+
+	data = stbi_load(&currentPath[0], &sizeX, &sizeY, &comps, 3);
+
+	if (!data)
+	{
+		std::cout << "Tiles not found. ";
+	}
 
 	GUITheme currentTheme = gui.themes[theme];
 	/*
@@ -2378,7 +2390,6 @@ void selectAlgorithmOperator(Vector2 pos)
 		loadedInstruments[editor.selectedInstrument].operatorMapping[selectedOp]++;
 		if (loadedInstruments[editor.selectedInstrument].operatorMapping[selectedOp] > 3)
 			loadedInstruments[editor.selectedInstrument].operatorMapping[selectedOp] = 0;
-
 
 
 		

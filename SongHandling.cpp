@@ -74,7 +74,56 @@ ma_encoder encoder;
 
 
 
+float wrapReadPos(float readPos, int channel, int wave);
 
+
+float wrapReadPos(float readPos, int channel, int wave)
+{
+    int inst = channels[channel].instrument;
+
+    int loopStart = loadedInstruments[inst].waveforms[wave].loopStart;
+    int loopEnd = loadedInstruments[inst].waveforms[wave].loopEnd;
+    int loopType = loadedInstruments[inst].waveforms[wave].loopType;
+
+    if (loopType == 0) // No loop.
+    {
+        if (readPos >= loopEnd)
+            readPos = loopEnd - 1;
+        else if (readPos < loopStart)
+            readPos = loopStart;
+    }
+    else if (loopType == 1) // Forward loop.
+    {
+        while (readPos < loopStart)
+            readPos += (loopEnd - loopStart);
+        while (readPos >= loopEnd)
+            readPos -= (loopEnd - loopStart);
+    }
+    else // Bounce loop.
+    {
+        bool wrapped = false;
+        while (!wrapped)
+        {
+            if (readPos < loopStart)
+            {
+                readPos -= loopStart;
+                readPos *= -1.0f;
+                readPos += loopStart;
+            }
+            else if (readPos >= loopEnd)
+            {
+                readPos -= loopEnd;
+                readPos *= -1.0f;
+                readPos += loopEnd;
+                readPos--;
+            }
+            else
+                wrapped = true;
+        }
+    }
+
+    return readPos;
+}
 
 
 
@@ -84,6 +133,11 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
     int mappedWave = loadedInstruments[channels[channel].instrument].operatorMapping[op];
     // For a mapped wave, all instrument properties are used.
     // The channel waveform state uses the direct operator waveform.
+
+
+    // Make sure that the frame reading position is inside the sample.
+    channels[channel].waveforms[op].wrapReadPos(loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopType,
+        loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopStart, loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopEnd);
 
 
     float notePitch = channels[channel].waveforms[op].pitch;
@@ -102,8 +156,7 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
     notePitch *= lfoMultiplier;
 
     if (notePitch > 12.0f) notePitch = 12.0f;
-    else if (notePitch < 0.00001f) notePitch = 0.00001f;
-
+    if (notePitch < -12.0f) notePitch = -12.0f;
 
 
     // Glide value.
@@ -116,9 +169,7 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
 
 
 
-    // Make sure that the frame reading position is inside the sample.
-    channels[channel].waveforms[op].wrapReadPos(loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopType,
-        loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopStart, loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopEnd);
+    
 
 
     
@@ -186,7 +237,7 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
         notePitch *= lfoMultiplier;
 
         if (notePitch > 12.0f) notePitch = 12.0f;
-        else if (notePitch < 0.00001f) notePitch = 0.00001f;
+        if (notePitch < -12.0f) notePitch = -12.0f;
 
 
 
@@ -199,18 +250,15 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
         float t = channels[channel].waveforms[op].sampleReadPos - index1;  // Fractional part
 
 
-        if (index2 >= loadedInstruments[channels[channel].instrument].waveforms[mappedWave].pcmFrames.size())
-            index2 = 0;
+        if (index2 >= loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopEnd)
+            index2 = loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopStart;
 
         float frameVol = loadedInstruments[channels[channel].instrument].waveforms[mappedWave].pcmFrames[index1] * (1.0f - t) + loadedInstruments[channels[channel].instrument].waveforms[mappedWave].pcmFrames[index2] * t;
 
 
         float frameVolStereo[2] = { frameVol, frameVol };
 
-        if (channels[channel].waveforms[op].reverseRead)
-            channels[channel].waveforms[op].sampleReadPos -= notePitch;
-        else
-            channels[channel].waveforms[op].sampleReadPos += notePitch;
+        channels[channel].waveforms[op].sampleReadPos += notePitch;
 
         /////////////////////////////////////// Read interpolation volume.
         if (channels[channel].waveforms[op].interpTimer > 0.0f)
@@ -282,10 +330,7 @@ void readModulator(float* pOutputF32, ma_uint64 frameCount, int channel, int op,
 
                         float delayIndex = channels[channel].waveforms[op].sampleReadPos + mods[modNum][i * 2 + stereoOffset] * 100.0f * loadedInstruments[channels[channel].instrument].modScale[modNum] * 2.0f;
 
-                        while (delayIndex >= loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopEnd)
-                            delayIndex -= loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopEnd - loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopStart;
-                        while (delayIndex < loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopStart)
-                            delayIndex += loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopEnd - loadedInstruments[channels[channel].instrument].waveforms[mappedWave].loopStart;
+                        delayIndex = wrapReadPos(delayIndex, channel, mappedWave);
 
                         ma_uint32 dIndex1 = delayIndex;
                         ma_uint32 dIndex2 = delayIndex + 1;
@@ -1222,7 +1267,7 @@ void StartNote(int channel, int sampleNumber, float pitch, int startFrame)
     // Set interpolation values for the previous sample.
     for (int wave = 0; wave < 4; wave++)
     {
-        channels[channel].waveforms[wave].interpLastReadPos = channels[channel].waveforms[wave].sampleReadPos;
+        
 
         if (loadedInstruments[channels[channel].instrument].interpolation)
             channels[channel].waveforms[wave].interpTimer = 1.0f;
@@ -1249,6 +1294,11 @@ void StartNote(int channel, int sampleNumber, float pitch, int startFrame)
 
     for (int wave = 0; wave < 4; wave++)
     {
+        // Make sure that the old read position is inside the sample.
+        //channels[channel].waveforms[wave].interpLastReadPos = wrapReadPos(channels[channel].waveforms[wave].interpLastReadPos, channel, wave);
+
+
+
         if (loadedInstruments[channels[channel].instrument].interpolation)
             channels[channel].waveforms[wave].interpTimer = 1.0f;
 
@@ -1267,8 +1317,15 @@ void StartNote(int channel, int sampleNumber, float pitch, int startFrame)
         }
 
 
-        channels[channel].waveforms[wave].reverseRead = false;
+        // Set old read position.
+        if (!loadedInstruments[sampleNumber].waveforms[mappedWave].continueNote || instrumentChanged)
+        {
+            channels[channel].waveforms[wave].interpLastReadPos = channels[channel].waveforms[wave].sampleReadPos;
+        }
+        else
+            channels[channel].waveforms[wave].interpLastReadPos = 0.0f;
 
+        
 
         
 
@@ -1276,16 +1333,16 @@ void StartNote(int channel, int sampleNumber, float pitch, int startFrame)
         // Set frame reading position.
         if (!loadedInstruments[sampleNumber].waveforms[mappedWave].continueNote || instrumentChanged)
         {
-            if (channels[channel].waveforms[wave].reverseRead)
-                channels[channel].waveforms[wave].sampleReadPos = loadedInstruments[sampleNumber].waveforms[mappedWave].pcmFrames.size() - 1;
-            else
-                channels[channel].waveforms[wave].sampleReadPos = 0;
+            //if (channels[channel].waveforms[wave].reverseRead)
+            //    channels[channel].waveforms[wave].sampleReadPos = loadedInstruments[sampleNumber].waveforms[mappedWave].pcmFrames.size() - 1;
+            //else
+            channels[channel].waveforms[wave].sampleReadPos = 0;
 
 
-            if (channels[channel].waveforms[wave].reverseRead)
-                channels[channel].waveforms[wave].sampleReadPos -= startFrame;
-            else
-                channels[channel].waveforms[wave].sampleReadPos += startFrame;
+            //if (channels[channel].waveforms[wave].reverseRead)
+            //    channels[channel].waveforms[wave].sampleReadPos -= startFrame;
+            //else
+            channels[channel].waveforms[wave].sampleReadPos += startFrame;
 
 
             // Make sure that the sample reading position is inside the sample.
@@ -1317,7 +1374,6 @@ void StartNote(int channel, int sampleNumber, float pitch, int startFrame)
         cutoffFreq = 1.0f;
     float RC = 1.0f / (2.0f * 3.14159265f * cutoffFreq);
     channels[channel].alphaHigh = RC / (RC + (1.0f / 48000.0f));
-
 
 
     return;
@@ -1704,7 +1760,13 @@ int updateChannelOnBeat(int ch)
                     if (p1 > 3)
                         p1 = 3;
                     int p2 = effectValue % 16;
-                    channels[ch].waveforms[p1].volume = float(p2) / 15.0f;
+
+                    for (int i = 0; i < 4; i++) // Apply the effect to all operators mapped to this wave.
+                    {
+                        int mappedWave = loadedInstruments[channels[ch].instrument].operatorMapping[i];
+                        if (mappedWave == p1)
+                            channels[ch].waveforms[i].volume = float(p2) / 15.0f;
+                    }
                 }
                 else if (effect == 114) // Decrease operator volume.
                 {
@@ -1712,7 +1774,13 @@ int updateChannelOnBeat(int ch)
                     if (p1 > 3)
                         p1 = 3;
                     int p2 = effectValue % 16;
-                    channels[ch].waveforms[p1].volumeSlide = float(p2) / -1700.0f;
+
+                    for (int i = 0; i < 4; i++) // Apply the effect to all operators mapped to this wave.
+                    {
+                        int mappedWave = loadedInstruments[channels[ch].instrument].operatorMapping[i];
+                        if (mappedWave == p1)
+                            channels[ch].waveforms[i].volumeSlide = float(p2) / -1700.0f;
+                    }
                 }
                 else if (effect == 214) // Increase operator volume.
                 {
@@ -1720,7 +1788,13 @@ int updateChannelOnBeat(int ch)
                     if (p1 > 3)
                         p1 = 3;
                     int p2 = effectValue % 16;
-                    channels[ch].waveforms[p1].volumeSlide = float(p2) / 1700.0f;
+
+                    for (int i = 0; i < 4; i++) // Apply the effect to all operators mapped to this wave.
+                    {
+                        int mappedWave = loadedInstruments[channels[ch].instrument].operatorMapping[i];
+                        if (mappedWave == p1)
+                            channels[ch].waveforms[i].volumeSlide = float(p2) / 1700.0f;
+                    }
                 }
                 else if (effect == 3) // Delay note.
                 {
@@ -1923,7 +1997,7 @@ void RecordSong()
     StartOrStopSong();
 
 
-    std::string fileName = "C:/" + fileNavigator.currentFilePath.std::filesystem::path::string() + "/" + loadedSong.songName + ".wav";
+    std::string fileName = fileNavigator.currentFilePath.std::filesystem::path::string() + "/" + loadedSong.songName + ".wav";
     const char* name = &fileName[0];
     ma_encoder_init_file(name, &encoderConfig, &encoder);
 
@@ -2027,6 +2101,9 @@ void StartOrStopSong()
             loadedSong.toNextChannelNote[ch] = 0;
             loadedSong.toNextChannelVolume[ch] = 0;
             loadedSong.toNextChannelEffect[ch] = 0;
+
+
+            
 
 
             for (int wave = 0; wave < 4; wave++)
@@ -2405,7 +2482,7 @@ void DrawSampleDisplay()
 
 void GenerateAdditiveWave(Instrument* instrument, int op)
 {
-
+    //std::cout << "< ";
     if (!instrument->enabled) // Create a new sample.
     {
         instrument->enabled = true;
@@ -2417,8 +2494,8 @@ void GenerateAdditiveWave(Instrument* instrument, int op)
         int sampleLen = 480 * instrument->waveforms[op].numOfSineWaves * instrument->waveforms[op].numOfSineWaves;
 
         instrument->waveforms[op].pcmFrames.clear();
-        for (int x = 0; x < sampleLen; x++)
-            instrument->waveforms[op].pcmFrames.emplace_back(0.0f);
+        instrument->waveforms[op].pcmFrames.resize(sampleLen);
+        std::fill(instrument->waveforms[op].pcmFrames.begin(), instrument->waveforms[op].pcmFrames.begin() + sampleLen, 0.0f);
 
 
         for (int wave = 0; wave < 11; wave++)
@@ -3002,6 +3079,7 @@ void ConstructWave(Instrument* instrument, int op, int waveType, float frequenci
            }
     }
 
+    
 
 
     if (waveType == 0 || waveType == 2 || waveType == 4 || waveType == 7) // Sine/triangle/Wave C imperfections.
@@ -3015,6 +3093,7 @@ void ConstructWave(Instrument* instrument, int op, int waveType, float frequenci
             inputWave[x] *= crackleVol;
         }
     }
+
 
 
     return;

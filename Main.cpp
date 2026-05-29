@@ -2068,6 +2068,12 @@ void pressButton(GLFWwindow* window)
                     }
                     else // Delete sample.
                     {
+                        // Stop all channels playing the sample to delete.
+                        for (int ch = 0; ch < channels.size(); ch++)
+                        {
+                            if (channels[ch].instrument == editor.selectedInstrument)
+                                channels[ch].playing = false;
+                        }
                         Instrument emptyinstrument;
                         loadedInstruments[editor.selectedInstrument] = emptyinstrument;
                         loadedInstruments[editor.selectedInstrument].enabled = false;

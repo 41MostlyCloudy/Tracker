@@ -70,7 +70,7 @@ struct InstrumentWave
 
 	
 
-	std::vector <float> pcmFrames = { 0, 0, 0, 0 };
+	std::vector <float> pcmFrames = { };
 
 	// The duty cycle.
 	float dutyCycle = 1.0f;
@@ -459,7 +459,7 @@ struct ChannelWaveform
 	float glideDest = 0.0f;
 	float glideVolume = 0.0f;
 
-	bool reverseRead = false;
+	
 
 	// Interpolation between notes to prevent clipping.
 	float interpTimer = 0.0f; // Decrements from 0 to 1, then stops.
@@ -506,11 +506,10 @@ struct ChannelWaveform
 			if (sampleReadPos >= loopEnd)
 				sampleReadPos = loopEnd - 1;
 			else if (sampleReadPos < loopStart)
-				sampleReadPos = loopEnd - 1;
+				sampleReadPos = loopStart;
 		}
 		else if (loopType < 2) // Forward loop.
 		{
-			reverseRead = false;
 			while (sampleReadPos < loopStart)
 				sampleReadPos += (loopEnd - loopStart);
 			while (sampleReadPos >= loopEnd)
@@ -526,7 +525,8 @@ struct ChannelWaveform
 					sampleReadPos -= loopStart;
 					sampleReadPos *= -1.0f;
 					sampleReadPos += loopStart;
-					reverseRead = !reverseRead;
+					pitch *= -1.0f;
+					glideDest *= -1.0f;
 				}
 				else if (sampleReadPos >= loopEnd)
 				{
@@ -534,7 +534,8 @@ struct ChannelWaveform
 					sampleReadPos *= -1.0f;
 					sampleReadPos += loopEnd;
 					sampleReadPos--;
-					reverseRead = !reverseRead;
+					pitch *= -1.0f;
+					glideDest *= -1.0f;
 				}
 				else
 					wrapped = true;
@@ -930,10 +931,41 @@ struct FileNavigator
 	ScrollBar fileScrollBar;
 
 
+
+	std::string getRelativePath()
+	{
+
+		std::string currentPath = std::filesystem::current_path().string();
+
+		for (int i = 0; i < currentPath.length(); i++)
+		{
+			if (currentPath.at(i) == '\\')
+				currentPath.at(i) = '/';
+		}
+
+		return currentPath;
+	}
+
+
+	std::string getFilePath()
+	{
+
+		std::string currentPath = currentFilePath.string();
+
+		for (int i = 0; i < currentPath.length(); i++)
+		{
+			if (currentPath.at(i) == '\\')
+				currentPath.at(i) = '/';
+		}
+
+		return currentPath;
+	}
+
+
 	
 	void NavigateToFile()
 	{
-		std::string pathName = "C:/" + currentFilePath.std::filesystem::path::string();
+		std::string pathName = currentFilePath.std::filesystem::path::string();
 
 		filePathName = " " + currentFilePath.std::filesystem::path::filename().generic_string();
 
@@ -980,7 +1012,7 @@ struct FileNavigator
 
 	void NavigateToSamplesFile()
 	{
-		currentFilePath = std::filesystem::relative("Samples", "C:/");
+		currentFilePath = std::filesystem::current_path();
 
 		NavigateToFile();
 
@@ -1007,7 +1039,7 @@ struct PresetMenu
 
 	void NavigateToFile()
 	{
-		std::string pathName = "C:/" + currentFilePath.std::filesystem::path::string();
+		std::string pathName = currentFilePath.std::filesystem::path::string();
 
 		fileNames.clear();
 		for (auto const& dir_entry : std::filesystem::directory_iterator(pathName))
@@ -1026,7 +1058,12 @@ struct PresetMenu
 
 	void NavigateToInstrumentType(std::string category)
 	{
-		currentFilePath = std::filesystem::relative("Presets", "C:/");
+		currentFilePath = std::filesystem::current_path();
+		currentFilePath = currentFilePath.std::filesystem::path::append("Presets");
+
+		
+
+		//currentFilePath = std::filesystem::relative("Presets", "C:/");
 		currentFilePath = currentFilePath.std::filesystem::path::append(category);
 		NavigateToFile();
 		return;

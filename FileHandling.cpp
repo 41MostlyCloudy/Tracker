@@ -53,7 +53,6 @@ void LoadCrackleSample();
 
 
 
-
 void SaveSong() // Save the currently loaded song.
 {
     if (!loadedSong.unusedFrames)
@@ -90,9 +89,11 @@ void SaveSong() // Save the currently loaded song.
     else
         loadedSong.unusedFrames = false;
 
-    std::string songFilePath = "C:/" + fileNavigator.currentFilePath.std::filesystem::path::string() + "/";
+   // std::string songFilePath = fileNavigator.currentFilePath.std::filesystem::path::string() + "/";
 
+    std::string songFilePath = fileNavigator.getFilePath() + "/";
     
+
 
     // See if any songs have the same name.
     if (!loadedSong.overWriteOldSong)
@@ -264,7 +265,7 @@ void LoadSong(std::string name) // Load the song file with the given name.
     loadedSong.currentPattern = 0;
     loadedSong.currentNote = 0;
 
-    std::ifstream songFile("C:/" + fileNavigator.currentFilePath.std::filesystem::path::string() + "/" + name, std::ios::binary | std::ios::in);
+    std::ifstream songFile(fileNavigator.currentFilePath.std::filesystem::path::string() + "/" + name, std::ios::binary | std::ios::in);
 
     name.erase(name.length() - 5, 6);
 
@@ -501,14 +502,21 @@ void LoadSong(std::string name) // Load the song file with the given name.
 
 void LoadGUIThemes()
 {
+
+    std::string currentPath;
+
     int sizeX, sizeY, comps;
     unsigned char* data;
 
     if (gui.lightMode)
-        data = stbi_load("LightColorThemes.png", &sizeX, &sizeY, &comps, 3);
+        currentPath = fileNavigator.getRelativePath() + "/GUI/LightColorThemes.png";
     else
-        data = stbi_load("ThemeColors.png", &sizeX, &sizeY, &comps, 3);
+        currentPath = fileNavigator.getRelativePath() + "/GUI/ThemeColors.png";
+
+
     
+    data = stbi_load(&currentPath[0], &sizeX, &sizeY, &comps, 3);
+
 
     if (data)
     {
@@ -525,6 +533,10 @@ void LoadGUIThemes()
             
             gui.themes.emplace_back(newTheme);
         }
+    }
+    else
+    {
+        std::cout << "Color themes not found. ";
     }
 
     stbi_image_free(data);
@@ -835,6 +847,8 @@ Instrument ReadInstrument(std::ifstream* instrumentFile)
                 newInstrument.waveforms[j].pcmFrames.emplace_back(scaledFrame);
             }
 
+            
+
             uint8_t waveform;
             instrumentFile->read((char*)&waveform, 1);
             var1 = int(waveform / 16.0f);
@@ -931,13 +945,23 @@ Instrument ReadInstrument(std::ifstream* instrumentFile)
     }
 
 
+    for (int i = 0; i < 4; i++) // Fill empty waves.
+    {
+        if (newInstrument.waveforms[i].pcmFrames.size() < 128)
+        {
+            newInstrument.waveforms[i].pcmFrames.resize(183);
+            std::fill(newInstrument.waveforms[i].pcmFrames.begin(), newInstrument.waveforms[i].pcmFrames.begin() + 183, 0.0f);
+        }
+    }
+
+
     return newInstrument;
 }
 
 
 void SaveCurrentInstrument()
 {
-    std::string instrumentFilePath = "C:/" + fileNavigator.currentFilePath.std::filesystem::path::string() + "/";
+    std::string instrumentFilePath = fileNavigator.currentFilePath.std::filesystem::path::string() + "/";
 
     std::ofstream instrumentFile(instrumentFilePath + loadedInstruments[editor.selectedInstrument].name + ".inst", std::ios::binary | std::ios::out);
 
@@ -957,7 +981,7 @@ void LoadCurrentInstrument(std::string name)
 {
     Instrument newInstrument;
 
-    std::ifstream instrumentFile("C:/" + fileNavigator.currentFilePath.std::filesystem::path::string() + "/" + name, std::ios::binary | std::ios::in);
+    std::ifstream instrumentFile(fileNavigator.currentFilePath.std::filesystem::path::string() + "/" + name, std::ios::binary | std::ios::in);
 
     name.erase(name.length() - 5, 6);
 
@@ -1065,7 +1089,7 @@ void SaveCurrentSample()
     sampleEncoderConfig = ma_encoder_config_init(ma_encoding_format_wav, ma_format_f32, 1, 48000);
 
 
-    std::string fileName = "C:/" + fileNavigator.currentFilePath.std::filesystem::path::string() + "/" + loadedInstruments[editor.selectedInstrument].name + ".wav";
+    std::string fileName = fileNavigator.currentFilePath.std::filesystem::path::string() + "/" + loadedInstruments[editor.selectedInstrument].name + ".wav";
     const char* name = &fileName[0];
     ma_encoder_init_file(name, &sampleEncoderConfig, &sampleEncoder);
 
